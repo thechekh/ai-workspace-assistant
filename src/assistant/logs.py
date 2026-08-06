@@ -27,9 +27,15 @@ def configure_logging(settings: Settings) -> None:
         else structlog.dev.ConsoleRenderer()
     )
 
-    # stdlib logging (uvicorn deps, our logging.getLogger modules) -> same renderer
+    # stdlib logging (uvicorn deps, our logging.getLogger modules) -> same renderer.
+    # JSON mode needs format_exc_info to turn exc_info into an "exception" string
+    # (ConsoleRenderer pretty-prints tracebacks itself and must NOT get it).
+    formatter_processors: list = [structlog.stdlib.ProcessorFormatter.remove_processors_meta]
+    if settings.log_json:
+        formatter_processors.append(structlog.processors.format_exc_info)
+    formatter_processors.append(renderer)
     formatter = structlog.stdlib.ProcessorFormatter(
-        processors=[structlog.stdlib.ProcessorFormatter.remove_processors_meta, renderer],
+        processors=formatter_processors,
         foreign_pre_chain=shared_processors,
     )
     handler = logging.StreamHandler()

@@ -2,7 +2,7 @@ import { useWebSocket } from "@vueuse/core";
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 
-import type { ServerEvent, TurnEvent, UserMessage } from "../types";
+import type { AuditEvent, AuditTurn, ServerEvent, TurnEvent, UserMessage } from "../types";
 
 export type BackendName = "custom" | "pydantic_ai" | "langgraph";
 
@@ -206,6 +206,20 @@ export const useChatStore = defineStore("chat", () => {
     return true;
   }
 
+  /** Audit timeline for one turn of the current session ("explain this turn"). */
+  async function fetchTurnEvents(turnId: string): Promise<AuditEvent[] | null> {
+    if (!sessionId.value) return null;
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      const response = await fetch(`/api/sessions/${sessionId.value}/turns`, { headers });
+      if (!response.ok) return null;
+      const payload = (await response.json()) as { turns: AuditTurn[] };
+      return payload.turns.find((turn) => turn.turn_id === turnId)?.events ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   function newSession(): void {
     sessionStorage.removeItem("session_id");
     sessionId.value = null;
@@ -226,5 +240,6 @@ export const useChatStore = defineStore("chat", () => {
     sendMessage,
     newSession,
     reindex,
+    fetchTurnEvents,
   };
 });

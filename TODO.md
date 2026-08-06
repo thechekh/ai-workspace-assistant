@@ -27,6 +27,11 @@ cloud tracing wired but unverified (no tokens yet).
 
 ## Recently done
 
+- [x] Real-provider hardening + cost + explain-turn panel, verified live
+      against Groq + Docker Qdrant/Redis + Jaeger: 429 backoff, Groq
+      `tool_use_failed` retry & leaked-tool-call salvage, friendly WS errors,
+      $-per-turn, UI timeline panel, docs/tools.md + docs/testing.md
+      *(2026-08-07)*
 - [x] Phase 9 Tiers 1–3: structured logs + correlation IDs, spans → Jaeger,
       /metrics + Grafana, deep health, audit trail, per-turn UI stats
       *(2026-08-06)*
@@ -74,31 +79,45 @@ what the agent did, why, how long it took, and what it cost. Offline-first
 - [x] **Prompt/response debug toggle**: `ASSISTANT_LOG_PROMPTS=true` dumps
       full prompts + completions (dev-only; privacy note in config).
 
-### Tier 3 — Metrics & dashboards ✅ (cost accounting open)
+### Tier 3 — Metrics & dashboards ✅
 
 - [x] **/metrics (Prometheus)**: turns/errors/tool-calls/tokens counters +
       turn/LLM-step/tool/retrieval latency histograms, labeled by
       backend/provider/tool/status/mode.
 - [x] **Grafana** provisioned dashboard (turn rate + p50/p95 by backend, LLM
       p95 by provider, tokens/min, tool calls + p95, retrieval p95, errors).
-- [ ] **Cost accounting**: tokens → $ per session/day from captured usage.
+- [x] **Cost accounting**: price table → `cost_usd` per turn (stats line,
+      audit record, `assistant_cost_usd_total{model}` counter; per-day via
+      Prometheus `increase()`). Indicative $ at listed prices; free tier
+      bills $0.
 
 ### Tier 4 — Product-level visibility (remaining)
 
 - [x] **Per-turn stats in the UI**: `turn` WS frame → stats line under each
-      answer (duration, first token, steps, tokens real/est, tools).
-- [ ] **"Explain this turn" panel in the UI**: render the audit trail
-      (`/api/sessions/{id}/turns` is live) as a timeline next to the answer.
+      answer (duration, first token, steps, tokens real/est, cost, tools).
+- [x] **"Explain this turn" panel in the UI**: `details` under each answer
+      expands the audit timeline (tool_call/tool_result/final with +ms).
 - [ ] **Eval trend history**: append eval runs to `evals/history.jsonl`
       with timestamp + config; print deltas — regressions become visible.
 - [ ] **Cloud backends when tokens exist**: Logfire + Langfuse share the
       pipeline (`observability.py`) — add tokens, verify dashboards, done.
 
+### Provider hardening (added 2026-08-07, verified live vs Groq) ✅
+
+- [x] **429 backoff-retry** honoring Retry-After; friendly rate-limit error
+      frame; `assistant_errors_total{kind}` for every failure class.
+- [x] **Groq `tool_use_failed` recovery**: retry the step (2×), then salvage
+      the call from `failed_generation`; leaked `<function…>` text output is
+      parsed into real tool calls instead of reaching the chat.
+- [x] **Clear WS errors** for auth (401/403), missing model (404), provider
+      5xx, unreachable provider — mapped from any backend's exception chain.
+
 ---
 
 ## Backlog — features
 
-- [ ] **Your side (.env, minutes each)**: Groq key → real model in the demo;
+- [ ] **Your side (.env, minutes each)**: ~~Groq key → real model in the
+      demo~~ *(done 2026-08-07 — key in `.env`, verified end-to-end)*;
       OpenAI key → real rows in the embedding comparison table
       (`python -m evals.compare_embeddings`); GitHub PAT + one config line →
       real GitHub MCP instead of the mock.

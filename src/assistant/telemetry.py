@@ -33,6 +33,23 @@ TOOL_CALLS_TOTAL = Counter("assistant_tool_calls_total", "Tool calls", ["tool", 
 RETRIEVAL_SECONDS = Histogram("assistant_retrieval_seconds", "RAG retrieval duration", ["mode"])
 TOKENS_TOTAL = Counter("assistant_tokens_total", "LLM tokens (real or estimated)", ["direction"])
 ERRORS_TOTAL = Counter("assistant_errors_total", "Errors surfaced to clients", ["kind"])
+COST_USD_TOTAL = Counter("assistant_cost_usd_total", "Indicative LLM spend in USD", ["model"])
+
+# Indicative $ per 1M tokens (prompt, completion) at the providers' listed
+# pay-as-you-go prices. Free tiers actually bill $0 — the number shows what
+# the traffic *would* cost. Unknown models (and the fake provider) price at 0.
+MODEL_PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
+    "llama-3.3-70b-versatile": (0.59, 0.79),  # Groq
+    "llama-3.1-8b-instant": (0.05, 0.08),  # Groq
+    "gpt-4o-mini": (0.15, 0.60),
+    "gpt-4o": (2.50, 10.00),
+    "gpt-4.1-mini": (0.40, 1.60),
+}
+
+
+def estimate_cost_usd(model: str, prompt_tokens: int, completion_tokens: int) -> float:
+    prompt_price, completion_price = MODEL_PRICES_PER_MTOK.get(model, (0.0, 0.0))
+    return (prompt_tokens * prompt_price + completion_tokens * completion_price) / 1_000_000
 
 
 @dataclass

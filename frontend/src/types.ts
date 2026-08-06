@@ -44,6 +44,27 @@ export interface TurnEvent {
   prompt_tokens: number;
   completion_tokens: number;
   usage_estimated: boolean;
+  /** Indicative spend at listed pay-per-token prices; 0 for fake/unknown models. */
+  cost_usd: number;
+}
+
+/** One row of a turn's audit timeline (GET /api/sessions/{id}/turns). */
+export interface AuditEvent {
+  ms: number;
+  type: string; // tool_call | tool_result | final | error
+  tool?: string;
+  arguments?: string;
+  result_chars?: number;
+  chars?: number;
+  message?: string;
+}
+
+export interface AuditTurn {
+  turn_id: string;
+  backend: string;
+  duration_ms: number;
+  tool_calls: string[];
+  events: AuditEvent[];
 }
 
 export type ServerEvent =

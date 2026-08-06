@@ -255,6 +255,63 @@ button.ghost {
   white-space: normal;
 }
 
+.turn-stats .link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  margin-left: 0.5rem;
+  font: inherit;
+}
+
+/* "explain this turn" timeline (audit trail from /api/sessions/{id}/turns) */
+.turn-timeline {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: var(--text);
+  white-space: normal;
+}
+
+.timeline-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.timeline-row.muted {
+  color: var(--muted);
+}
+
+.t-ms {
+  flex: 0 0 4.5rem;
+  text-align: right;
+  color: var(--muted);
+}
+
+.t-type {
+  flex: 0 0 5.5rem;
+}
+
+.t-type.tool_call {
+  color: var(--accent);
+}
+
+.t-type.tool_result {
+  color: var(--ok);
+}
+
+.t-type.error {
+  color: var(--error);
+}
+
+.t-desc {
+  overflow-wrap: anywhere;
+}
+
 @keyframes blink {
   50% {
     opacity: 0;

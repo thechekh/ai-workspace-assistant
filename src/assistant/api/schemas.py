@@ -43,6 +43,8 @@ class TurnSummary(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     usage_estimated: bool = True
+    # Indicative spend at listed pay-per-token prices (0.0 for fake/unknown models)
+    cost_usd: float = 0.0
 
 
 ServerEvent = Annotated[
