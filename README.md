@@ -2,7 +2,7 @@
 
 Internal AI assistant for engineers: agentic FastAPI backend, MCP tools, Qdrant RAG, real-time WebSocket chat.
 
-Docs: [project description](project-description-en.md) · [tech stack & decisions](tech-stack.md) · [implementation plan](implementation-plan.md) · [backend comparison](docs/backend-comparison.md) · [workshop materials](docs/workshop.md) · **[theory — every concept from zero](theory/README.md)**
+Docs: [project description](project-description-en.md) · [tech stack & decisions](tech-stack.md) · [implementation plan](implementation-plan.md) · [roadmap / TODO](TODO.md) · [backend comparison](docs/backend-comparison.md) · [workshop materials](docs/workshop.md) · **[theory — every concept from zero](theory/README.md)**
 
 ## Quickstart
 
