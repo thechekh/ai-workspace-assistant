@@ -389,6 +389,15 @@ class FakeLLM:
                 )
                 return
 
+            url_match = re.search(r"https?://\S+", last.content)
+            if "fetch_url" in tool_names and url_match:
+                yield ToolCallRequest(
+                    id="call_fake_fetch",
+                    name="fetch_url",
+                    arguments=json.dumps({"url": url_match.group(0).rstrip(".,;)?'\"")}),
+                )
+                return
+
             if "search_docs" in tool_names and last.content.rstrip().endswith("?"):
                 yield ToolCallRequest(
                     id="call_fake_docs",

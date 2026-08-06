@@ -12,7 +12,7 @@ from redis.asyncio import Redis
 
 from assistant.agent.base import AgentBackend
 from assistant.agent.registry import build_agents
-from assistant.agent.tools import Tool, ToolRegistry, make_search_docs
+from assistant.agent.tools import Tool, ToolRegistry, make_fetch_url, make_search_docs
 from assistant.api.routes import router as api_router
 from assistant.api.ws import router as ws_router
 from assistant.config import Settings
@@ -82,6 +82,7 @@ def create_app(
             mcp_tools = await mcp_registry.start()
 
         native_tools = [make_search_docs(resolved_retriever)] if resolved_retriever else []
+        native_tools.append(make_fetch_url())
         all_tools = native_tools + mcp_tools
         tools = ToolRegistry(all_tools) if all_tools else None
 

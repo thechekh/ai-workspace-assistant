@@ -58,10 +58,15 @@ def _describe_llm_error(exc: Exception) -> tuple[str, str] | None:
         if isinstance(status, int):
             detail = str(getattr(current, "message", None) or current)[:200]
             if status == 429:
+                # Pass the provider's own text through — it says WHICH limit
+                # (per-minute vs per-day) and how long to wait; our guess would
+                # mislead (a daily cap won't clear "in a few seconds").
                 return (
                     "rate_limited",
-                    "LLM rate limit hit (429) — free tiers allow ~30 requests/min; "
-                    "wait a few seconds and send again.",
+                    f"LLM rate limit hit (429). Provider says: {detail}"
+                    if detail
+                    else "LLM rate limit hit (429) — wait and retry, or switch "
+                    "ASSISTANT_LLM_MODEL to a model with remaining quota.",
                 )
             if status in (401, 403):
                 return (

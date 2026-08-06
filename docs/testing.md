@@ -31,6 +31,14 @@ uv run uvicorn assistant.main:app --port 8000
       - `Which service generates PDF invoices?` → `search_docs` card; with no
         Qdrant the result is an `error: tool 'search_docs' failed…` string —
         **the turn must still answer** (graceful degradation)
+- [ ] **fetch_url** *(needs internet)*: paste
+      `what is https://github.com/thechekh/awsomequiz-streamlit about?` →
+      tool card `fetch_url`, answer grounded in the repo's real README;
+      `https://github.com/thechekh` alone → your public repo list.
+- [ ] **Off-topic honesty**: ask about something outside the docs (e.g.
+      `what certificates does the quiz project offer?` without a URL) —
+      `search_docs` returns "No relevant documents…" and the answer says the
+      docs don't cover it. No invented facts, no repeated searches.
 - [ ] **Health dot**: amber (degraded) — hover it: `redis: ok`,
       `qdrant: error`, `mcp: ok`. (`curl localhost:8000/api/health` shows the
       same as JSON.)
@@ -95,12 +103,15 @@ uv run uvicorn assistant.main:app --port 8000
       `retrying step (…/2)` / `recovered N tool call(s) from …`; the chat
       never shows raw `<function…>` markup. Only after repeated failure does
       a friendly "model failed to generate a valid tool call" error appear.
-- [ ] **Rate-limit UX**: hammer 5–6 messages quickly (free tier ≈30 req/min).
-      Expected: short waits (client retries with backoff, watch for
-      `LLM rate limited (429) — retry…` in server logs); if the budget is
-      exhausted the chat shows *"LLM rate limit hit (429) — … wait a few
-      seconds"*, never a generic server error. `/metrics`:
-      `assistant_errors_total{kind="rate_limited"}`.
+- [ ] **Rate-limit UX**: hammer 5–6 messages quickly. Groq free tier limits
+      `llama-3.3-70b-versatile` per minute (≈30 req, ≈6k tokens) **and per
+      day (100k tokens — a long testing session can exhaust it)**. Expected:
+      short waits (client retries with backoff, `LLM rate limited (429) —
+      retry…` in server logs); on exhaustion the chat shows Groq's own
+      message (which limit + how long to wait), never a generic server
+      error. `/metrics`: `assistant_errors_total{kind="rate_limited"}`.
+      Daily budget gone? Set `ASSISTANT_LLM_MODEL=llama-3.1-8b-instant`
+      (separate, larger daily budget) and keep testing.
 - [ ] **Model-typo UX**: set `ASSISTANT_LLM_MODEL=does-not-exist`, restart,
       send a message → *"Model not available — check ASSISTANT_LLM_MODEL.
       Provider says: …"*; restore the real model after.

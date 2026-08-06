@@ -28,7 +28,15 @@ lives:
    loop keeps running. A tool can never kill a turn.
 
 `status` is `ok`, `error` (handler returned an `error:`-prefixed string),
-`crash` (handler raised), or `unknown` (model hallucinated a tool name).
+`crash` (handler raised), `duplicate` (see below), or `unknown` (model
+hallucinated a tool name).
+
+**Duplicate-call guard.** Models (llama especially) sometimes repeat the
+exact same tool call within one turn — re-fetching the same URL three times
+burns seconds, tokens, and the free-tier rate limit for zero new information.
+`Tool.run` keeps a per-turn set of `(tool, arguments)` and answers repeats
+with a short "you already ran this — use the earlier result" message instead
+of re-executing. Fresh turn, fresh set; different arguments always execute.
 
 **How each backend consumes the registry.**
 
@@ -75,8 +83,30 @@ span `rag.retrieve` (mode, candidates, results, top score) nested inside the
 tool's `tool.execute` span, plus a `rag.retrieved` log line and the
 `assistant_retrieval_seconds{mode}` histogram.
 
+**Relevance gate.** Vector search always returns *something*, and RRF/hash
+scores are not calibrated — so the tool drops chunks that share no meaningful
+token with the query (`query_overlap` in [rerank.py](../src/assistant/rag/rerank.py),
+prefix-tolerant: "deploy" matches "deployment"). If nothing survives, the
+model gets an explicit "no relevant documents — don't retry, tell the user"
+message instead of confident-looking noise about unrelated topics.
+
 The system prompt tells the model to call this tool first for any question
 about internal systems and to cite the source files it gets back.
+
+### `fetch_url` — public web pages & GitHub (native)
+
+| | |
+|---|---|
+| Purpose | Ground answers about external URLs/projects in real page content instead of guessing |
+| Parameters | `url` *(string, required)* — absolute http(s) URL |
+| Returns | Readable text of the page (HTML stripped), capped at 8 000 chars. **GitHub special cases** via the API: `github.com/{owner}/{repo}` → description, language, stars, topics + README (first 6 000 chars); `github.com/{owner}` → account info + list of public repositories |
+| Errors | `error: only http(s) URLs are supported`, `error: refusing to fetch private or loopback addresses`, `error: GET <url> returned HTTP <status>`, `error: could not fetch <url>: <why>` |
+| Implementation | [`make_fetch_url`](../src/assistant/agent/tools.py) — httpx, 15 s timeout, redirects followed |
+
+Notes: the loopback/private-range block is a **dev-grade** SSRF guard (string
+match on the host; production would resolve DNS and enforce an egress
+allowlist). GitHub API calls are unauthenticated (60 req/h per IP) — enough
+for chat use; on rate-limit the tool falls back to fetching the HTML page.
 
 ### `code__search_code` — regex search over a repository (MCP: `code` server)
 
@@ -148,6 +178,7 @@ heuristics — useful when testing tools without a key:
 |---|---|
 | anything mentioning *PR*, *PRs* or *pull request* | `github__list_pull_requests` |
 | `search code for <pattern>` | `code__search_code` with that pattern |
+| any message containing an `http(s)://` URL | `fetch_url` with that URL |
 | any message ending in `?` | `search_docs` with the full question |
 | anything after a tool result | final answer quoting the result |
 

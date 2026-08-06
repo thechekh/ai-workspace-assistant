@@ -37,7 +37,9 @@ def _iter_files() -> Iterator[Path]:
 
 @mcp.tool()
 def search_code(pattern: str, max_results: int = 20) -> str:
-    """Search the repository for lines matching a regex pattern (case-insensitive).
+    """Search THIS project's own source repository (the AI Workspace Assistant
+    codebase) for lines matching a regex pattern (case-insensitive). It cannot
+    see other projects or external repositories.
 
     Returns `path:line: content` matches, one per line.
     """
@@ -63,7 +65,8 @@ def search_code(pattern: str, max_results: int = 20) -> str:
 
 @mcp.tool()
 def read_file(path: str, start_line: int = 1, max_lines: int = 100) -> str:
-    """Read a file from the repository (path relative to the repo root)."""
+    """Read a file from THIS project's own repository (the AI Workspace
+    Assistant codebase); path is relative to its root. Not for external repos."""
     target = (ROOT / path).resolve()
     if not target.is_relative_to(ROOT):
         return "error: path escapes the repository root"

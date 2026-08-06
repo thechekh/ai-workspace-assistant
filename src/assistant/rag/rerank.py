@@ -19,6 +19,29 @@ _STOPWORDS = frozenset(
 )
 
 
+def query_overlap(query: str, text: str) -> int:
+    """How many meaningful query tokens appear in `text` (prefix-tolerant:
+    "deploy" matches "deployment"). 0 means the chunk is unrelated to the
+    query — retrieval scores are not calibrated (RRF/hash embeddings), so
+    this is the relevance gate used by the search_docs tool."""
+    query_tokens = {token for token in _TOKEN_RE.findall(query.lower()) if token not in _STOPWORDS}
+    if not query_tokens:
+        return 1  # nothing meaningful to gate on — let the chunk through
+    text_tokens = set(_TOKEN_RE.findall(text.lower()))
+    overlap = 0
+    for token in query_tokens:
+        if token in text_tokens or (
+            len(token) >= 4
+            and any(
+                candidate.startswith(token) or token.startswith(candidate)
+                for candidate in text_tokens
+                if len(candidate) >= 4
+            )
+        ):
+            overlap += 1
+    return overlap
+
+
 class Reranker(Protocol):
     def rerank(
         self, query: str, candidates: list[RetrievedChunk], *, limit: int

@@ -13,7 +13,7 @@
 
 import time
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import structlog
 from opentelemetry import trace
@@ -54,13 +54,19 @@ def estimate_cost_usd(model: str, prompt_tokens: int, completion_tokens: int) ->
 
 @dataclass
 class TurnStats:
-    """Accumulated by InstrumentedLLM during one turn; read by the WS layer."""
+    """Accumulated by InstrumentedLLM during one turn; read by the WS layer.
+
+    `seen_tool_calls` backs Tool.run's duplicate-call guard: models (llama
+    especially) sometimes repeat the exact same tool call within a turn,
+    burning latency and rate limits for zero new information.
+    """
 
     llm_steps: int = 0
     llm_ms: float = 0.0
     prompt_tokens: int = 0
     completion_tokens: int = 0
     usage_estimated: bool = False
+    seen_tool_calls: set[tuple[str, str]] = field(default_factory=set)
 
 
 current_turn_stats: ContextVar[TurnStats | None] = ContextVar("current_turn_stats", default=None)
