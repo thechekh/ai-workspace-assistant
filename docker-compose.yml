@@ -1,0 +1,54 @@
+# Dev default:      docker compose up -d              -> redis + qdrant only
+# Full platform:    docker compose --profile app up   -> + api, worker, scheduler
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  api:
+    profiles: ["app"]
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      ASSISTANT_REDIS_URL: redis://redis:6379/0
+      ASSISTANT_QDRANT_URL: http://qdrant:6333
+    depends_on:
+      - redis
+      - qdrant
+
+  worker:
+    profiles: ["app"]
+    build: .
+    command: ["uv", "run", "--no-sync", "taskiq", "worker", "assistant.worker:broker"]
+    environment:
+      ASSISTANT_REDIS_URL: redis://redis:6379/0
+      ASSISTANT_QDRANT_URL: http://qdrant:6333
+    depends_on:
+      - redis
+      - qdrant
+
+  scheduler:
+    profiles: ["app"]
+    build: .
+    command: ["uv", "run", "--no-sync", "taskiq", "scheduler", "assistant.worker:scheduler"]
+    environment:
+      ASSISTANT_REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:
+  qdrant-data:
