@@ -1,10 +1,20 @@
 <script setup lang="ts">
+import { computed } from "vue";
+
 import BackendSelect from "./components/BackendSelect.vue";
 import ChatInput from "./components/ChatInput.vue";
 import ChatWindow from "./components/ChatWindow.vue";
 import { useChatStore } from "./stores/chat";
 
 const chat = useChatStore();
+
+const healthTitle = computed(() => {
+  if (!chat.health) return "health: unknown (backend unreachable)";
+  const lines = Object.entries(chat.health.components).map(
+    ([name, component]) => `${name}: ${component.status}`,
+  );
+  return [`health: ${chat.health.status}`, ...lines].join("\n");
+});
 </script>
 
 <template>
@@ -15,6 +25,7 @@ const chat = useChatStore();
         <span class="phase">internal engineering assistant</span>
       </div>
       <div class="controls">
+        <span class="health-dot" :class="chat.health?.status ?? 'unknown'" :title="healthTitle" />
         <span v-if="chat.info" class="badge" :title="`collection: ${chat.info.collection}`">
           {{ chat.info.llm_provider }} · {{ chat.info.retrieval_mode }}
         </span>

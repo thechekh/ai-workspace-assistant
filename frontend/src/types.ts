@@ -32,13 +32,28 @@ export interface ErrorEvent {
   message: string;
 }
 
+/** Per-turn stats, sent right after `final` (TurnSummary on the backend). */
+export interface TurnEvent {
+  type: "turn";
+  turn_id: string;
+  backend: string;
+  duration_ms: number;
+  first_token_ms: number | null;
+  llm_steps: number;
+  tool_calls: string[];
+  prompt_tokens: number;
+  completion_tokens: number;
+  usage_estimated: boolean;
+}
+
 export type ServerEvent =
   | SessionEvent
   | TokenEvent
   | ToolCallEvent
   | ToolResultEvent
   | FinalEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | TurnEvent;
 
 export interface UserMessage {
   type: "user_message";

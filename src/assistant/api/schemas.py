@@ -30,7 +30,28 @@ class SessionStarted(BaseModel):
     session_id: str
 
 
+class TurnSummary(BaseModel):
+    """Per-turn stats, sent after `final` — rendered as a meta line in the UI."""
+
+    type: Literal["turn"] = "turn"
+    turn_id: str
+    backend: str
+    duration_ms: int
+    first_token_ms: int | None = None
+    llm_steps: int
+    tool_calls: list[str] = Field(default_factory=list)
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    usage_estimated: bool = True
+
+
 ServerEvent = Annotated[
-    SessionStarted | TokenEvent | ToolCallEvent | ToolResultEvent | FinalEvent | ErrorEvent,
+    SessionStarted
+    | TokenEvent
+    | ToolCallEvent
+    | ToolResultEvent
+    | FinalEvent
+    | ErrorEvent
+    | TurnSummary,
     Field(discriminator="type"),
 ]

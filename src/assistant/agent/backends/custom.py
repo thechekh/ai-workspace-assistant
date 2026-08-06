@@ -63,8 +63,9 @@ class CustomAgent:
                 if isinstance(event, TextDelta):
                     parts.append(event.text)
                     yield TokenEvent(content=event.text)
-                else:
+                elif isinstance(event, ToolCallRequest):
                     requests.append(event)
+                # other event kinds (e.g. usage) are telemetry-only — ignore
             text = "".join(parts)
 
             if not requests:

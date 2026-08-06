@@ -100,7 +100,19 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     session_ttl_seconds: int = 60 * 60 * 24
 
-    # Observability — fully inert until tokens are configured
+    # Logging (always on) — structured logs, pretty console by default,
+    # JSON lines when log_json=true. log_prompts dumps full prompts and
+    # completions (dev-only debugging; conversations end up in logs).
+    log_level: str = "INFO"
+    log_json: bool = False
+    log_prompts: bool = False
+
+    # Tracing — spans are emitted when ANY destination is configured:
+    # otlp_endpoint (local Jaeger via `docker compose --profile observability up`),
+    # Logfire token, or Langfuse keys. Otherwise fully inert.
+    otlp_endpoint: str | None = None  # e.g. http://localhost:4318
+
+    # Observability cloud backends — inert until tokens are configured
     logfire_token: SecretStr | None = None
     langfuse_public_key: str | None = None
     langfuse_secret_key: SecretStr | None = None

@@ -2,7 +2,7 @@ import { useWebSocket } from "@vueuse/core";
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 
-import type { ServerEvent, UserMessage } from "../types";
+import type { ServerEvent, TurnEvent, UserMessage } from "../types";
 
 export type BackendName = "custom" | "pydantic_ai" | "langgraph";
 
@@ -22,6 +22,16 @@ export interface Toast {
   text: string;
 }
 
+export interface HealthComponent {
+  status: string;
+  [detail: string]: unknown;
+}
+
+export interface HealthInfo {
+  status: "ok" | "degraded";
+  components: Record<string, HealthComponent>;
+}
+
 /** Optional bearer token: captured once from ?token=... and persisted. */
 function resolveToken(): string | null {
   const fromUrl = new URLSearchParams(location.search).get("token");
@@ -37,6 +47,8 @@ export interface AssistantItem {
   kind: "assistant";
   text: string;
   streaming: boolean;
+  /** Attached when the post-final `turn` frame arrives. */
+  stats?: TurnEvent;
 }
 export interface ToolItem {
   kind: "tool";
@@ -76,6 +88,20 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
   void loadInfo();
+
+  // Deep health (/api/health pings Redis/Qdrant) -> header dot, refreshed
+  // every 10s. Unreachable backend -> null -> gray "unknown" dot.
+  const health = ref<HealthInfo | null>(null);
+  async function loadHealth(): Promise<void> {
+    try {
+      const response = await fetch("/api/health");
+      health.value = response.ok ? ((await response.json()) as HealthInfo) : null;
+    } catch {
+      health.value = null;
+    }
+  }
+  void loadHealth();
+  setInterval(() => void loadHealth(), 10_000);
 
   async function reindex(): Promise<void> {
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
@@ -144,6 +170,14 @@ export const useChatStore = defineStore("chat", () => {
         items.value.push({ kind: "error", text: event.message });
         toast("error", event.message);
         break;
+      case "turn": {
+        // Arrives right after `final` — attach to the answer it describes.
+        const answer = [...items.value]
+          .reverse()
+          .find((item): item is AssistantItem => item.kind === "assistant");
+        if (answer) answer.stats = event;
+        break;
+      }
     }
   }
 
@@ -187,6 +221,7 @@ export const useChatStore = defineStore("chat", () => {
     connected,
     status,
     info,
+    health,
     toasts,
     sendMessage,
     newSession,

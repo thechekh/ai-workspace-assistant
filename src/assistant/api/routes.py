@@ -1,11 +1,13 @@
-"""HTTP API: platform info + document re-indexing.
+"""HTTP API: platform info, deep health, per-session audit trail, re-indexing.
 
-Auth: when ASSISTANT_AUTH_TOKEN is set, mutating endpoints require
-`Authorization: Bearer <token>`; /api/info stays public (the UI needs it
-before authenticating). Unset token = open, for zero-config dev.
+Auth: when ASSISTANT_AUTH_TOKEN is set, mutating/read-sensitive endpoints
+require `Authorization: Bearer <token>`; /api/info and /api/health stay
+public (the UI needs them before authenticating, and neither leaks
+conversation data). Unset token = open, for zero-config dev.
 """
 
 import logging
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,6 +17,10 @@ from assistant.rag.ingest import ingest
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
+
+
+def _ms(started: float) -> float:
+    return round((time.perf_counter() - started) * 1000, 1)
 
 
 def require_token(request: Request) -> None:
@@ -38,6 +44,62 @@ async def info(request: Request) -> dict[str, object]:
         "collection": settings.qdrant_collection,
         "auth_required": settings.auth_token is not None,
     }
+
+
+@router.get("/health")
+async def health(request: Request) -> dict[str, object]:
+    """Deep health: ping every dependency with latency — unlike the /healthz
+    liveness probe, this answers "can a chat turn actually succeed right now?"."""
+    settings: Settings = request.app.state.settings
+    components: dict[str, dict[str, object]] = {}
+
+    started = time.perf_counter()
+    try:
+        await request.app.state.redis.ping()
+        components["redis"] = {"status": "ok", "latency_ms": _ms(started)}
+    except Exception as exc:
+        components["redis"] = {"status": "error", "detail": str(exc)}
+
+    qdrant = getattr(request.app.state, "qdrant", None)
+    if qdrant is None:
+        # Tests / embedded mode inject a retriever, so there is no live client.
+        components["qdrant"] = {"status": "skipped", "detail": "external retriever injected"}
+    else:
+        started = time.perf_counter()
+        try:
+            result = await qdrant.count(settings.qdrant_collection)
+            components["qdrant"] = {
+                "status": "ok",
+                "latency_ms": _ms(started),
+                "collection": settings.qdrant_collection,
+                "points": result.count,
+            }
+        except Exception as exc:
+            components["qdrant"] = {"status": "error", "detail": str(exc)}
+
+    # No live LLM call — deep health must stay free and rate-limit-safe.
+    # If a hosted provider's key were missing, startup would have failed.
+    components["llm"] = {
+        "status": "ok",
+        "provider": settings.llm_provider,
+        "model": settings.llm_model,
+    }
+
+    if getattr(request.app.state, "mcp_registry", None) is None:
+        components["mcp"] = {"status": "disabled"}
+    else:
+        tool_names: list[str] = request.app.state.mcp_tool_names
+        components["mcp"] = {"status": "ok", "tools": tool_names}
+
+    degraded = any(component["status"] == "error" for component in components.values())
+    return {"status": "degraded" if degraded else "ok", "components": components}
+
+
+@router.get("/sessions/{session_id}/turns", dependencies=[Depends(require_token)])
+async def session_turns(session_id: str, request: Request) -> dict[str, object]:
+    """Audit trail: per-turn stats + event timeline (last 50 turns of a session)."""
+    turns = await request.app.state.session_store.turns(session_id)
+    return {"session_id": session_id, "count": len(turns), "turns": turns}
 
 
 @router.post("/reindex", dependencies=[Depends(require_token)])

@@ -56,7 +56,7 @@ def _adapt_tool(tool: RegistryTool) -> PydanticTool:
     """Wrap a registry tool (JSON schema + async handler) as a pydantic-ai Tool."""
 
     async def call(**kwargs: object) -> str:
-        return await tool.handler(dict(kwargs))
+        return await tool.run(dict(kwargs))  # Tool.run = the telemetry seam
 
     return PydanticTool.from_schema(
         call,

@@ -51,7 +51,7 @@ from assistant.agent.base import (
     ToolResultEvent,
 )
 from assistant.agent.tools import ToolRegistry
-from assistant.llm.client import LLMClient, TextDelta, ToolSpec
+from assistant.llm.client import LLMClient, TextDelta, ToolCallRequest, ToolSpec
 
 _EVENT_RESULT_LIMIT = 1500
 
@@ -137,7 +137,7 @@ class LLMClientChatModel(BaseChatModel):
         async for event in self._client.stream_step(_lc_to_ours(messages), tools=specs or None):
             if isinstance(event, TextDelta):
                 yield ChatGenerationChunk(message=AIMessageChunk(content=event.text))
-            else:
+            elif isinstance(event, ToolCallRequest):
                 chunk = AIMessageChunk(
                     content="",
                     tool_call_chunks=[

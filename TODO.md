@@ -16,7 +16,8 @@ All 8 planned phases are **complete**:
 | MCP | Client registry + 2 bundled stdio servers (real code-search, mock GitHub with real tool names) |
 | Memory | Rolling summarization — prompts provably stop growing (tested ×3 backends) |
 | Platform | taskiq worker + nightly re-index, optional bearer auth, /api/info + /api/reindex, Vue UI |
-| Quality | 72 deterministic tests, ruff + pyright clean, CI green on GitHub |
+| Observability | structlog JSON + correlation IDs, manual OTel spans → Jaeger, /metrics + Grafana dashboard, deep health, audit trail, per-turn stats in UI |
+| Quality | 90 deterministic tests, ruff + pyright clean, CI green on GitHub |
 | Docs | README, tech-stack, backend comparison, workshop script, 13-chapter theory course |
 | Git | https://github.com/thechekh/ai-workspace-assistant (private), 11 per-area commits, Actions ✅ |
 
@@ -26,66 +27,72 @@ cloud tracing wired but unverified (no tokens yet).
 
 ## Recently done
 
+- [x] Phase 9 Tiers 1–3: structured logs + correlation IDs, spans → Jaeger,
+      /metrics + Grafana, deep health, audit trail, per-turn UI stats
+      *(2026-08-06)*
 - [x] Git commits + GitHub push + CI green *(2026-08-06)*
 
 ---
 
-## Next milestone — Phase 9: Maximum observability
+## Phase 9: Maximum observability — Tiers 1–3 DONE *(2026-08-06)*
 
 Goal: **every process explained, traceable, and controlled** — see exactly
 what the agent did, why, how long it took, and what it cost. Offline-first
-(same philosophy as the rest of the project): Tiers 1–2 need zero accounts.
+(same philosophy as the rest of the project): Tiers 1–3 need zero accounts.
 
-### Tier 1 — Foundations (structured logs + correlation; no new services)
+### Tier 1 — Foundations (structured logs + correlation; no new services) ✅
 
-- [ ] **Structured logging (structlog)**: every log line as JSON (pretty in
-      dev) with timestamp, level, logger — replacing ad-hoc std logging.
-- [ ] **Correlation IDs everywhere**: generate a `turn_id` per user message;
-      bind `session_id` + `turn_id` + `backend` into context so *every* log
-      from the loop, tools, RAG, and MCP carries them automatically. Include
-      `turn_id` in WS frames so UI events map to server logs.
-- [ ] **Turn summary line**: one log per turn — backend, LLM steps, tool
-      calls (names + durations), retrieval stats (chunks, top score),
-      iterations used, total ms, prompt/answer sizes. The "what just
-      happened" record, greppable.
-- [ ] **Deep health endpoint**: `/api/health` checking Redis ping, Qdrant
-      readiness, MCP servers connected, provider configured — surfaced as a
-      green/yellow dot in the UI header (the "controlled" part).
-- [ ] **Agent event audit trail**: persist each turn's full AgentEvent
-      stream (Redis, TTL) → `GET /api/sessions/{id}/turns` for replay/debug.
+- [x] **Structured logging (structlog)**: `logs.py` — pretty console in dev,
+      JSON lines with `ASSISTANT_LOG_JSON=true`; one pipeline for our loggers
+      and stdlib/uvicorn loggers.
+- [x] **Correlation IDs everywhere**: `turn_id` per user message;
+      `session_id` + `turn_id` + `backend` bound via structlog contextvars —
+      every log from the loop, tools, RAG carries them automatically; the
+      `turn` WS frame carries `turn_id` so UI events map to server logs.
+- [x] **Turn summary line**: one `turn.summary` log per turn — duration,
+      first-token ms, LLM steps + ms, tool calls, tokens, answer size
+      (retrieval details on the correlated `rag.retrieved` line).
+- [x] **Deep health endpoint**: `/api/health` — Redis ping + Qdrant count
+      (with latency), LLM provider/model, MCP tools; green/amber/gray dot in
+      the UI header, refreshed every 10 s.
+- [x] **Agent event audit trail**: per-turn record (stats + event timeline)
+      in Redis, capped at 50/session → `GET /api/sessions/{id}/turns`.
 
-### Tier 2 — Real tracing, still no accounts
+### Tier 2 — Real tracing, still no accounts ✅
 
-- [ ] **Local trace UI via Jaeger**: add a compose `observability` profile
-      with Jaeger all-in-one; new `ASSISTANT_OTLP_ENDPOINT` setting exports
-      OTel spans there → full trace waterfalls at `localhost:16686`, zero
-      signups.
-- [ ] **Manual spans on the seams auto-instrumentation misses**: span per
-      *agent turn*, per *LLM step*, per *tool execution* (attrs: tool,
-      args size, result size), per *retrieval* (attrs: mode, candidates,
-      scores) — this is what makes traces explain the agent, not just HTTP.
-- [ ] **Token/usage capture**: request usage from OpenAI-compatible streams
-      (`stream_options.include_usage`), attach to spans + turn summary;
-      estimated (chars/4) for the fake provider.
-- [ ] **Prompt/response debug toggle**: `ASSISTANT_LOG_PROMPTS=true` dumps
-      full prompts + raw model output (dev-only; privacy note in config).
+- [x] **Local trace UI via Jaeger**: compose `observability` profile;
+      `ASSISTANT_OTLP_ENDPOINT=http://localhost:4318` exports spans →
+      waterfalls at `localhost:16686`, zero signups.
+- [x] **Manual spans on the seams**: `agent.turn` → `llm.step` (provider,
+      model, tokens, tool calls) / `tool.execute` (tool, status, result
+      size) / `rag.retrieve` (mode, candidates, top score) — traces explain
+      the agent, not just HTTP.
+- [x] **Token/usage capture**: `stream_options.include_usage` on
+      OpenAI-compatible streams (with reject-retry fallback) → UsageEvent →
+      spans, metrics, turn summary; chars/4 estimate otherwise, flagged
+      `usage_estimated`.
+- [x] **Prompt/response debug toggle**: `ASSISTANT_LOG_PROMPTS=true` dumps
+      full prompts + completions (dev-only; privacy note in config).
 
-### Tier 3 — Metrics & dashboards
+### Tier 3 — Metrics & dashboards ✅ (cost accounting open)
 
-- [ ] **/metrics (Prometheus)**: counters (turns by backend, tool calls by
-      tool, errors by type) + histograms (turn/LLM/tool/retrieval latency).
-- [ ] **Grafana** in the observability profile with one pre-provisioned
-      dashboard (traffic, latency, error rate, tool usage).
+- [x] **/metrics (Prometheus)**: turns/errors/tool-calls/tokens counters +
+      turn/LLM-step/tool/retrieval latency histograms, labeled by
+      backend/provider/tool/status/mode.
+- [x] **Grafana** provisioned dashboard (turn rate + p50/p95 by backend, LLM
+      p95 by provider, tokens/min, tool calls + p95, retrieval p95, errors).
 - [ ] **Cost accounting**: tokens → $ per session/day from captured usage.
 
-### Tier 4 — Product-level visibility
+### Tier 4 — Product-level visibility (remaining)
 
-- [ ] **"Explain this turn" panel in the UI**: render the audit trail as a
-      timeline (step, duration, tool, result preview) next to the answer.
+- [x] **Per-turn stats in the UI**: `turn` WS frame → stats line under each
+      answer (duration, first token, steps, tokens real/est, tools).
+- [ ] **"Explain this turn" panel in the UI**: render the audit trail
+      (`/api/sessions/{id}/turns` is live) as a timeline next to the answer.
 - [ ] **Eval trend history**: append eval runs to `evals/history.jsonl`
       with timestamp + config; print deltas — regressions become visible.
-- [ ] **Cloud backends when tokens exist**: Logfire + Langfuse are already
-      wired (`observability.py`) — add tokens, verify dashboards, done.
+- [ ] **Cloud backends when tokens exist**: Logfire + Langfuse share the
+      pipeline (`observability.py`) — add tokens, verify dashboards, done.
 
 ---
 

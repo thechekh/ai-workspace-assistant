@@ -143,6 +143,24 @@ select {
   color: var(--error);
 }
 
+/* deep-health indicator (/api/health): green ok, amber degraded, gray unknown */
+.health-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: var(--muted);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.health-dot.ok {
+  background: var(--ok);
+}
+
+.health-dot.degraded {
+  background: #f5b041;
+}
+
 button {
   background: var(--accent);
   border: 0;
@@ -224,6 +242,17 @@ button.ghost {
 .cursor {
   animation: blink 1s steps(1) infinite;
   color: var(--accent);
+}
+
+/* per-turn stats line under an answer (from the post-final `turn` frame) */
+.turn-stats {
+  margin-top: 0.45rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  white-space: normal;
 }
 
 @keyframes blink {

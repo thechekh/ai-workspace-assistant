@@ -1,14 +1,22 @@
 """Shared tool registry — every agent backend gets the same tools.
 
 Native tools live here (search_docs over the RAG retriever); MCP-provided
-tools are adapted into this same registry in Phase 4.
+tools are adapted into this same registry. `Tool.run` is the single
+execution seam — span + metrics + structured log for every call, on every
+backend.
 """
 
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+import structlog
+
 from assistant.llm.client import ToolSpec
 from assistant.rag.retriever import Retriever
+from assistant.telemetry import TOOL_CALLS_TOTAL, TOOL_SECONDS, tracer
+
+logger = structlog.get_logger("assistant.tools")
 
 ToolHandler = Callable[[dict[str, object]], Awaitable[str]]
 
@@ -25,6 +33,34 @@ class Tool:
     @property
     def spec(self) -> ToolSpec:
         return ToolSpec(name=self.name, description=self.description, parameters=self.parameters)
+
+    async def run(self, arguments: dict[str, object]) -> str:
+        """Execute with telemetry; a crash becomes an error *result*, never an exception."""
+        start = time.perf_counter()
+        status = "ok"
+        with tracer.start_as_current_span("tool.execute") as span:
+            span.set_attribute("tool.name", self.name)
+            try:
+                result = await self.handler(dict(arguments))
+            except Exception as exc:  # a tool crash must not kill the agent loop
+                status = "crash"
+                result = f"error: tool {self.name!r} failed: {exc}"
+                logger.warning("tool.crashed", tool=self.name, exc_info=True)
+            if status == "ok" and result.startswith("error:"):
+                status = "error"
+            span.set_attribute("tool.status", status)
+            span.set_attribute("tool.result_chars", len(result))
+        duration = time.perf_counter() - start
+        TOOL_SECONDS.labels(tool=self.name).observe(duration)
+        TOOL_CALLS_TOTAL.labels(tool=self.name, status=status).inc()
+        logger.info(
+            "tool.executed",
+            tool=self.name,
+            status=status,
+            duration_ms=round(duration * 1000),
+            result_chars=len(result),
+        )
+        return result
 
 
 class ToolRegistry:
@@ -45,11 +81,10 @@ class ToolRegistry:
     async def execute(self, name: str, arguments: dict[str, object]) -> str:
         tool = self._tools.get(name)
         if tool is None:
+            TOOL_CALLS_TOTAL.labels(tool=name, status="unknown").inc()
+            logger.warning("tool.unknown", tool=name)
             return f"error: unknown tool {name!r}"
-        try:
-            return await tool.handler(arguments)
-        except Exception as exc:  # a tool crash must not kill the agent loop
-            return f"error: tool {name!r} failed: {exc}"
+        return await tool.run(arguments)
 
 
 def make_search_docs(retriever: Retriever, *, limit: int = 4) -> Tool:

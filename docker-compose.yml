@@ -1,5 +1,8 @@
 # Dev default:      docker compose up -d              -> redis + qdrant only
 # Full platform:    docker compose --profile app up   -> + api, worker, scheduler
+# Observability:    docker compose --profile observability up
+#                   -> + Jaeger :16686, Prometheus :9090, Grafana :3000
+#                   (set ASSISTANT_OTLP_ENDPOINT=http://localhost:4318 for traces)
 services:
   redis:
     image: redis:7-alpine
@@ -48,6 +51,42 @@ services:
       ASSISTANT_REDIS_URL: redis://redis:6379/0
     depends_on:
       - redis
+
+  # --- Observability profile: zero-account local tracing + metrics ---------
+  jaeger:
+    profiles: ["observability"]
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318" # OTLP http — ASSISTANT_OTLP_ENDPOINT points here
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:latest
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # reach a host-run API on Linux too
+    ports:
+      - "9090:9090"
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:latest
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
 
 volumes:
   redis-data:

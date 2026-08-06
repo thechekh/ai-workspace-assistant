@@ -36,6 +36,21 @@ class SessionStore:
         await self._redis.expire(key, self._ttl)
 
     @staticmethod
+    def _turns_key(session_id: str) -> str:
+        return f"session:{session_id}:turns"
+
+    async def append_turn(self, session_id: str, record: dict[str, object]) -> None:
+        """Audit trail: one record per turn (summary + event timeline), capped at 50."""
+        key = self._turns_key(session_id)
+        await self._redis.rpush(key, json.dumps(record))
+        await self._redis.ltrim(key, -50, -1)
+        await self._redis.expire(key, self._ttl)
+
+    async def turns(self, session_id: str) -> list[dict[str, object]]:
+        raw = await self._redis.lrange(self._turns_key(session_id), 0, -1)
+        return [json.loads(item) for item in raw]
+
+    @staticmethod
     def _summary_key(session_id: str) -> str:
         return f"session:{session_id}:summary"
 

@@ -85,11 +85,45 @@ Measured three-way comparison: [docs/backend-comparison.md](docs/backend-compari
 
 ## Observability
 
-One OpenTelemetry pipeline, two backends — enable either or both in `.env`:
-`ASSISTANT_LOGFIRE_TOKEN` (app view: requests, WS, LLM calls, agent runs)
-and/or `ASSISTANT_LANGFUSE_PUBLIC_KEY` + `ASSISTANT_LANGFUSE_SECRET_KEY`
-(LLM view: generations, costs). **Without tokens everything is disabled** —
-no imports, no network.
+Layered, offline-first — everything below the cloud backends needs **zero
+accounts**:
+
+**Structured logs (always on).** structlog renders pretty console lines in
+dev, JSON lines with `ASSISTANT_LOG_JSON=true`. Every log from the agent
+loop, tools, RAG, and WS layer automatically carries `session_id`,
+`turn_id`, and `backend`; each turn ends with one greppable `turn.summary`
+line (duration, first-token latency, LLM steps, tool calls, tokens).
+`ASSISTANT_LOG_PROMPTS=true` additionally dumps full prompts/completions
+(dev-only — conversations end up in logs).
+
+**Metrics (always on).** `GET /metrics` exposes Prometheus counters and
+histograms: turns + latency by backend, LLM step latency by provider, tool
+calls by tool/status, retrieval latency by mode, token totals, errors.
+
+**Per-turn stats in the UI.** After each answer the server sends a `turn`
+WS frame; the UI renders it as a stats line under the message (duration,
+first token, LLM steps, tokens — real from `stream_options.include_usage`
+when the provider reports them, estimated otherwise — and tools used). The
+header shows a deep-health dot (`GET /api/health`: Redis ping, Qdrant
+count, MCP servers). Each session's full event timeline is served at
+`GET /api/sessions/{id}/turns` (last 50 turns, Redis TTL).
+
+**Traces, no accounts.** Manual OTel spans on the seams that explain the
+agent — `agent.turn` → `llm.step` / `tool.execute` / `rag.retrieve`:
+
+```sh
+docker compose --profile observability up -d   # Jaeger + Prometheus + Grafana
+# .env: ASSISTANT_OTLP_ENDPOINT=http://localhost:4318
+# Jaeger UI   http://localhost:16686 — trace waterfall per turn
+# Grafana     http://localhost:3000  — provisioned dashboard, no login
+# Prometheus  http://localhost:9090
+```
+
+**Cloud backends (optional).** The same spans also export to Logfire
+(`ASSISTANT_LOGFIRE_TOKEN` — adds FastAPI/httpx/pydantic-ai
+auto-instrumentation) and/or Langfuse (`ASSISTANT_LANGFUSE_*` keys —
+generations + costs view). With no destination configured, tracing is
+fully inert: no SDK imports, no network, no-op tracer.
 
 ## MCP tools
 

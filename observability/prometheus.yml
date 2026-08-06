@@ -1,0 +1,16 @@
+# Scrapes the assistant's /metrics endpoint. Two static targets so it works
+# both when the API runs on the host (dev default: `uvicorn assistant.main:app`)
+# and inside compose (`--profile app`) — the unused target just shows as down.
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: assistant
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          run_mode: host
+      - targets: ["api:8000"]
+        labels:
+          run_mode: compose

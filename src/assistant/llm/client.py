@@ -16,7 +16,7 @@ from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from typing import Protocol, cast
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, BadRequestError
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
 
 from assistant.agent.base import ChatMessage
@@ -51,7 +51,19 @@ class ToolCallRequest:
     arguments: str  # raw JSON string from the model
 
 
-LLMEvent = TextDelta | ToolCallRequest
+@dataclass(frozen=True)
+class UsageEvent:
+    """Real token usage reported by the provider (final stream chunk).
+
+    Emitted by OpenAICompatibleLLM and consumed by telemetry.InstrumentedLLM —
+    agent loops never see it (and defensively ignore unknown events anyway).
+    """
+
+    prompt_tokens: int
+    completion_tokens: int
+
+
+LLMEvent = TextDelta | ToolCallRequest | UsageEvent
 
 
 class LLMClient(Protocol):
@@ -114,22 +126,32 @@ class OpenAICompatibleLLM:
     async def stream_step(
         self, messages: list[ChatMessage], tools: list[ToolSpec] | None = None
     ) -> AsyncIterator[LLMEvent]:
+        payload = _to_openai_messages(messages)
+        create_kwargs: dict[str, object] = {
+            "model": self.model,
+            "messages": payload,
+            "stream": True,
+            # Ask the provider to report real token usage in the final chunk.
+            "stream_options": {"include_usage": True},
+        }
         if tools:
-            stream = await self._client.chat.completions.create(
-                model=self.model,
-                messages=_to_openai_messages(messages),
-                tools=_to_openai_tools(tools),
-                stream=True,
-            )
-        else:
-            stream = await self._client.chat.completions.create(
-                model=self.model,
-                messages=_to_openai_messages(messages),
-                stream=True,
-            )
+            create_kwargs["tools"] = _to_openai_tools(tools)
+        try:
+            stream = await self._client.chat.completions.create(**create_kwargs)  # type: ignore[arg-type]
+        except BadRequestError:
+            # Some OpenAI-compatible providers reject stream_options — retry without.
+            create_kwargs.pop("stream_options", None)
+            stream = await self._client.chat.completions.create(**create_kwargs)  # type: ignore[arg-type]
+
         # Tool-call fragments arrive interleaved across chunks; accumulate by index.
         pending: dict[int, dict[str, str]] = {}
+        usage: UsageEvent | None = None
         async for chunk in stream:
+            if chunk.usage is not None:
+                usage = UsageEvent(
+                    prompt_tokens=chunk.usage.prompt_tokens or 0,
+                    completion_tokens=chunk.usage.completion_tokens or 0,
+                )
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta
@@ -146,6 +168,8 @@ class OpenAICompatibleLLM:
         for index in sorted(pending):
             entry = pending[index]
             yield ToolCallRequest(id=entry["id"], name=entry["name"], arguments=entry["arguments"])
+        if usage is not None:
+            yield usage
 
 
 def _stream_words(reply: str) -> Iterator[str]:
