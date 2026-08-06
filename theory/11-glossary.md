@@ -1,0 +1,57 @@
+# 11 — Glossary
+
+One line per term. Chapter references in parentheses.
+
+- **LLM** — large language model; predicts the next token, repeatedly (01).
+- **Token** — the model's text unit, ≈4 characters; pricing and limits are counted in tokens (01).
+- **Context window** — everything the model can see in one request; its entire working memory (01).
+- **System prompt** — the operator's standing instructions to the model: persona, rules, tools (01).
+- **Streaming** — receiving the answer token-by-token as it's generated (01, 08).
+- **Stateless API** — the provider remembers nothing between requests; history must be resent (01, 07).
+- **Provider** — whoever serves the model over an API (OpenAI, Groq, Ollama, Gemini) (01).
+- **OpenAI-compatible API** — the de-facto standard chat API shape many providers implement (01).
+- **FakeLLM** — our deterministic offline model stand-in; $0, no network, same behavior every run (01, 09).
+- **Hallucination** — a confident fabricated answer; mitigated by grounding in retrieved docs (01, 03).
+- **Embedding** — a vector representing a text's meaning; similar meaning → nearby vectors (02).
+- **Cosine similarity** — angle-based closeness of two vectors; the "how related" score (02).
+- **Vector database** — a store optimized for nearest-neighbor search over vectors; ours is Qdrant (02).
+- **HNSW** — the standard approximate nearest-neighbor index inside vector DBs (02).
+- **Dense vector** — semantic embedding (meaning) (02).
+- **Sparse vector** — keyword-style vector: non-zero only for tokens the text contains (02).
+- **Feature hashing** — mapping tokens to fixed vector slots by hash; our offline `hash-512` embedder (02).
+- **Hybrid search** — running dense + sparse retrieval and fusing the rankings (02).
+- **RRF** — reciprocal rank fusion; combines ranked lists using ranks only: Σ 1/(k+rank) (02).
+- **Reranker** — a second, more careful pass that reorders the top retrieval candidates (02).
+- **RAG** — retrieval-augmented generation: retrieve relevant chunks, then answer from them (03).
+- **Chunking** — splitting documents into retrieval-sized pieces; ours is heading-aware (03).
+- **Breadcrumb** — the heading path ("Service Catalog > billing-service") prefixed to each chunk (03).
+- **Idempotent ingest** — re-ingesting overwrites (deterministic chunk IDs) instead of duplicating (03).
+- **Grounding** — forcing answers to come from retrieved evidence, with citations (03).
+- **Golden set** — annotated question→answer-location pairs used to score retrieval (03, 09).
+- **recall@k** — fraction of questions whose correct chunk appears in the top k results (03).
+- **MRR** — mean reciprocal rank; 1.0 means the correct chunk is always ranked first (03).
+- **Tool / function calling** — the model *requests* a function call as JSON; the app executes it (04).
+- **JSON Schema** — the typed description of a tool's arguments (04).
+- **Agent** — the loop: model → tool call → result → model, until a final answer (04).
+- **ReAct** — the reason+act pattern that loop implements (04).
+- **max_iterations / recursion limit** — the bound that stops a runaway agent loop (04, 05).
+- **AgentBackend** — our protocol all three runtimes implement; one contract, three engines (05).
+- **Pydantic AI** — typed agent framework from the Pydantic team; backend B (05).
+- **LangGraph** — state-graph agent framework from the LangChain ecosystem; backend C (05).
+- **Checkpointing** — LangGraph persisting graph state per thread; durable/resumable runs (05).
+- **MCP** — Model Context Protocol; the open standard for exposing tools to AI apps (06).
+- **MCP server / client** — the program exposing tools / the app consuming them (06).
+- **stdio transport** — client spawns the MCP server as a subprocess, talks over stdin/stdout (06).
+- **Streamable HTTP transport** — MCP over a remote HTTP endpoint (06).
+- **Tool namespacing** — `code__search_code`: server name prefixed so tools never collide (06).
+- **Graceful degradation** — unreachable MCP server → warning + skip, agent runs with the rest (06).
+- **Session** — one conversation, identified by `session_id`, resumable across reconnects (07, 08).
+- **Rolling summary** — persisted digest of older turns; keeps prompts bounded (07).
+- **WebSocket** — persistent bidirectional connection; carries our typed chat frames (08).
+- **SSE** — server-sent events; one-way streaming alternative we didn't need (08).
+- **OpenTelemetry / span / trace** — the standard for recording what happened, as timed trees (09).
+- **Logfire / Langfuse** — our two OTel backends: app view / LLM view (09).
+- **Eval** — a measured quality check (vs a pass/fail unit test) (09).
+- **taskiq** — async task queue running our background re-index + nightly cron (10).
+- **uv / ruff / pyright** — modern Python toolchain: packaging / lint+format / type checking (10).
+- **Compose profile** — optional service group; `--profile app` starts the full platform (10).
