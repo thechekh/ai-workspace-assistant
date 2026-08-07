@@ -24,3 +24,9 @@ frontend/dist/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Browser-test session artifacts
+.playwright-mcp/
+/chat-turn*.png
+/grafana-dashboard.png
+/jaeger-trace-waterfall.png
