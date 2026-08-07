@@ -1,8 +1,12 @@
 # TODO / Roadmap — current stage & what's next
 
-Updated: 2026-08-06. Phase-by-phase build history with acceptance evidence
+Updated: 2026-08-07. Phase-by-phase build history with acceptance evidence
 lives in [implementation-plan.md](implementation-plan.md); this file tracks
-what's *next*.
+what's *next* in **features**.
+
+> Code-quality work (bugs, refactors, CI/build hardening) is tracked
+> separately in **[TODO-code-quality.md](TODO-code-quality.md)** — a
+> prioritized review backlog with P0 bugs at the top.
 
 ## Where the project stands
 
