@@ -1,0 +1,127 @@
+- generic [active] [ref=f3e1]:
+  - generic:
+    - generic:
+      - generic:
+        - banner [ref=f3e2]:
+          - generic [ref=f3e3]:
+            - menu [ref=f3e4]:
+              - menuitem [ref=f3e5] [cursor=pointer]:
+                - link "JAEGER UI" [ref=f3e7]:
+                  - /url: /
+              - menuitem [ref=f3e8] [cursor=pointer]:
+                - link "Search" [ref=f3e10]:
+                  - /url: /search
+              - menuitem [ref=f3e11] [cursor=pointer]:
+                - link "Compare" [ref=f3e13]:
+                  - /url: /trace/...
+              - menuitem [ref=f3e14] [cursor=pointer]:
+                - link "System Architecture" [ref=f3e16]:
+                  - /url: /dependencies
+              - menuitem [ref=f3e17] [cursor=pointer]:
+                - link "Monitor" [ref=f3e19]:
+                  - /url: /monitor
+              - menuitem [disabled]
+            - menu [ref=f3e20]:
+              - menuitem [ref=f3e21] [cursor=pointer]:
+                - textbox "Lookup by Trace ID..." [ref=f3e28]
+              - menuitem "About Jaeger" [ref=f3e30] [cursor=pointer]
+        - main [ref=f3e35]:
+          - generic [ref=f3e36]:
+            - generic [ref=f3e38]:
+              - generic [ref=f3e39]:
+                - switch [checked] [ref=f3e40] [cursor=pointer]:
+                  - 'heading "ai- workspace- assistant: agent. turn Copy to clipboard" [level=1] [ref=f3e43]':
+                    - generic [ref=f3e44]:
+                      - generic [ref=f3e45]: ai-
+                      - generic [ref=f3e46]: workspace-
+                      - generic [ref=f3e47]: "assistant:"
+                      - generic [ref=f3e48]: agent.
+                      - generic [ref=f3e49]: turn
+                    - button "Copy to clipboard" [ref=f3e50]:
+                      - generic [ref=f3e51]: 94cf016
+                - generic [ref=f3e53]:
+                  - textbox "Find..." [ref=f3e55]
+                  - img [ref=f3e58] [cursor=pointer]
+                  - button [disabled] [ref=f3e61]
+                  - button [disabled] [ref=f3e62]
+                  - button [disabled] [ref=f3e63]
+                - button "⌘" [ref=f3e64] [cursor=pointer]
+                - button "Trace Timeline" [ref=f3e66] [cursor=pointer]
+              - list [ref=f3e70]:
+                - listitem [ref=f3e71]:
+                  - text: Trace Start
+                  - strong [ref=f3e72]:
+                    - generic [ref=f3e73]: August 7 2026, 14:07:21.937
+                - listitem [ref=f3e74]:
+                  - separator [ref=f3e75]
+                - listitem [ref=f3e76]:
+                  - text: Duration
+                  - strong [ref=f3e77]: 1.52s
+                - listitem [ref=f3e78]:
+                  - separator [ref=f3e79]
+                - listitem [ref=f3e80]:
+                  - text: Services
+                  - strong [ref=f3e81]: "1"
+                - listitem [ref=f3e82]:
+                  - separator [ref=f3e83]
+                - listitem [ref=f3e84]:
+                  - text: Depth
+                  - strong [ref=f3e85]: "3"
+                - listitem [ref=f3e86]:
+                  - separator [ref=f3e87]
+                - listitem [ref=f3e88]:
+                  - text: Total Spans
+                  - strong [ref=f3e89]: "5"
+              - generic [ref=f3e91]:
+                - generic [ref=f3e92]: 0μs
+                - generic [ref=f3e93]: 378.82ms
+                - generic [ref=f3e94]: 757.65ms
+                - generic [ref=f3e95]: 1.14s
+                - generic [ref=f3e96]: 1.52s
+            - generic [ref=f3e111]:
+              - generic [ref=f3e112]:
+                - generic [ref=f3e113]:
+                  - heading "Service & Operation" [level=3] [ref=f3e114]
+                  - generic [ref=f3e115]:
+                    - img [ref=f3e116] [cursor=pointer]
+                    - img [ref=f3e118] [cursor=pointer]
+                    - img [ref=f3e120] [cursor=pointer]
+                    - img [ref=f3e123] [cursor=pointer]
+                - generic [ref=f3e126]:
+                  - generic:
+                    - generic: 0μs
+                    - generic: 378.82ms
+                    - generic: 757.65ms
+                    - generic: 1.14s
+                    - generic: 1.52s
+              - generic [ref=f3e131]:
+                - generic:
+                  - generic [ref=f3e133]:
+                    - generic [ref=f3e135]:
+                      - switch [checked] [ref=f3e136]
+                      - switch "ai-workspace-assistant agent.turn" [ref=f3e141] [cursor=pointer]:
+                        - generic [ref=f3e142]: ai-workspace-assistant
+                        - text: agent.turn
+                    - generic [ref=f3e143] [cursor=pointer]: 1.52s
+                  - generic [ref=f3e152]:
+                    - switch "ai-workspace-assistant llm.step" [ref=f3e158] [cursor=pointer]:
+                      - generic [ref=f3e159]: ai-workspace-assistant
+                      - text: llm.step
+                    - generic [ref=f3e160] [cursor=pointer]: 1.07s
+                  - generic [ref=f3e166]:
+                    - generic [ref=f3e168]:
+                      - switch [checked] [ref=f3e169]
+                      - switch "ai-workspace-assistant tool.execute" [ref=f3e175] [cursor=pointer]:
+                        - generic [ref=f3e176]: ai-workspace-assistant
+                        - text: tool.execute
+                    - generic [ref=f3e177] [cursor=pointer]: 43.67ms
+                  - generic [ref=f3e184]:
+                    - switch "ai-workspace-assistant rag.retrieve" [ref=f3e191] [cursor=pointer]:
+                      - generic [ref=f3e192]: ai-workspace-assistant
+                      - text: rag.retrieve
+                    - generic [ref=f3e193] [cursor=pointer]: 42.95ms
+                  - generic [ref=f3e199]:
+                    - switch "ai-workspace-assistant llm.step" [ref=f3e205] [cursor=pointer]:
+                      - generic [ref=f3e206]: ai-workspace-assistant
+                      - text: llm.step
+                    - generic [ref=f3e207] [cursor=pointer]: 394.04ms

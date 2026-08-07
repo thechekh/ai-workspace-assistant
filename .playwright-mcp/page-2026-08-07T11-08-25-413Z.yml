@@ -1,0 +1,226 @@
+- generic [active] [ref=f2e1]:
+  - generic:
+    - generic:
+      - generic:
+        - banner [ref=f2e2]:
+          - generic [ref=f2e3]:
+            - menu [ref=f2e4]:
+              - menuitem [ref=f2e5] [cursor=pointer]:
+                - link "JAEGER UI" [ref=f2e7]:
+                  - /url: /
+              - menuitem [ref=f2e8] [cursor=pointer]:
+                - link "Search" [ref=f2e10]:
+                  - /url: /search
+              - menuitem [ref=f2e11] [cursor=pointer]:
+                - link "Compare" [ref=f2e13]:
+                  - /url: /trace/...
+              - menuitem [ref=f2e14] [cursor=pointer]:
+                - link "System Architecture" [ref=f2e16]:
+                  - /url: /dependencies
+              - menuitem [ref=f2e17] [cursor=pointer]:
+                - link "Monitor" [ref=f2e19]:
+                  - /url: /monitor
+              - menuitem [disabled]
+            - menu [ref=f2e20]:
+              - menuitem [ref=f2e21] [cursor=pointer]:
+                - textbox "Lookup by Trace ID..." [ref=f2e28]
+              - menuitem "About Jaeger" [ref=f2e30] [cursor=pointer]
+        - main [ref=f2e35]:
+          - generic [ref=f2e36]:
+            - generic [ref=f2e39]:
+              - tablist [ref=f2e40]:
+                - generic [ref=f2e42]:
+                  - tab "Search" [selected] [ref=f2e44] [cursor=pointer]
+                  - tab "Upload" [ref=f2e46] [cursor=pointer]
+              - tabpanel "Search" [ref=f2e49]:
+                - generic [ref=f2e50]:
+                  - generic [ref=f2e52]:
+                    - generic [ref=f2e55]:
+                      - text: Service
+                      - generic [ref=f2e56]: (2)
+                    - generic [ref=f2e60] [cursor=pointer]:
+                      - generic [ref=f2e61]:
+                        - generic "ai-workspace-assistant" [ref=f2e62]
+                        - combobox [ref=f2e63]
+                      - img "down" [ref=f2e65]
+                  - generic [ref=f2e69]:
+                    - generic [ref=f2e72]:
+                      - text: Operation
+                      - generic [ref=f2e73]: (9)
+                    - generic [ref=f2e77] [cursor=pointer]:
+                      - generic [ref=f2e78]:
+                        - generic "agent.turn" [ref=f2e79]
+                        - combobox [ref=f2e80]
+                      - img "down" [ref=f2e82]
+                  - generic [ref=f2e86]:
+                    - generic [ref=f2e89]:
+                      - text: Tags
+                      - img [ref=f2e90] [cursor=pointer]
+                    - textbox "http.status_code=200 error=true" [ref=f2e97]
+                  - generic [ref=f2e100]:
+                    - generic "Lookback" [ref=f2e102]
+                    - generic [ref=f2e106] [cursor=pointer]:
+                      - generic [ref=f2e107]:
+                        - generic "Last Hour" [ref=f2e108]
+                        - combobox [ref=f2e109]
+                      - img "down" [ref=f2e111]
+                  - generic [ref=f2e114]:
+                    - generic [ref=f2e117]:
+                      - generic "Max Duration" [ref=f2e119]
+                      - textbox "e.g. 1.2s, 100ms, 500us" [ref=f2e123]
+                    - generic [ref=f2e126]:
+                      - generic "Min Duration" [ref=f2e128]
+                      - textbox "e.g. 1.2s, 100ms, 500us" [ref=f2e132]
+                  - generic [ref=f2e134]:
+                    - generic "Limit Results" [ref=f2e136]
+                    - spinbutton "Limit Results" [ref=f2e140]: "5"
+                  - button "Find Traces" [ref=f2e141] [cursor=pointer]
+            - generic [ref=f2e144]:
+              - generic [ref=f2e149]:
+                - heading "5 Traces" [level=2] [ref=f2e150]
+                - generic [ref=f2e151]:
+                  - text: "Sort:"
+                  - generic [ref=f2e152] [cursor=pointer]:
+                    - generic [ref=f2e153]:
+                      - generic "Most Recent" [ref=f2e154]
+                      - 'combobox "Sort: Most Recent down" [ref=f2e155]'
+                    - img "down" [ref=f2e157]
+                - button "Download Results" [ref=f2e160] [cursor=pointer]
+                - button "Deep Dependency Graph" [ref=f2e162] [cursor=pointer]
+              - heading "Compare traces by selecting result items" [level=2] [ref=f2e166]
+              - list [ref=f2e167]:
+                - listitem [ref=f2e168]:
+                  - 'button "1.52s ai- workspace- assistant: agent. turn Copy to clipboard 5 Spans ai-workspace-assistant (5) Today 2:07:21 pm a minute ago" [ref=f2e169]':
+                    - generic [ref=f2e170]:
+                      - checkbox [ref=f2e173] [cursor=pointer]
+                      - 'link "1.52s ai- workspace- assistant: agent. turn Copy to clipboard" [ref=f2e175] [cursor=pointer]':
+                        - /url: /trace/94cf0167033ff6c28320cd3137a60272
+                        - generic [ref=f2e177]: 1.52s
+                        - 'heading "ai- workspace- assistant: agent. turn Copy to clipboard" [level=3] [ref=f2e178]':
+                          - generic [ref=f2e179]:
+                            - generic [ref=f2e180]: ai-
+                            - generic [ref=f2e181]: workspace-
+                            - generic [ref=f2e182]: "assistant:"
+                            - generic [ref=f2e183]: agent.
+                            - generic [ref=f2e184]: turn
+                          - button "Copy to clipboard" [ref=f2e185]:
+                            - generic [ref=f2e186]: 94cf016
+                    - link "5 Spans ai-workspace-assistant (5) Today 2:07:21 pm a minute ago" [ref=f2e187] [cursor=pointer]:
+                      - /url: /trace/94cf0167033ff6c28320cd3137a60272
+                      - generic [ref=f2e188]:
+                        - generic [ref=f2e189]: 5 Spans
+                        - list [ref=f2e192]:
+                          - listitem [ref=f2e193]:
+                            - generic [ref=f2e194]: ai-workspace-assistant (5)
+                        - generic [ref=f2e195]:
+                          - text: Today
+                          - separator [ref=f2e196]
+                          - text: 2:07:21 pma minute ago
+                - listitem [ref=f2e197]:
+                  - 'button "3.29s ai- workspace- assistant: agent. turn Copy to clipboard 4 Spans ai-workspace-assistant (4) Today 2:05:40 pm 3 minutes ago" [ref=f2e198]':
+                    - generic [ref=f2e199]:
+                      - checkbox [ref=f2e202] [cursor=pointer]
+                      - 'link "3.29s ai- workspace- assistant: agent. turn Copy to clipboard" [ref=f2e204] [cursor=pointer]':
+                        - /url: /trace/a7b99bf12c96b7671d75a4b5a884daef
+                        - generic [ref=f2e206]: 3.29s
+                        - 'heading "ai- workspace- assistant: agent. turn Copy to clipboard" [level=3] [ref=f2e207]':
+                          - generic [ref=f2e208]:
+                            - generic [ref=f2e209]: ai-
+                            - generic [ref=f2e210]: workspace-
+                            - generic [ref=f2e211]: "assistant:"
+                            - generic [ref=f2e212]: agent.
+                            - generic [ref=f2e213]: turn
+                          - button "Copy to clipboard" [ref=f2e214]:
+                            - generic [ref=f2e215]: a7b99bf
+                    - link "4 Spans ai-workspace-assistant (4) Today 2:05:40 pm 3 minutes ago" [ref=f2e216] [cursor=pointer]:
+                      - /url: /trace/a7b99bf12c96b7671d75a4b5a884daef
+                      - generic [ref=f2e217]:
+                        - generic [ref=f2e218]: 4 Spans
+                        - list [ref=f2e221]:
+                          - listitem [ref=f2e222]:
+                            - generic [ref=f2e223]: ai-workspace-assistant (4)
+                        - generic [ref=f2e224]:
+                          - text: Today
+                          - separator [ref=f2e225]
+                          - text: 2:05:40 pm3 minutes ago
+                - listitem [ref=f2e226]:
+                  - 'button "2.87ms ai- workspace- assistant: agent. turn Copy to clipboard 2 Spans ai-workspace-assistant (2) Today 2:05:04 pm 3 minutes ago" [ref=f2e227]':
+                    - generic [ref=f2e228]:
+                      - checkbox [ref=f2e231] [cursor=pointer]
+                      - 'link "2.87ms ai- workspace- assistant: agent. turn Copy to clipboard" [ref=f2e233] [cursor=pointer]':
+                        - /url: /trace/72ab2429b2056544993b8fd9bb18569c
+                        - generic [ref=f2e235]: 2.87ms
+                        - 'heading "ai- workspace- assistant: agent. turn Copy to clipboard" [level=3] [ref=f2e236]':
+                          - generic [ref=f2e237]:
+                            - generic [ref=f2e238]: ai-
+                            - generic [ref=f2e239]: workspace-
+                            - generic [ref=f2e240]: "assistant:"
+                            - generic [ref=f2e241]: agent.
+                            - generic [ref=f2e242]: turn
+                          - button "Copy to clipboard" [ref=f2e243]:
+                            - generic [ref=f2e244]: 72ab242
+                    - link "2 Spans ai-workspace-assistant (2) Today 2:05:04 pm 3 minutes ago" [ref=f2e245] [cursor=pointer]:
+                      - /url: /trace/72ab2429b2056544993b8fd9bb18569c
+                      - generic [ref=f2e246]:
+                        - generic [ref=f2e247]: 2 Spans
+                        - list [ref=f2e250]:
+                          - listitem [ref=f2e251]:
+                            - generic [ref=f2e252]: ai-workspace-assistant (2)
+                        - generic [ref=f2e253]:
+                          - text: Today
+                          - separator [ref=f2e254]
+                          - text: 2:05:04 pm3 minutes ago
+                - listitem [ref=f2e255]:
+                  - 'button "5.69ms ai- workspace- assistant: agent. turn Copy to clipboard 2 Spans ai-workspace-assistant (2) Today 2:05:04 pm 3 minutes ago" [ref=f2e256]':
+                    - generic [ref=f2e257]:
+                      - checkbox [ref=f2e260] [cursor=pointer]
+                      - 'link "5.69ms ai- workspace- assistant: agent. turn Copy to clipboard" [ref=f2e262] [cursor=pointer]':
+                        - /url: /trace/bdbf474bce2957aeb653e7e12cdca203
+                        - generic [ref=f2e264]: 5.69ms
+                        - 'heading "ai- workspace- assistant: agent. turn Copy to clipboard" [level=3] [ref=f2e265]':
+                          - generic [ref=f2e266]:
+                            - generic [ref=f2e267]: ai-
+                            - generic [ref=f2e268]: workspace-
+                            - generic [ref=f2e269]: "assistant:"
+                            - generic [ref=f2e270]: agent.
+                            - generic [ref=f2e271]: turn
+                          - button "Copy to clipboard" [ref=f2e272]:
+                            - generic [ref=f2e273]: bdbf474
+                    - link "2 Spans ai-workspace-assistant (2) Today 2:05:04 pm 3 minutes ago" [ref=f2e274] [cursor=pointer]:
+                      - /url: /trace/bdbf474bce2957aeb653e7e12cdca203
+                      - generic [ref=f2e275]:
+                        - generic [ref=f2e276]: 2 Spans
+                        - list [ref=f2e279]:
+                          - listitem [ref=f2e280]:
+                            - generic [ref=f2e281]: ai-workspace-assistant (2)
+                        - generic [ref=f2e282]:
+                          - text: Today
+                          - separator [ref=f2e283]
+                          - text: 2:05:04 pm3 minutes ago
+                - listitem [ref=f2e284]:
+                  - 'button "4.94ms ai- workspace- assistant: agent. turn Copy to clipboard 2 Spans ai-workspace-assistant (2) Today 2:05:04 pm 3 minutes ago" [ref=f2e285]':
+                    - generic [ref=f2e286]:
+                      - checkbox [ref=f2e289] [cursor=pointer]
+                      - 'link "4.94ms ai- workspace- assistant: agent. turn Copy to clipboard" [ref=f2e291] [cursor=pointer]':
+                        - /url: /trace/653cb36ae5d701cc987a0712aec58e0f
+                        - generic [ref=f2e293]: 4.94ms
+                        - 'heading "ai- workspace- assistant: agent. turn Copy to clipboard" [level=3] [ref=f2e294]':
+                          - generic [ref=f2e295]:
+                            - generic [ref=f2e296]: ai-
+                            - generic [ref=f2e297]: workspace-
+                            - generic [ref=f2e298]: "assistant:"
+                            - generic [ref=f2e299]: agent.
+                            - generic [ref=f2e300]: turn
+                          - button "Copy to clipboard" [ref=f2e301]:
+                            - generic [ref=f2e302]: 653cb36
+                    - link "2 Spans ai-workspace-assistant (2) Today 2:05:04 pm 3 minutes ago" [ref=f2e303] [cursor=pointer]:
+                      - /url: /trace/653cb36ae5d701cc987a0712aec58e0f
+                      - generic [ref=f2e304]:
+                        - generic [ref=f2e305]: 2 Spans
+                        - list [ref=f2e308]:
+                          - listitem [ref=f2e309]:
+                            - generic [ref=f2e310]: ai-workspace-assistant (2)
+                        - generic [ref=f2e311]:
+                          - text: Today
+                          - separator [ref=f2e312]
+                          - text: 2:05:04 pm3 minutes ago

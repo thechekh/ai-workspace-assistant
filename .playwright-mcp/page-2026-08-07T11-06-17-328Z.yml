@@ -1,0 +1,41 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "AI Workspace Assistant" [level=1] [ref=e6]
+      - text: internal engineering assistant
+    - generic [ref=e7]:
+      - 'generic "health: ok redis: ok qdrant: ok llm: ok mcp: ok" [ref=e8]'
+      - 'generic "collection: docs" [ref=e9]': groq · hybrid
+      - generic [ref=e10]:
+        - text: "agent:"
+        - combobox "agent:" [ref=e11]:
+          - option "custom loop" [selected]
+          - option "pydantic-ai"
+          - option "langgraph"
+      - generic [ref=e12]: connected
+      - button "Re-index" [ref=e13] [cursor=pointer]
+      - button "New session" [ref=e14] [cursor=pointer]
+  - main [ref=e15]:
+    - generic [ref=e23]:
+      - generic [ref=e24]: You
+      - generic [ref=e25]: what is this project about? https://github.com/thechekh/awsomequiz-streamlit
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - text: 🔧
+        - strong [ref=e28]: fetch_url
+        - code [ref=e29]: "{\"url\":\"https://github.com/thechekh/awsomequiz-streamlit\"}"
+      - generic [ref=e30]: "GitHub - thechekh/awsomequiz-streamlit: AWS Certified Cloud Practitioner practice platform: Streamlit + Supabase · GitHub Skip to content Navigation Menu Sign in Appearance settings Platform AI CODE CREATION GitHub Copilot Write better code with AI GitHub Copilot app Direct agents from issue to merge MCP Registry Integrate external tools DEVELOPER WORKFLOWS Actions Automate any workflow Codespaces Instant dev environments Issues Plan and track work Code Review Manage code changes Code Quality Enforce quality at merge APPLICATION SECURITY GitHub Advanced Security Find and fix vulnerabilities Code security Secure your code as you build Secret protection Stop leaks before they start EXPLORE Why GitHub Documentation Blog Changelog Marketplace View all features Solutions BY COMPANY SIZE Enterprises Small and medium teams Startups Nonprofits BY USE CASE App Modernization DevSecOps DevOps CI/CD View all use cases BY INDUSTRY Healthcare Financial services Manufacturing Government View all industries View all solutions Resources EXPLORE BY TOPIC AI Software Development DevOps Security View all topics EXPLORE BY TYPE Customer stories Events & webinars Ebooks & reports Business insights GitHub Skills SUPPORT & SERVICES Documentation Customer support Community forum Trust center Partners View all resources Open Source COMMUNITY GitHub Sponsors Fund open source developers PROGRAMS Security Lab Maintainer Community Accelerator GitHub Stars Archive Program REPOSITORIES Topics Trending Colle…"
+    - generic [ref=e31]:
+      - generic [ref=e32]: AI
+      - generic [ref=e33]:
+        - paragraph [ref=e35]:
+          - text: The project is an AWS Certified Cloud Practitioner practice platform called AWSomeQuiz, built with Streamlit and Supabase. It features a multi-user platform with email/password and GitHub OAuth authentication, practice mode, timed exam simulation, weak areas review, bookmarks, and Anki-style flashcards. The project is feature-complete and has a roadmap and product brief documented in the
+          - link "CLAUDE.md" [ref=e36] [cursor=pointer]:
+            - /url: http://CLAUDE.md
+          - text: and docs/BRIEF.md files, respectively.
+        - generic "turn 312d8321ba4b · backend custom" [ref=e37]:
+          - text: 3.3s · first token 2995 ms · 2 LLM steps · 4313→115 tok · ~$0.0026 · fetch_url
+          - button "details" [ref=e38] [cursor=pointer]
+  - contentinfo [ref=e20]:
+    - textbox "Ask something… (Enter to send, Shift+Enter for a new line)" [active] [ref=e21]
+    - button "Send" [disabled] [ref=e22]
