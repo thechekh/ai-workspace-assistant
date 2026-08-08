@@ -24,7 +24,7 @@ The GitHub mock exposes the **same tool names** as the official
 ## How a tool call executes (the seam)
 
 Every call — from any of the three backends — funnels through **`Tool.run`**
-([agent/tools.py](../../src/assistant/agent/tools.py)):
+([agent/tools/base.py](../../src/assistant/agent/tools/base.py)):
 
 ```
 model emits tool_call

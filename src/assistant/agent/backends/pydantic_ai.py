@@ -41,14 +41,13 @@ from assistant.agent.base import (
     TokenEvent,
     ToolCallEvent,
     ToolResultEvent,
+    truncate_for_event,
 )
 from assistant.agent.tools import Tool as RegistryTool
 from assistant.agent.tools import ToolRegistry
 from assistant.config import Settings
 from assistant.llm.client import resolve_provider
 from assistant.llm.fake import decide_fake_tool_call, echo_reply, stream_words, tool_result_reply
-
-_EVENT_RESULT_LIMIT = 1500
 
 
 def _adapt_tool(tool: RegistryTool) -> PydanticTool:
@@ -138,9 +137,10 @@ class PydanticAIAgent:
                                     if isinstance(part, ToolReturnPart)
                                     else f"error: {part.model_response()}"
                                 )
-                                if len(text) > _EVENT_RESULT_LIMIT:
-                                    text = text[:_EVENT_RESULT_LIMIT] + "…"
-                                yield ToolResultEvent(tool=part.tool_name or "unknown", result=text)
+                                yield ToolResultEvent(
+                                    tool=part.tool_name or "unknown",
+                                    result=truncate_for_event(text),
+                                )
         output = agent_run.result.output if agent_run.result is not None else ""
         yield FinalEvent(content=output if isinstance(output, str) else str(output))
 

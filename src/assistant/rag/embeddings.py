@@ -8,6 +8,7 @@ It is the dev/test default so the whole RAG pipeline runs for free.
 voyage-3 for the measured comparison.
 """
 
+import asyncio
 import hashlib
 import math
 import re
@@ -35,7 +36,9 @@ class HashEmbedder:
     model_id = "hash-512"
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        return [self._embed_one(text) for text in texts]
+        # Pure CPU work (md5 per token), so it would otherwise block the event
+        # loop that is serving live chats while a corpus is being ingested.
+        return await asyncio.to_thread(lambda: [self._embed_one(text) for text in texts])
 
     def _embed_one(self, text: str) -> list[float]:
         vector = [0.0] * self.dimension

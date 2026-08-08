@@ -18,7 +18,7 @@ argued from blog posts.
 
 ```
 agent/base.py        AgentBackend protocol + AgentEvent stream (the contract)
-agent/tools.py       ToolRegistry — ONE tool source for all backends
+agent/tools/         ToolRegistry — ONE tool source for all backends
 agent/backends/
   custom.py     103 lines   the loop, no dependencies
   pydantic_ai.py 209 lines  Pydantic AI runtime

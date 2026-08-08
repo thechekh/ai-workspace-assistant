@@ -17,12 +17,12 @@ from assistant.agent.base import (
     ToolCall,
     ToolCallEvent,
     ToolResultEvent,
+    truncate_for_event,
 )
 from assistant.agent.tools import ToolRegistry
 from assistant.llm.client import LLMClient, TextDelta, ToolCallRequest
 
 # Tool output shown in the UI event is trimmed; the LLM always gets the full text.
-_EVENT_RESULT_LIMIT = 1500
 
 
 def _parse_arguments(raw: str) -> dict[str, object]:
@@ -45,7 +45,9 @@ class CustomAgent:
     ) -> None:
         self._llm = llm
         self._system_prompt = system_prompt
-        self._tools = tools
+        # Never None: an empty registry behaves identically and removes a
+        # dead branch from the hot loop.
+        self._tools = tools if tools is not None else ToolRegistry()
         self._max_iterations = max_iterations
 
     async def run(self, history: list[ChatMessage], user_message: str) -> AsyncIterator[AgentEvent]:
@@ -54,7 +56,7 @@ class CustomAgent:
             *history,
             ChatMessage(role="user", content=user_message),
         ]
-        specs = self._tools.specs if self._tools and len(self._tools) else None
+        specs = self._tools.specs if len(self._tools) else None
 
         for _ in range(self._max_iterations):
             parts: list[str] = []
@@ -84,16 +86,8 @@ class CustomAgent:
             for request in requests:
                 arguments = _parse_arguments(request.arguments)
                 yield ToolCallEvent(tool=request.name, arguments=arguments)
-                if self._tools is None:
-                    result = f"error: unknown tool {request.name!r}"
-                else:
-                    result = await self._tools.execute(request.name, arguments)
-                shown = (
-                    result
-                    if len(result) <= _EVENT_RESULT_LIMIT
-                    else result[:_EVENT_RESULT_LIMIT] + "…"
-                )
-                yield ToolResultEvent(tool=request.name, result=shown)
+                result = await self._tools.execute(request.name, arguments)
+                yield ToolResultEvent(tool=request.name, result=truncate_for_event(result))
                 messages.append(ChatMessage(role="tool", content=result, tool_call_id=request.id))
 
         yield FinalEvent(

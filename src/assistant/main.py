@@ -13,10 +13,11 @@ from redis.asyncio import Redis
 from assistant.agent.base import AgentBackend
 from assistant.agent.registry import build_agents
 from assistant.agent.tools import Tool, ToolRegistry, make_fetch_url, make_search_docs
+from assistant.agent.tools.fetch import new_http_client
 from assistant.api.routes import router as api_router
 from assistant.api.ws import router as ws_router
 from assistant.config import Settings
-from assistant.llm.client import LLMClient, build_llm
+from assistant.llm.client import LLMClient, OpenAICompatibleLLM, build_llm
 from assistant.logs import configure_logging
 from assistant.mcp.registry import MCPRegistry
 from assistant.memory.conversation import ConversationMemory
@@ -81,10 +82,11 @@ def create_app(
             mcp_registry = MCPRegistry(app_settings.mcp_servers)
             mcp_tools = await mcp_registry.start()
 
+        # One pooled outbound client for the whole app, closed on shutdown.
+        http_client = new_http_client()
         native_tools = [make_search_docs(resolved_retriever)] if resolved_retriever else []
-        native_tools.append(make_fetch_url())
-        all_tools = native_tools + mcp_tools
-        tools = ToolRegistry(all_tools) if all_tools else None
+        native_tools.append(make_fetch_url(client=http_client))
+        tools = ToolRegistry(native_tools + mcp_tools)
 
         agents = (
             {app_settings.agent_backend: agent}
@@ -117,6 +119,12 @@ def create_app(
         finally:
             if mcp_registry is not None:
                 await mcp_registry.close()
+            await http_client.aclose()
+            # Release the provider SDK's own connection pool too. Only the
+            # hosted client has aclose(); FakeLLM and the wrapper do not.
+            inner = getattr(resolved_llm, "_inner", resolved_llm)
+            if isinstance(inner, OpenAICompatibleLLM):
+                await inner.aclose()
             if owns_redis:
                 await client.aclose()
             if qdrant is not None:

@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from openai import APIConnectionError, APIError, BadRequestError, RateLimitError
 
 from assistant.agent.base import ChatMessage
-from assistant.api.ws import _describe_llm_error
 from assistant.llm.client import (
     FakeLLM,
     OpenAICompatibleLLM,
@@ -19,6 +18,7 @@ from assistant.llm.client import (
     ToolCallRequest,
     parse_leaked_tool_calls,
 )
+from assistant.llm.errors import describe_llm_error
 from assistant.main import create_app
 from assistant.telemetry import estimate_cost_usd
 from tests.conftest import HermeticSettings, collect_until_final
@@ -54,7 +54,7 @@ class _StatusError(Exception):
     ],
 )
 def test_describe_llm_error_maps_status_codes(status, kind, needle):
-    mapped = _describe_llm_error(_StatusError(status))
+    mapped = describe_llm_error(_StatusError(status))
     assert mapped is not None
     assert mapped[0] == kind
     assert needle.lower() in mapped[1].lower()
@@ -67,20 +67,20 @@ def test_describe_llm_error_walks_the_cause_chain():
         except _StatusError as inner:
             raise RuntimeError("backend wrapper") from inner
     except RuntimeError as wrapped:
-        mapped = _describe_llm_error(wrapped)
+        mapped = describe_llm_error(wrapped)
     assert mapped is not None
     assert mapped[0] == "rate_limited"
 
 
 def test_describe_llm_error_handles_connection_errors():
     exc = APIConnectionError(request=httpx.Request("POST", "https://api.test"))
-    mapped = _describe_llm_error(exc)
+    mapped = describe_llm_error(exc)
     assert mapped is not None
     assert mapped[0] == "provider_unreachable"
 
 
 def test_describe_llm_error_passes_on_unrelated_exceptions():
-    assert _describe_llm_error(ValueError("nothing to do with LLMs")) is None
+    assert describe_llm_error(ValueError("nothing to do with LLMs")) is None
 
 
 # --- WS error frames ----------------------------------------------------------
@@ -306,7 +306,7 @@ async def test_stream_step_never_retries_after_text_was_forwarded():
 
 
 def test_describe_llm_error_maps_tool_use_failure():
-    mapped = _describe_llm_error(_tool_use_error())
+    mapped = describe_llm_error(_tool_use_error())
     assert mapped is not None
     assert mapped[0] == "tool_use_failed"
     assert "send the message again" in mapped[1]

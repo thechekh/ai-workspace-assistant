@@ -49,11 +49,16 @@ from assistant.agent.base import (
     ToolCall,
     ToolCallEvent,
     ToolResultEvent,
+    truncate_for_event,
 )
 from assistant.agent.tools import ToolRegistry
-from assistant.llm.client import LLMClient, TextDelta, ToolCallRequest, ToolSpec
-
-_EVENT_RESULT_LIMIT = 1500
+from assistant.llm.client import (
+    LLMClient,
+    TextDelta,
+    ToolCallRequest,
+    ToolSpec,
+    to_openai_tools,
+)
 
 
 def _lc_to_ours(messages: Sequence[BaseMessage]) -> list[ChatMessage]:
@@ -163,25 +168,15 @@ class LangGraphAgent:
         max_iterations: int = 6,
     ) -> None:
         self._system_prompt = system_prompt
-        self._tools = tools
+        self._tools = tools if tools is not None else ToolRegistry()
         self._max_iterations = max_iterations
 
         model = LLMClientChatModel(llm)
-        if tools and len(tools):
-            openai_tools = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": spec.name,
-                        "description": spec.description,
-                        "parameters": spec.parameters,
-                    },
-                }
-                for spec in tools.specs
-            ]
-            self._model = model.bind(tools=openai_tools)
-        else:
-            self._model = model
+        # Same wire shape the LLM client sends — built by one helper so the
+        # two paths cannot describe the same tool differently.
+        self._model = (
+            model.bind(tools=to_openai_tools(self._tools.specs)) if len(self._tools) else model
+        )
 
         self._graph = self._build_graph()
 
@@ -200,10 +195,7 @@ class LangGraphAgent:
             last = cast("AIMessage", state["messages"][-1])
             results: list[BaseMessage] = []
             for call in last.tool_calls:
-                if self._tools is None:
-                    result = f"error: unknown tool {call['name']!r}"
-                else:
-                    result = await self._tools.execute(call["name"], dict(call["args"]))
+                result = await self._tools.execute(call["name"], dict(call["args"]))
                 results.append(
                     ToolMessage(content=result, tool_call_id=call["id"] or "", name=call["name"])
                 )
@@ -271,10 +263,10 @@ class LangGraphAgent:
                             else:
                                 final_text = str(message.content)
                         elif isinstance(message, ToolMessage):
-                            text = str(message.content)
-                            if len(text) > _EVENT_RESULT_LIMIT:
-                                text = text[:_EVENT_RESULT_LIMIT] + "…"
-                            yield ToolResultEvent(tool=message.name or "unknown", result=text)
+                            yield ToolResultEvent(
+                                tool=message.name or "unknown",
+                                result=truncate_for_event(str(message.content)),
+                            )
         except GraphRecursionError:
             yield FinalEvent(
                 content=(

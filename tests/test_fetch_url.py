@@ -10,7 +10,7 @@ from typing import ClassVar
 import pytest
 
 from assistant.agent.base import ChatMessage
-from assistant.agent.tools import _NO_RELEVANT_DOCS, make_fetch_url, make_search_docs, strip_html
+from assistant.agent.tools import NO_RELEVANT_DOCS, make_fetch_url, make_search_docs, strip_html
 from assistant.llm.client import FakeLLM, ToolCallRequest, ToolSpec
 from assistant.rag.rerank import query_overlap
 from tests.conftest import build_seeded_retriever_async
@@ -30,7 +30,7 @@ async def test_search_docs_gates_unrelated_queries():
     retriever = await build_seeded_retriever_async()
     tool = make_search_docs(retriever)
     result = await tool.handler({"query": "awsomequiz streamlit certificates chinese pinyin"})
-    assert result == _NO_RELEVANT_DOCS
+    assert result == NO_RELEVANT_DOCS
 
 
 async def test_search_docs_still_returns_relevant_chunks():
@@ -72,6 +72,10 @@ class FakeAsyncClient:
             if url.startswith(prefix):
                 return response
         return FakeResponse(status_code=404)
+
+    async def aclose(self):
+        """make_fetch_url closes any client it created itself."""
+        return None
 
 
 @pytest.fixture

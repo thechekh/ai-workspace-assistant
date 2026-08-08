@@ -187,7 +187,7 @@ def _to_openai_messages(messages: list[ChatMessage]) -> list[ChatCompletionMessa
     return cast("list[ChatCompletionMessageParam]", payload)
 
 
-def _to_openai_tools(tools: list[ToolSpec]) -> list[ChatCompletionToolParam]:
+def to_openai_tools(tools: list[ToolSpec]) -> list[ChatCompletionToolParam]:
     return cast(
         "list[ChatCompletionToolParam]",
         [
@@ -234,7 +234,7 @@ class OpenAICompatibleLLM:
             "stream_options": {"include_usage": True},
         }
         if tools:
-            create_kwargs["tools"] = _to_openai_tools(tools)
+            create_kwargs["tools"] = to_openai_tools(tools)
 
         # Tool-call fragments arrive interleaved across chunks; accumulate by index.
         pending: dict[int, dict[str, str]] = {}

@@ -3,7 +3,6 @@ import uuid
 
 import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from openai import APIConnectionError
 from pydantic import ValidationError
 
 from assistant.agent.base import (
@@ -16,7 +15,7 @@ from assistant.agent.base import (
     ToolResultEvent,
 )
 from assistant.api.schemas import SessionStarted, TurnSummary, UserMessage
-from assistant.llm.client import is_tool_use_failure
+from assistant.llm.errors import describe_llm_error
 from assistant.memory.conversation import ConversationMemory
 from assistant.memory.session import SessionStore
 from assistant.telemetry import (
@@ -36,58 +35,6 @@ logger = structlog.get_logger("assistant.ws")
 
 def _elapsed_ms(started: float) -> int:
     return round((time.perf_counter() - started) * 1000)
-
-
-def _describe_llm_error(exc: Exception) -> tuple[str, str] | None:
-    """Map a provider error (possibly wrapped by a backend) to (metric kind,
-    user-facing message). Works by status_code duck-typing so it catches
-    openai APIStatusError and pydantic-ai ModelHTTPError alike; returns None
-    for anything that isn't provider-shaped (callers fall back to a generic
-    message)."""
-    current: BaseException | None = exc
-    for _ in range(10):  # bounded walk down the __cause__/__context__ chain
-        if current is None:
-            return None
-        if is_tool_use_failure(current):
-            return (
-                "tool_use_failed",
-                "The model failed to generate a valid tool call (a known llama "
-                "flake, already retried) — send the message again or rephrase.",
-            )
-        status = getattr(current, "status_code", None)
-        if isinstance(status, int):
-            detail = str(getattr(current, "message", None) or current)[:200]
-            if status == 429:
-                # Pass the provider's own text through — it says WHICH limit
-                # (per-minute vs per-day) and how long to wait; our guess would
-                # mislead (a daily cap won't clear "in a few seconds").
-                return (
-                    "rate_limited",
-                    f"LLM rate limit hit (429). Provider says: {detail}"
-                    if detail
-                    else "LLM rate limit hit (429) — wait and retry, or switch "
-                    "ASSISTANT_LLM_MODEL to a model with remaining quota.",
-                )
-            if status in (401, 403):
-                return (
-                    "auth_failed",
-                    "LLM authentication failed — check ASSISTANT_LLM_API_KEY.",
-                )
-            if status == 404:
-                return (
-                    "model_unavailable",
-                    f"Model not available — check ASSISTANT_LLM_MODEL. Provider says: {detail}",
-                )
-            if status >= 500:
-                return "provider_error", f"LLM provider error ({status}) — try again shortly."
-            return "llm_bad_request", f"LLM rejected the request ({status}): {detail}"
-        if isinstance(current, APIConnectionError):  # includes APITimeoutError
-            return (
-                "provider_unreachable",
-                "Cannot reach the LLM provider — check the network and ASSISTANT_LLM_BASE_URL.",
-            )
-        current = current.__cause__ or current.__context__
-    return None
 
 
 @router.websocket("/chat")
@@ -237,7 +184,7 @@ async def _handle_turn(
             logger.info("turn.abandoned")
             raise
         except Exception as exc:
-            kind, message = _describe_llm_error(exc) or (
+            kind, message = describe_llm_error(exc) or (
                 "turn_exception",
                 "server error — check server logs (is Redis/Qdrant running?)",
             )

@@ -75,7 +75,7 @@ are extractive but the full tool loop is real.
 | Agent contract | `agent/base.py` | one protocol, one event stream |
 | The loop | `agent/backends/custom.py` | ReAct in ~100 lines |
 | Frameworks | `agent/backends/pydantic_ai.py`, `langgraph.py` | adapters, streaming APIs, checkpointer |
-| Tools | `agent/tools.py` | registry shared by all backends |
+| Tools | `agent/tools/` | registry shared by all backends |
 | MCP | `mcp/registry.py`, `mcp_servers/` | client + bundled servers |
 | RAG | `rag/` | chunking → embeddings → hybrid store → rerank |
 | Memory | `memory/` | Redis history + rolling summary |

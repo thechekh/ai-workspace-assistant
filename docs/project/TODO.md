@@ -86,7 +86,7 @@ but none of them is letting a bug through today.
       dead branches.
 
 - [ ] **HTTP clients created per call** 🔍 — `make_fetch_url` builds a fresh
-      `httpx.AsyncClient` per invocation ([tools.py:236](../../src/assistant/agent/tools.py#L236)),
+      `httpx.AsyncClient` per invocation ([tools/fetch.py](../../src/assistant/agent/tools/fetch.py)),
       so every call pays a TCP+TLS handshake (twice on the GitHub path); same
       in `VoyageEmbedder.embed`. `OpenAIEmbedder._client` is never closed.
       **Fix:** one pooled client in the lifespan, injected; `aclose()` in the

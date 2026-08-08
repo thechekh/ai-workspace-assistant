@@ -78,7 +78,7 @@ every agent framework is a wrapper around exactly this.
   wrong and usually self-corrects. ([`tests/test_tool_loop.py`](../../tests/test_tool_loop.py)
   covers every branch with a scripted LLM.)
 - **The registry is an allowlist.** The model can only request tools we
-  registered ([`agent/tools.py`](../../src/assistant/agent/tools.py)); there is
+  registered ([`agent/tools/base.py`](../../src/assistant/agent/tools/base.py)); there is
   no "run arbitrary code" escape hatch.
 
 ## Streaming events, not just text

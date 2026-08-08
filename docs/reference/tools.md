@@ -7,14 +7,14 @@ one registry — a tool is written once and works everywhere.
 
 ## How tools work (the plumbing)
 
-**One shape.** A tool is a [`Tool`](../../src/assistant/agent/tools.py) dataclass:
+**One shape.** A tool is a [`Tool`](../../src/assistant/agent/tools/base.py) dataclass:
 `name`, `description`, `parameters` (a JSON Schema), and an async `handler`
 that takes a `dict` of arguments and returns a `str`. `Tool.spec` converts it
 to the OpenAI function-calling wire format that every LLM provider we use
 understands (Groq, OpenAI, Ollama, Gemini — and `FakeLLM` mimics it offline).
 
 **One execution seam.** Every call — from any backend — goes through
-[`Tool.run`](../../src/assistant/agent/tools.py), which is where all telemetry
+[`Tool.run`](../../src/assistant/agent/tools/base.py), which is where all telemetry
 lives:
 
 1. opens an OTel span `tool.execute` (attrs: `tool.name`, `tool.status`,
@@ -73,7 +73,7 @@ degradation). Servers are configured via `ASSISTANT_MCP_SERVERS` JSON
 | Parameters | `query` *(string, required)* — natural-language search query |
 | Returns | Up to 4 chunks, each as `[source.md — heading] (score 0.87)` + chunk text (truncated ~1200 chars), separated by `---`. `"No matching documents found."` when nothing matches |
 | Errors | `error: the 'query' argument is required` on an empty query |
-| Implementation | [`make_search_docs`](../../src/assistant/agent/tools.py) → [`Retriever.search`](../../src/assistant/rag/retriever.py) |
+| Implementation | [`make_search_docs`](../../src/assistant/agent/tools/search_docs.py) → [`Retriever.search`](../../src/assistant/rag/retriever.py) |
 
 Under the hood the retriever embeds the query (hash embedder by default,
 OpenAI/Voyage when configured), runs **hybrid** search in Qdrant (dense +
@@ -101,7 +101,7 @@ about internal systems and to cite the source files it gets back.
 | Parameters | `url` *(string, required)* — absolute http(s) URL |
 | Returns | Readable text of the page (HTML stripped), capped at 8 000 chars. **GitHub special cases** via the API: `github.com/{owner}/{repo}` → description, language, stars, topics + README (first 6 000 chars); `github.com/{owner}` → account info + list of public repositories |
 | Errors | `error: only http(s) URLs are supported`, `error: refusing to fetch private or loopback addresses`, `error: GET <url> returned HTTP <status>`, `error: could not fetch <url>: <why>` |
-| Implementation | [`make_fetch_url`](../../src/assistant/agent/tools.py) — httpx, 15 s timeout, redirects followed |
+| Implementation | [`make_fetch_url`](../../src/assistant/agent/tools/fetch.py) — httpx, 15 s timeout, redirects followed |
 
 Notes: the loopback/private-range block is a **dev-grade** SSRF guard (string
 match on the host; production would resolve DNS and enforce an egress

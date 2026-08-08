@@ -86,7 +86,7 @@ Goal: the assistant can answer from *our* docs.
 Goal: the real ReAct loop — the model decides when to call tools.
 
 - [x] `LLMClient.stream_step()`: streamed `TextDelta` + accumulated `ToolCallRequest` events (OpenAI tools API); `ChatMessage` extended with `tool` role + `tool_calls`
-- [x] `agent/tools.py`: `Tool` + `ToolRegistry` shared by all backends; first tool: `search_docs` (RAG retriever, source-tagged results)
+- [x] `agent/tools/`: `Tool` + `ToolRegistry` shared by all backends; first tool: `search_docs` (RAG retriever, source-tagged results)
 - [x] CustomAgent v2: loop — LLM → tool_calls? → execute → append results → repeat, bounded by `max_iterations`; crashing/unknown tools become error results, not exceptions
 - [x] WS `tool_call` / `tool_result` events wired through; UI cards render them
 - [x] FakeLLM plays a one-round agent offline (question → search_docs → grounded answer) — the whole demo runs at $0 with no API key

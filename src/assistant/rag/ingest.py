@@ -21,11 +21,18 @@ from assistant.rag.store import VectorStore
 
 
 def load_chunks(corpus_dir: Path) -> list[Chunk]:
+    """Read and chunk every doc. Synchronous by design — callers on an event
+    loop must go through `load_chunks_async`."""
     chunks: list[Chunk] = []
     for path in sorted(corpus_dir.rglob("*.md")):
         source = path.relative_to(corpus_dir).as_posix()
         chunks.extend(chunk_markdown(path.read_text(encoding="utf-8"), source=source))
     return chunks
+
+
+async def load_chunks_async(corpus_dir: Path) -> list[Chunk]:
+    """Off-loop wrapper: file reads + chunking must not stall live chats."""
+    return await asyncio.to_thread(load_chunks, corpus_dir)
 
 
 async def ingest(
@@ -42,7 +49,7 @@ async def ingest(
     store = VectorStore(qdrant, collection or settings.qdrant_collection)
     embedder = build_embedder(settings)
     try:
-        chunks = load_chunks(corpus_dir)
+        chunks = await load_chunks_async(corpus_dir)
         if not chunks:
             return 0
         dense_vectors = await embedder.embed([chunk.text for chunk in chunks])

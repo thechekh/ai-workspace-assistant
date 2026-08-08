@@ -47,7 +47,7 @@ prompt budget. Heading-bounded ~300–500 tokens is the well-tested middle.
 
 **In this project:** [`rag/retriever.py`](../../src/assistant/rag/retriever.py),
 exposed to the agent as the `search_docs` tool
-([`agent/tools.py`](../../src/assistant/agent/tools.py)).
+([`agent/tools/search_docs.py`](../../src/assistant/agent/tools/search_docs.py)).
 
 1. The agent decides the question needs docs and calls
    `search_docs(query=...)` (chapter 04 — the *model* makes this decision).

@@ -11,7 +11,7 @@ import structlog
 
 from assistant.config import RetrievalMode
 from assistant.rag.embeddings import Embedder
-from assistant.rag.rerank import Reranker
+from assistant.rag.rerank import Reranker, query_overlap
 from assistant.rag.sparse import encode_sparse
 from assistant.rag.store import RetrievedChunk, VectorStore
 from assistant.telemetry import RETRIEVAL_SECONDS, tracer
@@ -57,6 +57,15 @@ class Retriever:
             if self._reranker:
                 candidates = self._reranker.rerank(query, candidates, limit=limit)
             results = candidates[:limit]
+            # Relevance gate. Vector search always returns top-k, even for a
+            # query about something the corpus has never heard of, and
+            # RRF/hash scores are not calibrated enough to threshold on. Drop
+            # chunks that share no meaningful token with the query so callers
+            # can trust "empty means nothing relevant" instead of receiving
+            # confident-looking noise.
+            gated = [chunk for chunk in results if query_overlap(query, chunk.text) > 0]
+            span.set_attribute("rag.gated_out", len(results) - len(gated))
+            results = gated
             span.set_attribute("rag.results", len(results))
             if results:
                 span.set_attribute("rag.top_score", results[0].score)

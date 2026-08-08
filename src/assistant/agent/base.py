@@ -55,6 +55,15 @@ class ErrorEvent(BaseModel):
 
 AgentEvent = TokenEvent | ToolCallEvent | ToolResultEvent | FinalEvent | ErrorEvent
 
+# How much of a tool result reaches the UI. Defined once: three backends
+# drifting on this would silently change what users see per runtime.
+EVENT_RESULT_LIMIT = 1500
+
+
+def truncate_for_event(result: str, limit: int = EVENT_RESULT_LIMIT) -> str:
+    """Clip a tool result for a ToolResultEvent, marking that it was clipped."""
+    return result if len(result) <= limit else result[:limit] + "…"
+
 
 class AgentBackend(Protocol):
     def run(self, history: list[ChatMessage], user_message: str) -> AsyncIterator[AgentEvent]:
