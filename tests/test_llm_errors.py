@@ -225,6 +225,20 @@ async def test_create_stream_drops_stream_options_on_bad_request():
 # --- Groq "tool_use_failed" mid-stream flake -----------------------------------
 
 
+class _AsyncStreamFake:
+    """Base for stream doubles: real AsyncStream is an async context manager,
+    and stream_step now closes the response deterministically with `async with`."""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    def __aiter__(self):
+        return self
+
+
 def _tool_use_error(failed_generation: str | None = None) -> APIError:
     body: dict[str, object] = {"code": "tool_use_failed"}
     if failed_generation is not None:
@@ -241,20 +255,14 @@ def _chunk(content: str) -> SimpleNamespace:
     return SimpleNamespace(usage=None, choices=[SimpleNamespace(delta=delta)])
 
 
-class _FailingStream:
-    def __aiter__(self):
-        return self
-
+class _FailingStream(_AsyncStreamFake):
     async def __anext__(self):
         raise _tool_use_error()
 
 
-class _GoodStream:
+class _GoodStream(_AsyncStreamFake):
     def __init__(self, *texts: str) -> None:
         self._chunks = iter([_chunk(text) for text in texts])
-
-    def __aiter__(self):
-        return self
 
     async def __anext__(self):
         try:
@@ -276,12 +284,9 @@ async def test_stream_step_retries_groq_tool_use_failure():
 
 
 async def test_stream_step_never_retries_after_text_was_forwarded():
-    class FailsMidStream:
+    class FailsMidStream(_AsyncStreamFake):
         def __init__(self) -> None:
             self._sent = False
-
-        def __aiter__(self):
-            return self
 
         async def __anext__(self):
             if self._sent:
@@ -379,10 +384,7 @@ async def test_stream_step_recovers_call_from_failed_generation():
     leaked = '<function=search_docs>{"query":"openaddons"}</function>'
     attempts = 0
 
-    class AlwaysFailing:
-        def __aiter__(self):
-            return self
-
+    class AlwaysFailing(_AsyncStreamFake):
         async def __anext__(self):
             raise _tool_use_error(failed_generation=leaked)
 

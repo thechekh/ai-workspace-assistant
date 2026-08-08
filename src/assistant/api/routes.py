@@ -12,6 +12,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from assistant.api.schemas import SessionTurns, TurnRecord
 from assistant.config import Settings
 from assistant.rag.ingest import ingest
 
@@ -106,11 +107,28 @@ async def health(request: Request) -> dict[str, object]:
     return {"status": "degraded" if degraded else "ok", "components": components}
 
 
-@router.get("/sessions/{session_id}/turns", dependencies=[Depends(require_token)])
-async def session_turns(session_id: str, request: Request) -> dict[str, object]:
+@router.get(
+    "/sessions/{session_id}/turns",
+    dependencies=[Depends(require_token)],
+    response_model=SessionTurns,
+)
+async def session_turns(session_id: str, request: Request) -> SessionTurns:
     """Audit trail: per-turn stats + event timeline (last 50 turns of a session)."""
     turns = await request.app.state.session_store.turns(session_id)
-    return {"session_id": session_id, "count": len(turns), "turns": turns}
+    return SessionTurns(session_id=session_id, count=len(turns), turns=turns)
+
+
+@router.get(
+    "/sessions/{session_id}/turns/{turn_id}",
+    dependencies=[Depends(require_token)],
+    response_model=TurnRecord,
+)
+async def session_turn(session_id: str, turn_id: str, request: Request) -> TurnRecord:
+    """One turn — what the UI's "details" panel needs, instead of all 50."""
+    record = await request.app.state.session_store.turn(session_id, turn_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"no turn {turn_id!r} in this session")
+    return record
 
 
 @router.post("/reindex", dependencies=[Depends(require_token)])

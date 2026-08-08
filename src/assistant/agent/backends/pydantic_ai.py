@@ -131,7 +131,9 @@ class PydanticAIAgent:
                                     arguments=event.part.args_as_dict(),
                                 )
                             elif isinstance(event, FunctionToolResultEvent):
-                                part = event.result
+                                # pydantic-ai 2.x renamed `.result` to `.part`
+                                # (inherited from the ToolResultEvent base).
+                                part = event.part
                                 text = (
                                     str(part.content)
                                     if isinstance(part, ToolReturnPart)

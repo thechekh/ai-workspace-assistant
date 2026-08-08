@@ -11,6 +11,11 @@ import uuid
 from redis.asyncio import Redis
 
 from assistant.agent.base import ChatMessage
+from assistant.api.schemas import TurnRecord
+
+# Audit trail depth per session — enough to debug a conversation, bounded
+# so a long session cannot grow without limit.
+_MAX_AUDIT_TURNS = 50
 
 
 class SessionStore:
@@ -39,16 +44,23 @@ class SessionStore:
     def _turns_key(session_id: str) -> str:
         return f"session:{session_id}:turns"
 
-    async def append_turn(self, session_id: str, record: dict[str, object]) -> None:
+    async def append_turn(self, session_id: str, record: TurnRecord) -> None:
         """Audit trail: one record per turn (summary + event timeline), capped at 50."""
         key = self._turns_key(session_id)
-        await self._redis.rpush(key, json.dumps(record))
-        await self._redis.ltrim(key, -50, -1)
+        await self._redis.rpush(key, record.model_dump_json())
+        await self._redis.ltrim(key, -_MAX_AUDIT_TURNS, -1)
         await self._redis.expire(key, self._ttl)
 
-    async def turns(self, session_id: str) -> list[dict[str, object]]:
+    async def turns(self, session_id: str) -> list[TurnRecord]:
         raw = await self._redis.lrange(self._turns_key(session_id), 0, -1)
-        return [json.loads(item) for item in raw]
+        return [TurnRecord.model_validate_json(item) for item in raw]
+
+    async def turn(self, session_id: str, turn_id: str) -> TurnRecord | None:
+        """One turn by id — what the UI's "details" panel actually needs."""
+        for record in await self.turns(session_id):
+            if record.turn_id == turn_id:
+                return record
+        return None
 
     @staticmethod
     def _summary_key(session_id: str) -> str:

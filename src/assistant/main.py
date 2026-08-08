@@ -1,7 +1,9 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 
+import httpx
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Response
 from fastapi.responses import FileResponse
@@ -40,6 +42,115 @@ def _redis_from_url(url: str) -> Redis:
     return aioredis.from_url(url, decode_responses=True)
 
 
+@dataclass
+class Runtime:
+    """Everything a request needs, built once at startup and closed at shutdown.
+
+    Assembling this separately from `create_app` keeps the wiring readable and
+    means tests can replace whole collaborators without the factory growing
+    another `if x is None` branch.
+    """
+
+    settings: Settings
+    redis: Redis
+    llm: LLMClient
+    session_store: SessionStore
+    memory: ConversationMemory
+    agents: dict[str, AgentBackend]
+    tools: ToolRegistry
+    http_client: httpx.AsyncClient
+    qdrant: AsyncQdrantClient | None = None
+    mcp_registry: MCPRegistry | None = None
+    mcp_tool_names: list[str] = field(default_factory=list)
+    owns_redis: bool = True
+
+    async def aclose(self) -> None:
+        """Release every resource this runtime owns, best-effort and in order."""
+        if self.mcp_registry is not None:
+            await self.mcp_registry.close()
+        await self.http_client.aclose()
+        # The provider SDK keeps its own pool; only the hosted client has one.
+        inner = getattr(self.llm, "_inner", self.llm)
+        if isinstance(inner, OpenAICompatibleLLM):
+            await inner.aclose()
+        if self.owns_redis:
+            await self.redis.aclose()
+        if self.qdrant is not None:
+            await self.qdrant.close()
+
+
+async def build_runtime(
+    settings: Settings,
+    *,
+    redis_client: Redis | None = None,
+    llm: LLMClient | None = None,
+    agent: AgentBackend | None = None,
+    retriever: Retriever | None = None,
+) -> Runtime:
+    """Wire the whole application graph. Overrides are for tests."""
+    redis = redis_client or _redis_from_url(settings.redis_url)
+    # One telemetry seam for every provider (FakeLLM included, so tests run
+    # the same path): span + metrics + token usage per LLM step.
+    resolved_llm: LLMClient = InstrumentedLLM(
+        llm or build_llm(settings),
+        provider=settings.llm_provider,
+        model=settings.llm_model,
+        log_prompts=settings.log_prompts,
+    )
+
+    qdrant: AsyncQdrantClient | None = None
+    resolved_retriever = retriever
+    if agent is None and resolved_retriever is None:
+        qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+        resolved_retriever = Retriever(
+            build_embedder(settings),
+            VectorStore(qdrant, settings.qdrant_collection),
+            mode=settings.retrieval_mode,
+            reranker=LexicalReranker() if settings.rerank_enabled else None,
+        )
+
+    mcp_registry: MCPRegistry | None = None
+    mcp_tools: list[Tool] = []
+    if agent is None and settings.mcp_enabled and settings.mcp_servers:
+        mcp_registry = MCPRegistry(settings.mcp_servers)
+        mcp_tools = await mcp_registry.start()
+
+    # One pooled outbound client for the whole app, closed on shutdown.
+    http_client = new_http_client()
+    native_tools = [make_search_docs(resolved_retriever)] if resolved_retriever else []
+    native_tools.append(make_fetch_url(client=http_client))
+    tools = ToolRegistry(native_tools + mcp_tools)
+
+    agents = (
+        {settings.agent_backend: agent}
+        if agent is not None
+        else build_agents(settings, resolved_llm, tools=tools)
+    )
+    if settings.agent_backend not in agents:
+        raise NotImplementedError(f"unknown agent backend {settings.agent_backend!r}")
+
+    session_store = SessionStore(redis, ttl_seconds=settings.session_ttl_seconds)
+    return Runtime(
+        settings=settings,
+        redis=redis,
+        llm=resolved_llm,
+        session_store=session_store,
+        memory=ConversationMemory(
+            session_store,
+            build_summarizer(settings, resolved_llm),
+            char_budget=settings.history_char_budget,
+            keep_recent=settings.history_keep_recent,
+        ),
+        agents=agents,
+        tools=tools,
+        http_client=http_client,
+        qdrant=qdrant,
+        mcp_registry=mcp_registry,
+        mcp_tool_names=[tool.name for tool in mcp_tools],
+        owns_redis=redis_client is None,
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     *,
@@ -54,81 +165,27 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        owns_redis = redis_client is None
-        client = redis_client or _redis_from_url(app_settings.redis_url)
-        # One telemetry seam for every provider (FakeLLM included, so tests run
-        # the same path): span + metrics + token usage per LLM step.
-        resolved_llm: LLMClient = InstrumentedLLM(
-            llm or build_llm(app_settings),
-            provider=app_settings.llm_provider,
-            model=app_settings.llm_model,
-            log_prompts=app_settings.log_prompts,
+        runtime = await build_runtime(
+            app_settings,
+            redis_client=redis_client,
+            llm=llm,
+            agent=agent,
+            retriever=retriever,
         )
-
-        qdrant: AsyncQdrantClient | None = None
-        resolved_retriever = retriever
-        if agent is None and resolved_retriever is None:
-            qdrant = AsyncQdrantClient(url=app_settings.qdrant_url)
-            resolved_retriever = Retriever(
-                build_embedder(app_settings),
-                VectorStore(qdrant, app_settings.qdrant_collection),
-                mode=app_settings.retrieval_mode,
-                reranker=LexicalReranker() if app_settings.rerank_enabled else None,
-            )
-
-        mcp_registry: MCPRegistry | None = None
-        mcp_tools: list[Tool] = []
-        if agent is None and app_settings.mcp_enabled and app_settings.mcp_servers:
-            mcp_registry = MCPRegistry(app_settings.mcp_servers)
-            mcp_tools = await mcp_registry.start()
-
-        # One pooled outbound client for the whole app, closed on shutdown.
-        http_client = new_http_client()
-        native_tools = [make_search_docs(resolved_retriever)] if resolved_retriever else []
-        native_tools.append(make_fetch_url(client=http_client))
-        tools = ToolRegistry(native_tools + mcp_tools)
-
-        agents = (
-            {app_settings.agent_backend: agent}
-            if agent is not None
-            else build_agents(app_settings, resolved_llm, tools=tools)
-        )
-        if app_settings.agent_backend not in agents:
-            raise NotImplementedError(
-                f"agent backend {app_settings.agent_backend!r} arrives in a later phase"
-            )
-
-        session_store = SessionStore(client, ttl_seconds=app_settings.session_ttl_seconds)
-        app.state.settings = app_settings
+        app.state.settings = runtime.settings
+        app.state.session_store = runtime.session_store
+        app.state.memory = runtime.memory
+        app.state.agents = runtime.agents
+        app.state.default_backend = runtime.settings.agent_backend
         # Live dependency handles for the deep health check (/api/health).
-        app.state.redis = client
-        app.state.qdrant = qdrant
-        app.state.mcp_registry = mcp_registry
-        app.state.mcp_tool_names = [tool.name for tool in mcp_tools]
-        app.state.session_store = session_store
-        app.state.memory = ConversationMemory(
-            session_store,
-            build_summarizer(app_settings, resolved_llm),
-            char_budget=app_settings.history_char_budget,
-            keep_recent=app_settings.history_keep_recent,
-        )
-        app.state.agents = agents
-        app.state.default_backend = app_settings.agent_backend
+        app.state.redis = runtime.redis
+        app.state.qdrant = runtime.qdrant
+        app.state.mcp_registry = runtime.mcp_registry
+        app.state.mcp_tool_names = runtime.mcp_tool_names
         try:
             yield
         finally:
-            if mcp_registry is not None:
-                await mcp_registry.close()
-            await http_client.aclose()
-            # Release the provider SDK's own connection pool too. Only the
-            # hosted client has aclose(); FakeLLM and the wrapper do not.
-            inner = getattr(resolved_llm, "_inner", resolved_llm)
-            if isinstance(inner, OpenAICompatibleLLM):
-                await inner.aclose()
-            if owns_redis:
-                await client.aclose()
-            if qdrant is not None:
-                await qdrant.close()
+            await runtime.aclose()
 
     app = FastAPI(title="AI Workspace Assistant", lifespan=lifespan)
     app.include_router(ws_router)

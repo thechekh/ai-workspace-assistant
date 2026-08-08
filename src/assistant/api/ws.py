@@ -10,11 +10,9 @@ from assistant.agent.base import (
     ChatMessage,
     ErrorEvent,
     FinalEvent,
-    TokenEvent,
-    ToolCallEvent,
-    ToolResultEvent,
 )
-from assistant.api.schemas import SessionStarted, TurnSummary, UserMessage
+from assistant.api.schemas import SessionStarted, UserMessage
+from assistant.api.turn_recorder import TurnRecorder
 from assistant.llm.errors import describe_llm_error
 from assistant.memory.conversation import ConversationMemory
 from assistant.memory.session import SessionStore
@@ -23,9 +21,7 @@ from assistant.telemetry import (
     ERRORS_TOTAL,
     TURN_SECONDS,
     TURNS_TOTAL,
-    TurnStats,
     current_turn_stats,
-    estimate_cost_usd,
     tracer,
 )
 
@@ -105,25 +101,21 @@ async def _handle_turn(
     user_message: str,
     llm_model: str,
 ) -> None:
-    """One user message: run the agent, forward events, record telemetry + audit."""
-    turn_id = uuid.uuid4().hex[:12]
-    started = time.perf_counter()
+    """One user message: run the agent, forward events, record telemetry + audit.
 
-    audit: list[dict[str, object]] = []
-    tool_names: list[str] = []
-    first_token_ms: int | None = None
-    answer_chars = 0
-
-    stats = TurnStats()
-    stats_token = current_turn_stats.set(stats)
+    The accounting lives in TurnRecorder; this function is the conductor —
+    it owns the socket, the span, the error mapping and persistence.
+    """
+    recorder = TurnRecorder(turn_id=uuid.uuid4().hex[:12], backend=backend, llm_model=llm_model)
+    stats_token = current_turn_stats.set(recorder.stats)
     with structlog.contextvars.bound_contextvars(
-        session_id=session_id, turn_id=turn_id, backend=backend
+        session_id=session_id, turn_id=recorder.turn_id, backend=backend
     ):
         logger.info("turn.start", user_chars=len(user_message))
         try:
             with tracer.start_as_current_span("agent.turn") as span:
                 span.set_attribute("session.id", session_id)
-                span.set_attribute("turn.id", turn_id)
+                span.set_attribute("turn.id", recorder.turn_id)
                 span.set_attribute("agent.backend", backend)
 
                 # Bounded view: rolling summary + recent turns (full transcript in Redis)
@@ -132,51 +124,16 @@ async def _handle_turn(
 
                 async for event in agent.run(history=history, user_message=user_message):
                     await websocket.send_text(event.model_dump_json())
-                    if isinstance(event, TokenEvent):
-                        if first_token_ms is None:
-                            first_token_ms = _elapsed_ms(started)
-                        answer_chars += len(event.content)
-                    elif isinstance(event, ToolCallEvent):
-                        tool_names.append(event.tool)
-                        audit.append(
-                            {
-                                "ms": _elapsed_ms(started),
-                                "type": "tool_call",
-                                "tool": event.tool,
-                                "arguments": str(event.arguments)[:300],
-                            }
-                        )
-                    elif isinstance(event, ToolResultEvent):
-                        audit.append(
-                            {
-                                "ms": _elapsed_ms(started),
-                                "type": "tool_result",
-                                "tool": event.tool,
-                                "result_chars": len(event.result),
-                            }
-                        )
-                    elif isinstance(event, FinalEvent):
+                    recorder.observe(event)
+                    if isinstance(event, FinalEvent):
                         await store.append(
                             session_id, ChatMessage(role="assistant", content=event.content)
                         )
-                        audit.append(
-                            {
-                                "ms": _elapsed_ms(started),
-                                "type": "final",
-                                "chars": len(event.content),
-                            }
-                        )
-                    elif isinstance(event, ErrorEvent):
-                        ERRORS_TOTAL.labels(kind="agent_event").inc()
-                        audit.append(
-                            {
-                                "ms": _elapsed_ms(started),
-                                "type": "error",
-                                "message": event.message[:300],
-                            }
-                        )
-                span.set_attribute("turn.tool_calls", len(tool_names))
-                span.set_attribute("turn.answer_chars", answer_chars)
+
+                if recorder.error_count:
+                    ERRORS_TOTAL.labels(kind="agent_event").inc(recorder.error_count)
+                span.set_attribute("turn.tool_calls", len(recorder.tool_calls))
+                span.set_attribute("turn.answer_chars", recorder.answer_chars)
         except WebSocketDisconnect:
             # The client went away mid-turn (closed tab, navigation). That is
             # routine, not a server error — let chat_endpoint end the loop
@@ -195,64 +152,24 @@ async def _handle_turn(
         finally:
             current_turn_stats.reset(stats_token)
 
-        duration_ms = _elapsed_ms(started)
+        summary = recorder.summary()
         TURNS_TOTAL.labels(backend=backend).inc()
-        TURN_SECONDS.labels(backend=backend).observe(duration_ms / 1000)
+        TURN_SECONDS.labels(backend=backend).observe(summary.duration_ms / 1000)
+        if summary.cost_usd:
+            COST_USD_TOTAL.labels(model=llm_model).inc(summary.cost_usd)
 
-        # The pydantic-ai backend runs its own model layer (not InstrumentedLLM),
-        # so fall back to structural estimates when the wrapper saw nothing.
-        llm_steps = stats.llm_steps or len(tool_names) + 1
-        usage_estimated = stats.usage_estimated or stats.llm_steps == 0
-        completion_tokens = stats.completion_tokens or answer_chars // 4
-        cost_usd = round(estimate_cost_usd(llm_model, stats.prompt_tokens, completion_tokens), 6)
-        if cost_usd:
-            COST_USD_TOTAL.labels(model=llm_model).inc(cost_usd)
-
-        summary = TurnSummary(
-            turn_id=turn_id,
-            backend=backend,
-            duration_ms=duration_ms,
-            first_token_ms=first_token_ms,
-            llm_steps=llm_steps,
-            tool_calls=tool_names,
-            prompt_tokens=stats.prompt_tokens,
-            completion_tokens=completion_tokens,
-            usage_estimated=usage_estimated,
-            cost_usd=cost_usd,
-        )
         try:
             await websocket.send_text(summary.model_dump_json())
         except Exception:  # client may close right after `final` — stats still get logged
             logger.info("turn.summary_send_failed")
+
         logger.info(
             "turn.summary",
-            duration_ms=duration_ms,
-            first_token_ms=first_token_ms,
-            llm_steps=llm_steps,
-            llm_ms=round(stats.llm_ms),
-            tool_calls=tool_names,
-            prompt_tokens=stats.prompt_tokens,
-            completion_tokens=completion_tokens,
-            usage_estimated=usage_estimated,
-            cost_usd=cost_usd,
-            answer_chars=answer_chars,
+            **summary.model_dump(exclude={"type", "turn_id", "backend"}),
+            llm_ms=round(recorder.stats.llm_ms),
+            answer_chars=recorder.answer_chars,
         )
         try:
-            await store.append_turn(
-                session_id,
-                {
-                    "turn_id": turn_id,
-                    "backend": backend,
-                    "duration_ms": duration_ms,
-                    "first_token_ms": first_token_ms,
-                    "llm_steps": llm_steps,
-                    "prompt_tokens": stats.prompt_tokens,
-                    "completion_tokens": completion_tokens,
-                    "usage_estimated": usage_estimated,
-                    "cost_usd": cost_usd,
-                    "tool_calls": tool_names,
-                    "events": audit,
-                },
-            )
+            await store.append_turn(session_id, recorder.record(summary))
         except Exception:
             logger.warning("turn.audit_store_failed", exc_info=True)

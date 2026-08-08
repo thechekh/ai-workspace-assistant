@@ -204,6 +204,74 @@ def to_openai_tools(tools: list[ToolSpec]) -> list[ChatCompletionToolParam]:
     )
 
 
+class _LeakedTextBuffer:
+    """Holds back leading text while it could still be llama's tool markup.
+
+    llama sometimes prints a tool call as prose (`<function.name>{...}`). We
+    cannot know until enough characters arrive, so the opening text is held:
+    as soon as it provably is *not* that prefix it is flushed and streaming
+    resumes normally. Whatever is still held at the end is parsed as a tool
+    call, or emitted as text if it turns out to be ordinary prose.
+    """
+
+    _PREFIX = "<function"
+
+    def __init__(self) -> None:
+        self._held: list[str] = []
+        self._holding = True
+
+    def push(self, text: str) -> str | None:
+        """Returns text to stream now, or None while still withholding."""
+        if not self._holding:
+            return text
+        self._held.append(text)
+        joined = "".join(self._held).lstrip()
+        if joined and not self._PREFIX.startswith(joined[: len(self._PREFIX)]):
+            self._holding = False  # ordinary prose — flush everything held
+            flushed = "".join(self._held)
+            self._held = []
+            return flushed
+        return None
+
+    def flush(self) -> list[LLMEvent]:
+        """Whatever never got streamed: recovered tool calls, or plain text."""
+        if not self._held:
+            return []
+        text = "".join(self._held)
+        self._held = []
+        leaked = parse_leaked_tool_calls(text)
+        if leaked:
+            logger.warning("recovered %d tool call(s) from text output", len(leaked))
+            return list(leaked)
+        return [TextDelta(text=text)]
+
+
+class _ToolCallAccumulator:
+    """Reassembles tool calls whose fragments arrive across many chunks."""
+
+    def __init__(self) -> None:
+        self._pending: dict[int, dict[str, str]] = {}
+
+    def add(self, fragment) -> None:
+        entry = self._pending.setdefault(fragment.index, {"id": "", "name": "", "arguments": ""})
+        if fragment.id:
+            entry["id"] = fragment.id
+        if fragment.function and fragment.function.name:
+            entry["name"] = fragment.function.name
+        if fragment.function and fragment.function.arguments:
+            entry["arguments"] += fragment.function.arguments
+
+    def finish(self) -> list[ToolCallRequest]:
+        return [
+            ToolCallRequest(
+                id=self._pending[i]["id"],
+                name=self._pending[i]["name"],
+                arguments=self._pending[i]["arguments"],
+            )
+            for i in sorted(self._pending)
+        ]
+
+
 class OpenAICompatibleLLM:
     def __init__(self, model: str, api_key: str, base_url: str | None) -> None:
         self.model = model
@@ -225,10 +293,12 @@ class OpenAICompatibleLLM:
     async def stream_step(
         self, messages: list[ChatMessage], tools: list[ToolSpec] | None = None
     ) -> AsyncIterator[LLMEvent]:
-        payload = _to_openai_messages(messages)
+        """One model step. The body is the retry shell; the two fiddly parts —
+        withholding leaked tool markup and reassembling fragmented tool calls —
+        live in the helpers above."""
         create_kwargs: dict[str, object] = {
             "model": self.model,
-            "messages": payload,
+            "messages": _to_openai_messages(messages),
             "stream": True,
             # Ask the provider to report real token usage in the final chunk.
             "stream_options": {"include_usage": True},
@@ -236,51 +306,30 @@ class OpenAICompatibleLLM:
         if tools:
             create_kwargs["tools"] = to_openai_tools(tools)
 
-        # Tool-call fragments arrive interleaved across chunks; accumulate by index.
-        pending: dict[int, dict[str, str]] = {}
-        usage: UsageEvent | None = None
-        held: list[str] = []  # text withheld while it still looks like leaked tool syntax
         tool_use_retries = 0
         while True:
-            stream = await self._create_stream(create_kwargs)
-            pending = {}
-            usage = None
-            held = []
-            holding = True  # hold text until it provably isn't a leaked "<function..." call
+            calls = _ToolCallAccumulator()
+            buffer = _LeakedTextBuffer()
+            usage: UsageEvent | None = None
             emitted = False  # once a delta went downstream, a retry would duplicate output
             try:
-                async for chunk in stream:
-                    if chunk.usage is not None:
-                        usage = UsageEvent(
-                            prompt_tokens=chunk.usage.prompt_tokens or 0,
-                            completion_tokens=chunk.usage.completion_tokens or 0,
-                        )
-                    if not chunk.choices:
-                        continue
-                    delta = chunk.choices[0].delta
-                    if delta.content:
-                        if holding:
-                            held.append(delta.content)
-                            joined = "".join(held).lstrip()
-                            prefix = joined[: len("<function")]
-                            if joined and not "<function".startswith(prefix):
-                                holding = False  # ordinary prose — flush and stream on
-                                emitted = True
-                                yield TextDelta(text="".join(held))
-                                held = []
-                        else:
+                # `async with` so the HTTP response closes deterministically
+                # rather than whenever the async generator is collected.
+                async with await self._create_stream(create_kwargs) as stream:
+                    async for chunk in stream:
+                        if chunk.usage is not None:
+                            usage = UsageEvent(
+                                prompt_tokens=chunk.usage.prompt_tokens or 0,
+                                completion_tokens=chunk.usage.completion_tokens or 0,
+                            )
+                        if not chunk.choices:
+                            continue
+                        delta = chunk.choices[0].delta
+                        if delta.content and (ready := buffer.push(delta.content)) is not None:
                             emitted = True
-                            yield TextDelta(text=delta.content)
-                    for fragment in delta.tool_calls or []:
-                        entry = pending.setdefault(
-                            fragment.index, {"id": "", "name": "", "arguments": ""}
-                        )
-                        if fragment.id:
-                            entry["id"] = fragment.id
-                        if fragment.function and fragment.function.name:
-                            entry["name"] = fragment.function.name
-                        if fragment.function and fragment.function.arguments:
-                            entry["arguments"] += fragment.function.arguments
+                            yield TextDelta(text=ready)
+                        for fragment in delta.tool_calls or []:
+                            calls.add(fragment)
             except APIError as exc:
                 if emitted or not is_tool_use_failure(exc):
                     raise
@@ -304,19 +353,10 @@ class OpenAICompatibleLLM:
                 return
             break
 
-        if held:
-            # The whole answer looked like llama's tool markup: parse it into
-            # real tool calls, or flush it as text if it turns out to be prose.
-            leaked = parse_leaked_tool_calls("".join(held))
-            if leaked:
-                logger.warning("recovered %d tool call(s) from text output", len(leaked))
-                for call in leaked:
-                    yield call
-            else:
-                yield TextDelta(text="".join(held))
-        for index in sorted(pending):
-            entry = pending[index]
-            yield ToolCallRequest(id=entry["id"], name=entry["name"], arguments=entry["arguments"])
+        for event in buffer.flush():
+            yield event
+        for call in calls.finish():
+            yield call
         if usage is not None:
             yield usage
 

@@ -136,6 +136,35 @@ def test_turns_audit_trail_records_timeline(client):
     assert all(event["ms"] >= 0 for turn in (first, second) for event in turn["events"])
 
 
+def test_single_turn_endpoint_returns_just_that_turn(client):
+    """The UI's details panel fetches one turn, not the whole audit list."""
+    with client.websocket_connect("/chat") as ws:
+        session_id = ws.receive_json()["session_id"]
+        _, summary = run_one_turn(ws, "Which service generates PDF invoices?")
+        run_one_turn(ws, "ping")
+
+        turn_id = summary["turn_id"]
+        response = client.get(f"/api/sessions/{session_id}/turns/{turn_id}")
+        for _ in range(50):  # the audit write lands just after the turn frame
+            if response.status_code == 200:
+                break
+            response = client.get(f"/api/sessions/{session_id}/turns/{turn_id}")
+
+    payload = response.json()
+    assert payload["turn_id"] == turn_id
+    assert payload["tool_calls"] == ["search_docs"]
+    assert [event["type"] for event in payload["events"]][-1] == "final"
+    # It is one record, not the {session_id, count, turns} envelope.
+    assert "turns" not in payload
+
+
+def test_single_turn_endpoint_404s_for_unknown_turn(client):
+    with client.websocket_connect("/chat") as ws:
+        session_id = ws.receive_json()["session_id"]
+        run_one_turn(ws, "ping")
+    assert client.get(f"/api/sessions/{session_id}/turns/deadbeef1234").status_code == 404
+
+
 def test_turns_endpoint_requires_token_when_auth_enabled():
     with make_client(auth_token=SecretStr("s3cret")) as client:
         assert client.get("/api/sessions/abc/turns").status_code == 401

@@ -211,10 +211,11 @@ export const useChatStore = defineStore("chat", () => {
     if (!sessionId.value) return null;
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const response = await fetch(`/api/sessions/${sessionId.value}/turns`, { headers });
+      // Ask for the single turn rather than downloading all 50 and filtering.
+      const response = await fetch(`/api/sessions/${sessionId.value}/turns/${turnId}`, { headers });
       if (!response.ok) return null;
-      const payload = (await response.json()) as { turns: AuditTurn[] };
-      return payload.turns.find((turn) => turn.turn_id === turnId)?.events ?? null;
+      const turn = (await response.json()) as AuditTurn;
+      return turn.events ?? null;
     } catch {
       return null;
     }

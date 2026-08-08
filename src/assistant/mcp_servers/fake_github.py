@@ -8,9 +8,9 @@ Run standalone over stdio:
     python -m assistant.mcp_servers.fake_github
 """
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP
 
-mcp = MCPServer("github-mock")
+mcp = FastMCP("github-mock")
 
 _PULL_REQUESTS = [
     {

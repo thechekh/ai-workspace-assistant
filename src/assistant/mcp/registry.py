@@ -69,7 +69,10 @@ class MCPRegistry:
         else:
             if not config.url:
                 raise ValueError(f"MCP server {config.name!r}: http transport requires a url")
-            read, write = await self._stack.enter_async_context(streamable_http_client(config.url))
+            # The HTTP transport also yields a session-id callback we don't use.
+            read, write, _ = await self._stack.enter_async_context(
+                streamable_http_client(config.url)
+            )
         session = await self._stack.enter_async_context(ClientSession(read, write))
         await session.initialize()
         listed = await session.list_tools()
@@ -83,12 +86,12 @@ class MCPRegistry:
             )
             texts = [item.text for item in result.content if isinstance(item, TextContent)]
             text = "\n".join(texts).strip() or "(empty result)"
-            return f"error: {text}" if result.is_error else text
+            return f"error: {text}" if result.isError else text
 
         return Tool(
             name=f"{server_name}__{info.name}",
             description=info.description or f"Tool {info.name} from MCP server {server_name}",
-            parameters=dict(info.input_schema or {"type": "object", "properties": {}}),
+            parameters=dict(info.inputSchema or {"type": "object", "properties": {}}),
             handler=handler,
         )
 
