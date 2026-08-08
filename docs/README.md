@@ -33,6 +33,10 @@ a tiered checklist (zero-infra → Docker → real model → observability).
 **I need exact tool behaviour** → [reference/tools.md](reference/tools.md) —
 every tool's purpose, parameters, return shape, errors, and implementation.
 
+**I'm asked "is this secure?"** → [reference/security.md](reference/security.md)
+— the threat model, every control with a pointer to its code, and an
+honest list of what is not built.
+
 **I want to know what's next** → [project/TODO.md](project/TODO.md) — the one
 backlog (features, code quality, hardening) plus a record of what's done.
 
@@ -73,6 +77,7 @@ backlog (features, code quality, hardening) plus a record of what's done.
 - [tools.md](reference/tools.md) — the complete tool reference (native + MCP)
 - [testing.md](reference/testing.md) — manual testing checklist, tiered
 - [backend-comparison.md](reference/backend-comparison.md) — custom vs Pydantic AI vs LangGraph, measured
+- [security.md](reference/security.md) — threat model, what is enforced, what is deliberately not
 
 ### project/ — planning, decisions, delivery
 - [TODO.md](project/TODO.md) — **the** backlog and the record of completed work

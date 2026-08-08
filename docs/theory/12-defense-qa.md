@@ -87,6 +87,9 @@ so. That last one came from a real failure — the model invented a plausible
 description of a GitHub repo it had never fetched; `fetch_url` plus the
 honesty instructions exist because of it.
 
+*(Full threat model and control-by-control detail:*
+[reference/security.md](../reference/security.md)*.)*
+
 **Q: What about prompt injection — a document that says "ignore your instructions"?**
 A real concern, and note the threat model *changed*: documents are now
 uploaded at runtime, so the corpus is no longer necessarily trusted. What
