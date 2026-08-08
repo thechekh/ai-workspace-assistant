@@ -79,7 +79,7 @@ async def run(k: int) -> None:
     lines = [
         "# Embedding comparison — golden retrieval set",
         "",
-        f"Corpus: `docs_corpus/` · questions: {len(load_golden())} · "
+        f"Corpus: `evals/corpus/` · questions: {len(load_golden())} · "
         "mode: hybrid (dense + sparse RRF) + lexical rerank",
         "",
         f"| model | recall@1 | recall@{k} | MRR |",

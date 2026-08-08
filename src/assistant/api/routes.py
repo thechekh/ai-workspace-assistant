@@ -10,11 +10,18 @@ import logging
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
-from assistant.api.schemas import SessionTurns, TurnRecord
+from assistant.api.schemas import (
+    DocumentList,
+    DocumentUploadResult,
+    IndexedDocument,
+    SessionTurns,
+    TurnRecord,
+)
 from assistant.config import Settings
-from assistant.rag.ingest import ingest
+from assistant.rag.ingest import ingest, ingest_documents
+from assistant.rag.store import VectorStore
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -131,14 +138,119 @@ async def session_turn(session_id: str, turn_id: str, request: Request) -> TurnR
     return record
 
 
+# --- Knowledge base: add documents at runtime -------------------------------
+# The assistant ships with an EMPTY index; you add the documents it should
+# answer from here (or with the ingest CLI). Nothing is seeded from the repo.
+
+_TEXT_SUFFIXES = {".md", ".markdown", ".txt", ".rst"}
+_MAX_UPLOAD_BYTES = 2 * 1024 * 1024  # per file
+
+
+def _require_store(request: Request) -> VectorStore:
+    store: VectorStore | None = getattr(request.app.state, "vector_store", None)
+    if store is None:
+        raise HTTPException(
+            status_code=503,
+            detail="no document store configured (is Qdrant reachable?)",
+        )
+    return store
+
+
+@router.get("/documents", response_model=DocumentList)
+async def list_documents(request: Request) -> DocumentList:
+    """Everything currently searchable, by source document."""
+    sources = await _require_store(request).list_sources()
+    documents = [IndexedDocument(source=name, chunks=count) for name, count in sources]
+    return DocumentList(documents=documents, total_chunks=sum(doc.chunks for doc in documents))
+
+
+@router.post(
+    "/documents",
+    response_model=DocumentUploadResult,
+    dependencies=[Depends(require_token)],
+)
+async def upload_documents(
+    request: Request,
+    files: list[UploadFile] | None = File(default=None),
+    text: str | None = Form(default=None),
+    source: str | None = Form(default=None),
+) -> DocumentUploadResult:
+    """Add documents to the knowledge base, in flight.
+
+    Accepts uploaded text/Markdown files and/or a pasted `text` body (name it
+    with `source`). Re-uploading the same source replaces its chunks, because
+    chunk ids are derived from (source, index).
+    """
+    settings: Settings = request.app.state.settings
+    store = _require_store(request)
+
+    documents: list[tuple[str, str]] = []
+    skipped: list[str] = []
+
+    for upload in files or []:
+        name = Path(upload.filename or "upload.md").name
+        if Path(name).suffix.lower() not in _TEXT_SUFFIXES:
+            skipped.append(f"{name} (unsupported type)")
+            continue
+        raw = await upload.read()
+        if len(raw) > _MAX_UPLOAD_BYTES:
+            skipped.append(f"{name} (larger than {_MAX_UPLOAD_BYTES // 1024 // 1024} MB)")
+            continue
+        try:
+            documents.append((name, raw.decode("utf-8")))
+        except UnicodeDecodeError:
+            skipped.append(f"{name} (not UTF-8 text)")
+
+    if text and text.strip():
+        documents.append((Path(source or "pasted.md").name, text))
+
+    if not documents:
+        raise HTTPException(
+            status_code=400,
+            detail=f"no usable documents in the request. Skipped: {skipped}"
+            if skipped
+            else "provide `files` (.md/.txt/.rst) and/or a `text` field",
+        )
+
+    chunks = await ingest_documents(documents, settings, store=store)
+    counts = dict(await store.list_sources())
+    logger.info("indexed %d chunks from %d document(s)", chunks, len(documents))
+    return DocumentUploadResult(
+        indexed=[IndexedDocument(source=name, chunks=counts.get(name, 0)) for name, _ in documents],
+        chunks=chunks,
+        skipped=skipped,
+    )
+
+
+@router.delete("/documents/{source:path}", dependencies=[Depends(require_token)])
+async def delete_document(source: str, request: Request) -> dict[str, object]:
+    """Remove one document (every chunk of it) from the knowledge base."""
+    removed = await _require_store(request).delete_source(source)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"no indexed document named {source!r}")
+    return {"source": source, "removed_chunks": removed}
+
+
 @router.post("/reindex", dependencies=[Depends(require_token)])
 async def reindex(request: Request) -> dict[str, object]:
-    """Re-ingest the docs corpus: queued via taskiq, or inline in zero-infra mode."""
+    """Re-ingest ASSISTANT_CORPUS_DIR: queued via taskiq, or inline in zero-infra mode.
+
+    Only meaningful when a corpus folder is configured. Documents added
+    through POST /api/documents live in Qdrant and need no re-indexing.
+    """
     settings: Settings = request.app.state.settings
+    if settings.corpus_dir is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "no ASSISTANT_CORPUS_DIR configured — this instance is filled "
+                "via POST /api/documents, which needs no re-indexing"
+            ),
+        )
     if settings.redis_url.startswith("fakeredis://"):
         # No real Redis -> no task queue; run inline so the flow still works.
         try:
-            count = await ingest(Path("docs_corpus"), settings)
+            count = await ingest(settings.corpus_dir, settings)
         except Exception as exc:
             logger.exception("inline reindex failed")
             raise HTTPException(status_code=503, detail=f"reindex failed: {exc}") from exc

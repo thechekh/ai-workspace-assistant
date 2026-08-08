@@ -21,9 +21,9 @@ generate an answer grounded in what was retrieved.
 ## Ingestion — done once (and re-run when docs change)
 
 **In this project:** [`rag/ingest.py`](../../src/assistant/rag/ingest.py); run
-`uv run python -m assistant.rag.ingest docs_corpus --recreate`.
+`uv run python -m assistant.rag.ingest evals/corpus --recreate`.
 
-1. **Load** every `*.md` under `docs_corpus/` (5 sample internal docs:
+1. **Load** every `*.md` under `evals/corpus/` (5 sample internal docs:
    deployment, service catalog, standards, incident response, onboarding).
 2. **Chunk** ([`rag/chunking.py`](../../src/assistant/rag/chunking.py)) —
    split along headings; pack paragraphs to ~1800 chars (~450 tokens).

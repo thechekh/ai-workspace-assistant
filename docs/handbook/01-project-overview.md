@@ -107,7 +107,7 @@ src/assistant/
   logs.py telemetry.py observability.py    the observability layer
   worker.py            taskiq broker + nightly re-index (cron 0 3 * * *)
 frontend/              Vue 3 + Pinia + Vite chat UI
-docs_corpus/           the internal docs the RAG answers from
+evals/corpus/          retrieval test fixture (golden-set answers live here)
 observability/         Prometheus config + Grafana provisioning + dashboard
 evals/                 golden set + retrieval quality + embedding comparison
 tests/                 129 deterministic tests (no network, no Docker needed)

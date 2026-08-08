@@ -49,6 +49,26 @@ class TurnSummary(BaseModel):
     cost_usd: float = 0.0
 
 
+class IndexedDocument(BaseModel):
+    """One document currently in the knowledge base."""
+
+    source: str
+    chunks: int
+
+
+class DocumentList(BaseModel):
+    documents: list[IndexedDocument]
+    total_chunks: int
+
+
+class DocumentUploadResult(BaseModel):
+    """What POST /api/documents indexed. Re-uploading a source replaces it."""
+
+    indexed: list[IndexedDocument]
+    chunks: int
+    skipped: list[str] = Field(default_factory=list)
+
+
 class TurnAuditEvent(BaseModel):
     """One row of a turn's timeline, with its offset from the turn's start.
 

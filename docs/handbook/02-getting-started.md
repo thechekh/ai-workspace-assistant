@@ -40,7 +40,7 @@ uv run uvicorn assistant.main:app --reload
 ```sh
 docker compose up -d                                   # redis :6379, qdrant :6333
 # .env: remove ASSISTANT_REDIS_URL override (default = redis://localhost:6379/0)
-uv run python -m assistant.rag.ingest docs_corpus --recreate   # fill the collection
+uv run python -m assistant.rag.ingest evals/corpus --recreate   # fill the collection
 uv run uvicorn assistant.main:app --reload
 ```
 
@@ -89,7 +89,7 @@ uv run taskiq scheduler assistant.worker:scheduler  # fires the nightly cron (03
 
 With real Redis, the UI's **Re-index** button queues a job (needs the worker
 running); with `fakeredis://` it re-indexes inline. CLI alternative:
-`uv run python -m assistant.rag.ingest docs_corpus [--recreate]`.
+`uv run python -m assistant.rag.ingest <folder> [--recreate]`.
 
 ## Frontend development
 

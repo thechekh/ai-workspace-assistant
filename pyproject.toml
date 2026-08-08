@@ -22,6 +22,7 @@ dependencies = [
     "structlog>=24.4",
     "prometheus-client>=0.20",
     "httpx>=0.27",  # fetch_url tool + Voyage embedder (was only a transitive dep)
+    "python-multipart>=0.0.9",  # multipart uploads for POST /api/documents
 ]
 
 [dependency-groups]
@@ -58,6 +59,18 @@ src = ["src", "tests"]
 # S = bandit (this app fetches URLs and spawns subprocesses), PT = pytest
 # style, LOG/G = logging correctness (we use structlog), T20 = stray prints.
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC", "S", "PT", "LOG", "G", "T20"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency markers are *meant* to be called in argument defaults;
+# they are immutable, so B008 does not apply to them.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Query",
+    "fastapi.Body",
+    "fastapi.Header",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests: asserts are the point, and hardcoded dummy credentials are fine.

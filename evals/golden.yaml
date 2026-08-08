@@ -1,5 +1,5 @@
 # Golden retrieval set v1 — real engineer questions mapped to where the
-# answer lives in docs_corpus/. Used by evals/run_retrieval.py for
+# answer lives in evals/corpus/. Used by evals/run_retrieval.py for
 # recall@k + MRR, and reused in Phase 7 for the embedding comparison.
 #
 # expect_source: corpus-relative file that must appear in the top-k

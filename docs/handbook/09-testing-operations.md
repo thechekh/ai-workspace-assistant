@@ -37,7 +37,7 @@ model → observability).
 | API server (dev) | `uv run uvicorn assistant.main:app --reload` |
 | Job worker (re-index queue) | `uv run taskiq worker assistant.worker:broker` |
 | Nightly scheduler (cron 03:00) | `uv run taskiq scheduler assistant.worker:scheduler` |
-| Re-index now (CLI) | `uv run python -m assistant.rag.ingest docs_corpus [--recreate]` |
+| Re-index now (CLI) | `uv run python -m assistant.rag.ingest <folder> [--recreate]` |
 | Retrieval quality | `uv run python evals/run_retrieval.py --memory` |
 | Everything in containers | `docker compose --profile app up --build` |
 
@@ -62,7 +62,7 @@ keeps them out of logs. The `log_prompts` toggle is dev-only by policy
 | Answer contains raw `<function…>` text | should **never** happen now (salvage layer) — if seen, it's a new llama syntax variant | add it to `_LEAKED_CALL_PREFIX` in [llm/client.py](../../src/assistant/llm/client.py) + a test |
 | *"duplicate call — … use the result you already received"* in a tool card | model repeated an identical call; guard answered | cosmetic; the model continues with the earlier result |
 | *"No relevant documents found in the internal docs …"* | relevance gate: the query shares no meaningful token with any chunk | expected for off-topic questions — the honest answer |
-| `search_docs` returns chunks from a repo you tested with | you ingested extra sources into `docs` | `uv run python -m assistant.rag.ingest docs_corpus --recreate` |
+| `search_docs` returns chunks from a repo you tested with | you ingested extra sources into `docs` | `uv run python -m assistant.rag.ingest evals/corpus --recreate` |
 | Chat: *"LLM authentication failed"* / *"Model not available"* | bad key / model name typo | fix `ASSISTANT_LLM_API_KEY` / `ASSISTANT_LLM_MODEL`, restart |
 | UI loads but "disconnected" | server down, or auth on and no `?token=` | start server / open `/?token=<secret>` |
 | Re-index button says "queued" but nothing happens | real Redis without a running worker | start the worker, or use the CLI ingest |

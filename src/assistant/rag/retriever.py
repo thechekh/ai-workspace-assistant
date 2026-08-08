@@ -35,6 +35,11 @@ class Retriever:
         self._reranker = reranker
         self._fetch_limit = fetch_limit
 
+    @property
+    def store(self) -> VectorStore:
+        """The backing store — document management writes where search reads."""
+        return self._store
+
     async def search(
         self,
         query: str,

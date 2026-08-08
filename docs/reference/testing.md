@@ -62,7 +62,7 @@ uv run uvicorn assistant.main:app --port 8000
 ```sh
 docker compose up -d               # redis + qdrant
 # .env: remove/comment ASSISTANT_REDIS_URL (defaults to localhost:6379)
-uv run python -m assistant.rag.ingest docs_corpus   # or click "Re-index"
+uv run python -m assistant.rag.ingest evals/corpus   # or click "Re-index"
 uv run uvicorn assistant.main:app --port 8000
 ```
 

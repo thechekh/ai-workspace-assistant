@@ -69,7 +69,7 @@ degradation). Servers are configured via `ASSISTANT_MCP_SERVERS` JSON
 
 | | |
 |---|---|
-| Purpose | Answer questions about "our" systems/processes from the ingested Markdown corpus (`docs_corpus/`: architecture, service catalog, deployment, guidelines, onboarding) |
+| Purpose | Answer questions from the knowledge base — whatever documents were added via the UI Documents panel, `POST /api/documents`, or the ingest CLI. Starts empty. |
 | Parameters | `query` *(string, required)* — natural-language search query |
 | Returns | Up to 4 chunks, each as `[source.md — heading] (score 0.87)` + chunk text (truncated ~1200 chars), separated by `---`. `"No matching documents found."` when nothing matches |
 | Errors | `error: the 'query' argument is required` on an empty query |

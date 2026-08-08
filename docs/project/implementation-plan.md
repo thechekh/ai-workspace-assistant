@@ -69,10 +69,10 @@ Goal: replace the dev console with a real SPA.
 
 Goal: the assistant can answer from *our* docs.
 
-- [x] Add `qdrant-client`; `docs_corpus/` sample docs (architecture, guidelines, onboarding — 5 docs)
+- [x] Add `qdrant-client`; `evals/corpus/` sample docs (architecture, guidelines, onboarding — 5 docs)
 - [x] `rag/chunking.py`: heading-aware Markdown chunking with breadcrumb prefixes, code-fence-safe, deterministic uuid5 ids (idempotent re-ingest)
 - [x] `rag/embeddings.py`: `Embedder` protocol — offline `hash-512` feature-hashing embedder (zero-cost dev/test default) + OpenAI `text-embedding-3-small` (voyage-3 added in Phase 7)
-- [x] `rag/ingest.py`: CLI `uv run python -m assistant.rag.ingest docs_corpus` → parse → chunk → embed → upsert
+- [x] `rag/ingest.py`: CLI `uv run python -m assistant.rag.ingest evals/corpus` → parse → chunk → embed → upsert
 - [x] `rag/retriever.py`: top-k search with payload (source) filters
 - [x] Golden question set v1 (`evals/golden.yaml`, 18 questions → expected source + text)
 - [x] `evals/run_retrieval.py`: recall@1 / recall@k / MRR report

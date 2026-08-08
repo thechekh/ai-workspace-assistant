@@ -42,7 +42,7 @@ Setup beforehand:
 
 ```sh
 docker compose up -d                                  # redis + qdrant
-uv run python -m assistant.rag.ingest docs_corpus --recreate
+uv run python -m assistant.rag.ingest evals/corpus --recreate
 uv run uvicorn assistant.main:app                     # open http://localhost:8000/
 # (no Docker available? ASSISTANT_REDIS_URL=fakeredis:// works too)
 ```

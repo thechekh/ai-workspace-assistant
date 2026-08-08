@@ -25,7 +25,8 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src/ src/
-COPY docs_corpus/ docs_corpus/
+# No corpus is baked into the image: the knowledge base starts empty and is
+# filled at runtime via POST /api/documents (or ASSISTANT_CORPUS_DIR).
 COPY evals/ evals/
 RUN uv sync --frozen --no-dev
 COPY --from=frontend /app/frontend/dist frontend/dist

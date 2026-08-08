@@ -54,6 +54,51 @@ class VectorStore:
             return False
         return vectors[DENSE].size == dimension
 
+    async def exists(self) -> bool:
+        """Whether the collection has been created yet (nothing ingested = False)."""
+        return await self._client.collection_exists(self.collection)
+
+    async def list_sources(self) -> list[tuple[str, int]]:
+        """Every indexed document as (source, chunk_count), alphabetically.
+
+        Qdrant has no GROUP BY, so this scrolls payloads. Fine at this scale
+        (documents are chunked into tens, not millions, of points).
+        """
+        if not await self.exists():
+            return []
+        counts: dict[str, int] = {}
+        offset = None
+        while True:
+            points, offset = await self._client.scroll(
+                collection_name=self.collection,
+                limit=256,
+                offset=offset,
+                with_payload=["source"],
+                with_vectors=False,
+            )
+            for point in points:
+                source = str((point.payload or {}).get("source", "unknown"))
+                counts[source] = counts.get(source, 0) + 1
+            if offset is None:
+                break
+        return sorted(counts.items())
+
+    async def delete_source(self, source: str) -> int:
+        """Remove every chunk of one document. Returns how many were removed."""
+        if not await self.exists():
+            return 0
+        selector = qm.Filter(
+            must=[qm.FieldCondition(key="source", match=qm.MatchValue(value=source))]
+        )
+        before = await self._client.count(self.collection, count_filter=selector, exact=True)
+        if before.count:
+            await self._client.delete(
+                collection_name=self.collection,
+                points_selector=qm.FilterSelector(filter=selector),
+                wait=True,
+            )
+        return before.count
+
     async def upsert(
         self,
         chunks: list[Chunk],

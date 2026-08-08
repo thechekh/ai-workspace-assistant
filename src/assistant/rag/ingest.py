@@ -1,7 +1,7 @@
 """Ingestion pipeline: parse -> chunk -> embed -> upsert.
 
 Usage:
-    uv run python -m assistant.rag.ingest [docs_corpus] [--collection docs]
+    uv run python -m assistant.rag.ingest <folder> [--collection docs]
 
 Re-running is idempotent for unchanged docs (deterministic chunk ids
 overwrite in place). Runs as a taskiq background job from Phase 8.
@@ -35,6 +35,45 @@ async def load_chunks_async(corpus_dir: Path) -> list[Chunk]:
     return await asyncio.to_thread(load_chunks, corpus_dir)
 
 
+async def ingest_chunks(
+    chunks: list[Chunk],
+    settings: Settings,
+    *,
+    store: VectorStore,
+    recreate: bool = False,
+) -> int:
+    """Embed and upsert already-chunked documents. The shared tail of both the
+    CLI corpus path and the runtime upload endpoint."""
+    if not chunks:
+        return 0
+    embedder = build_embedder(settings)
+    dense_vectors = await embedder.embed([chunk.text for chunk in chunks])
+    sparse_vectors = [encode_sparse(chunk.text) for chunk in chunks]
+    await store.ensure_collection(embedder.dimension, recreate=recreate)
+    await store.upsert(chunks, dense_vectors, sparse_vectors)
+    return len(chunks)
+
+
+async def ingest_documents(
+    documents: list[tuple[str, str]],
+    settings: Settings,
+    *,
+    store: VectorStore,
+) -> int:
+    """Ingest documents supplied at runtime as (source_name, markdown_text).
+
+    Chunking is CPU-bound, so it runs off the event loop — an upload must not
+    stall live chats. Re-uploading the same source overwrites it in place,
+    because chunk ids are deterministic from (source, index).
+    """
+    chunks = await asyncio.to_thread(
+        lambda: [
+            chunk for source, text in documents for chunk in chunk_markdown(text, source=source)
+        ]
+    )
+    return await ingest_chunks(chunks, settings, store=store)
+
+
 async def ingest(
     corpus_dir: Path,
     settings: Settings,
@@ -47,16 +86,9 @@ async def ingest(
     owns_client = client is None
     qdrant = client or AsyncQdrantClient(url=settings.qdrant_url)
     store = VectorStore(qdrant, collection or settings.qdrant_collection)
-    embedder = build_embedder(settings)
     try:
         chunks = await load_chunks_async(corpus_dir)
-        if not chunks:
-            return 0
-        dense_vectors = await embedder.embed([chunk.text for chunk in chunks])
-        sparse_vectors = [encode_sparse(chunk.text) for chunk in chunks]
-        await store.ensure_collection(embedder.dimension, recreate=recreate)
-        await store.upsert(chunks, dense_vectors, sparse_vectors)
-        return len(chunks)
+        return await ingest_chunks(chunks, settings, store=store, recreate=recreate)
     finally:
         if owns_client:
             await qdrant.close()
@@ -64,7 +96,7 @@ async def ingest(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ingest a Markdown corpus into Qdrant")
-    parser.add_argument("corpus", type=Path, nargs="?", default=Path("docs_corpus"))
+    parser.add_argument("corpus", type=Path, help="folder of *.md to ingest")
     parser.add_argument("--collection", default=None, help="override ASSISTANT_QDRANT_COLLECTION")
     parser.add_argument(
         "--recreate", action="store_true", help="drop and recreate the collection first"

@@ -60,6 +60,9 @@ class Runtime:
     tools: ToolRegistry
     http_client: httpx.AsyncClient
     qdrant: AsyncQdrantClient | None = None
+    # The document store backing /api/documents; None when a retriever was
+    # injected (tests) and there is no live Qdrant to write to.
+    vector_store: VectorStore | None = None
     mcp_registry: MCPRegistry | None = None
     mcp_tool_names: list[str] = field(default_factory=list)
     owns_redis: bool = True
@@ -108,6 +111,9 @@ async def build_runtime(
             mode=settings.retrieval_mode,
             reranker=LexicalReranker() if settings.rerank_enabled else None,
         )
+    # /api/documents writes to whatever store the retriever reads from — so an
+    # injected retriever (tests, in-memory Qdrant) gets a working API too.
+    vector_store = resolved_retriever.store if resolved_retriever else None
 
     mcp_registry: MCPRegistry | None = None
     mcp_tools: list[Tool] = []
@@ -145,6 +151,7 @@ async def build_runtime(
         tools=tools,
         http_client=http_client,
         qdrant=qdrant,
+        vector_store=vector_store,
         mcp_registry=mcp_registry,
         mcp_tool_names=[tool.name for tool in mcp_tools],
         owns_redis=redis_client is None,
@@ -182,6 +189,7 @@ def create_app(
         app.state.qdrant = runtime.qdrant
         app.state.mcp_registry = runtime.mcp_registry
         app.state.mcp_tool_names = runtime.mcp_tool_names
+        app.state.vector_store = runtime.vector_store
         try:
             yield
         finally:

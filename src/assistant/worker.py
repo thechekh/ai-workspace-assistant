@@ -26,10 +26,20 @@ broker = ListQueueBroker(url=_settings.redis_url)
 
 
 @broker.task(schedule=[{"cron": "0 3 * * *"}])  # nightly re-index at 03:00
-async def reindex_docs(corpus: str = "docs_corpus") -> int:
+async def reindex_docs(corpus: str | None = None) -> int:
+    """Re-ingest a folder of Markdown, if one is configured.
+
+    Documents added through POST /api/documents live in Qdrant and need no
+    re-indexing, so with no ASSISTANT_CORPUS_DIR this is a no-op rather than
+    an error — the nightly schedule should not fail an unconfigured install.
+    """
     settings = Settings()
-    count = await ingest(Path(corpus), settings)
-    logger.info("reindexed %s chunks from %s", count, corpus)
+    corpus_dir = Path(corpus) if corpus else settings.corpus_dir
+    if corpus_dir is None:
+        logger.info("reindex skipped — no ASSISTANT_CORPUS_DIR configured")
+        return 0
+    count = await ingest(corpus_dir, settings)
+    logger.info("reindexed %s chunks from %s", count, corpus_dir)
     return count
 
 

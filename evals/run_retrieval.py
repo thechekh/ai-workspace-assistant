@@ -8,7 +8,7 @@ Usage:
 ingested on the fly — no containers needed (also used by CI and the
 embedding comparison). Without it, an ingested collection is required first:
 
-    uv run python -m assistant.rag.ingest docs_corpus --recreate
+    uv run python -m assistant.rag.ingest evals/corpus --recreate
 """
 
 import argparse
@@ -27,7 +27,7 @@ from assistant.rag.retriever import Retriever
 from assistant.rag.store import VectorStore
 
 GOLDEN = Path(__file__).parent / "golden.yaml"
-CORPUS = Path(__file__).parent.parent / "docs_corpus"
+CORPUS = Path(__file__).parent / "corpus"
 
 
 def load_golden() -> list[dict[str, str]]:

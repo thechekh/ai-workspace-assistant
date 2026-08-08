@@ -68,10 +68,13 @@ def test_all_prose_docs_live_under_docs():
         "README.md",  # GitHub landing page + packaging readme
         "evals/results-embeddings.md",  # generated next to its generator
     }
+    # evals/corpus/ is the retrieval test fixture (the golden set's answers
+    # live in it), not documentation — same reason docs_corpus/ was exempt.
+    allowed_prefixes = ("docs/", "evals/corpus/")
     strays = [
         path.relative_to(REPO_ROOT).as_posix()
         for path in _markdown_files()
-        if not path.relative_to(REPO_ROOT).as_posix().startswith(("docs/", "docs_corpus/"))
+        if not path.relative_to(REPO_ROOT).as_posix().startswith(allowed_prefixes)
         and path.relative_to(REPO_ROOT).as_posix() not in allowed
     ]
     assert not strays, f"move these into docs/ (or allow-list them): {strays}"

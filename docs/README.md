@@ -86,7 +86,7 @@ backlog (features, code quality, hardening) plus a record of what's done.
 
 Two sets of Markdown files live elsewhere on purpose:
 
-- **[`docs_corpus/`](../docs_corpus/)** — the *data* the RAG system ingests
+- **[`evals/corpus/`](../evals/corpus/)** — the *data* the RAG system ingests
   into Qdrant. It is referenced by path in code
   ([routes.py](../src/assistant/api/routes.py), the ingest CLI, and
   [evals/golden.yaml](../evals/golden.yaml)); moving it would break retrieval.

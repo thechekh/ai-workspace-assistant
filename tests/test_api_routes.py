@@ -1,5 +1,7 @@
 """HTTP API tests: /api/info, /api/reindex (inline mode), and bearer auth."""
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
@@ -37,7 +39,7 @@ def test_reindex_inline_mode(monkeypatch: pytest.MonkeyPatch):
         return 30
 
     monkeypatch.setattr(routes, "ingest", fake_ingest)
-    with make_client() as client:
+    with make_client(corpus_dir=Path("evals/corpus")) as client:
         response = client.post("/api/reindex")
     assert response.status_code == 200
     assert response.json() == {"mode": "inline", "chunks": 30}
@@ -48,7 +50,7 @@ def test_reindex_failure_returns_503(monkeypatch: pytest.MonkeyPatch):
         raise RuntimeError("qdrant unreachable")
 
     monkeypatch.setattr(routes, "ingest", broken_ingest)
-    with make_client() as client:
+    with make_client(corpus_dir=Path("evals/corpus")) as client:
         response = client.post("/api/reindex")
     assert response.status_code == 503
     assert "qdrant unreachable" in response.json()["detail"]
@@ -59,7 +61,7 @@ def test_bearer_auth_guards_reindex_but_not_info(monkeypatch: pytest.MonkeyPatch
         return 1
 
     monkeypatch.setattr(routes, "ingest", fake_ingest)
-    with make_client(auth_token=SecretStr("s3cret")) as client:
+    with make_client(auth_token=SecretStr("s3cret"), corpus_dir=Path("evals/corpus")) as client:
         assert client.get("/api/info").status_code == 200
         assert client.get("/api/info").json()["auth_required"] is True
 

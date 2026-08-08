@@ -6,9 +6,14 @@ regardless of which module a tool lives in.
 
 from assistant.agent.tools.base import Tool, ToolHandler, ToolRegistry
 from assistant.agent.tools.fetch import make_fetch_url, strip_html
-from assistant.agent.tools.search_docs import NO_RELEVANT_DOCS, make_search_docs
+from assistant.agent.tools.search_docs import (
+    NO_RELEVANT_DOCS,
+    NOTHING_INDEXED,
+    make_search_docs,
+)
 
 __all__ = [
+    "NOTHING_INDEXED",
     "NO_RELEVANT_DOCS",
     "Tool",
     "ToolHandler",

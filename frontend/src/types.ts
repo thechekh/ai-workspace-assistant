@@ -80,3 +80,9 @@ export interface UserMessage {
   type: "user_message";
   content: string;
 }
+
+/** One document in the knowledge base (GET /api/documents). */
+export interface IndexedDocument {
+  source: string;
+  chunks: number;
+}

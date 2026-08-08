@@ -41,11 +41,21 @@ npm run build      # type check (vue-tsc) + production build → frontend/dist
 
 ## RAG
 
-```sh
-# ingest the sample corpus into Qdrant (offline hash embedder by default — zero cost)
-uv run python -m assistant.rag.ingest docs_corpus --recreate
+The knowledge base starts **empty** — no seed data ships with the app. Add
+the documents it should answer from at runtime:
 
-# measure retrieval quality against the golden question set
+- **In the UI**: the **Documents** panel in the header — drop `.md`/`.txt`/
+  `.rst` files or paste text. Searchable on your next message.
+- **Over HTTP**: `POST /api/documents` (multipart `files=` and/or
+  `text=`+`source=`), `GET /api/documents` to list, `DELETE
+  /api/documents/{source}` to remove.
+- **From a folder**: `uv run python -m assistant.rag.ingest <folder>`, or set
+  `ASSISTANT_CORPUS_DIR` to keep one synced (nightly job + Re-index button).
+
+Re-uploading the same source replaces it — chunk ids are deterministic.
+
+```sh
+# retrieval quality against the golden question set (fixture: evals/corpus/)
 uv run python evals/run_retrieval.py --memory     # --memory: no Docker needed
 
 # compare embedding models (hash always; openai/voyage when keys are set)
@@ -200,7 +210,7 @@ docs/                  # ALL documentation (see docs/README.md)
 ├── theory/            #   every concept from zero — 13 chapters
 ├── reference/         #   tools, manual testing checklist, backend comparison
 └── project/           #   roadmap/TODO, tech decisions, build history, workshop
-docs_corpus/           # RAG *data*: sample internal docs (demo + eval corpus)
+evals/corpus/           # RAG *data*: sample internal docs (demo + eval corpus)
 evals/                 # golden question set + retrieval metrics runner
 frontend/              # Vue 3 + Vite + TS SPA (Pinia, @vueuse/core, markdown-it)
 observability/         # Prometheus config + provisioned Grafana dashboard

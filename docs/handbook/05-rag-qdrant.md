@@ -3,9 +3,26 @@
 Concept primer: [theory/03-rag.md](../theory/03-rag.md). This chapter is the
 project-specific pipeline, end to end.
 
-## The corpus
+## Where documents come from
 
-[docs_corpus/](../../docs_corpus/) — Markdown files in three areas
+The knowledge base **starts empty**. Documents are added at runtime:
+
+| How | When to use |
+|---|---|
+| **Documents panel** in the UI header — drop files or paste text | day to day |
+| `POST /api/documents` (multipart `files=` and/or `text=`+`source=`); `GET` to list, `DELETE /api/documents/{source}` to remove | scripting, CI |
+| `uv run python -m assistant.rag.ingest <folder>` | bulk import |
+| `ASSISTANT_CORPUS_DIR=<folder>` | keep a folder synced (nightly job, Re-index button) |
+
+Re-uploading a source **replaces** it rather than duplicating, because chunk
+ids are derived from `(source, index)`.
+
+`search_docs` distinguishes *nothing indexed yet* from *nothing relevant* —
+they need different answers, and only the first is the user's to fix.
+
+## The eval fixture
+
+[evals/corpus/](../../evals/corpus/) — Markdown files in three areas
 (`architecture/`, `guidelines/`, `onboarding/`), ~30 chunks after splitting.
 This is the "internal engineering documentation" the system prompt promises.
 Only `*.md` files under the corpus directory are ingested; the chunk's
@@ -44,7 +61,7 @@ Three ways to (re)ingest:
 
 | How | When |
 |---|---|
-| `uv run python -m assistant.rag.ingest docs_corpus [--recreate]` | CLI, always works |
+| `uv run python -m assistant.rag.ingest <folder> [--recreate]` | CLI, always works |
 | UI **Re-index** button / `POST /api/reindex` | queued via taskiq (real Redis + worker running) |
 | same, in `fakeredis://` mode | runs inline in the request |
 
@@ -111,7 +128,7 @@ writes [evals/results-embeddings.md](../../evals/results-embeddings.md).
 - **Don't ingest unrelated repos into `docs`** — everything in the collection
   is treated as "our internal docs" by the system prompt. (A test repo's
   Chinese README once ended up in answers this way.) Recover with
-  `... ingest docs_corpus --recreate`.
+  `... ingest <folder> --recreate`.
 - **Changing embedder = re-ingest** — vectors from different embedders are
   incompatible; `--recreate` to switch cleanly.
 - The displayed `(score 0.87)` is the *retrieval* score (RRF/cosine), kept

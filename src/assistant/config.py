@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr
@@ -83,6 +84,10 @@ class Settings(BaseSettings):
     embedding_api_key: SecretStr | None = None
     voyage_api_key: SecretStr | None = None  # for the voyage embedding comparison
     qdrant_collection: str = "docs"
+    # Optional folder to (re)ingest from. Unset by default: the knowledge
+    # base starts empty and is filled at runtime via POST /api/documents.
+    # Set it to keep a folder of Markdown synced (nightly job + Re-index).
+    corpus_dir: Path | None = None
 
     # Retrieval: hybrid = dense + sparse lexical vectors fused with RRF;
     # a deterministic lexical reranker reorders the top candidates.

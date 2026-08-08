@@ -2,7 +2,14 @@ import { useWebSocket } from "@vueuse/core";
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 
-import type { AuditEvent, AuditTurn, ServerEvent, TurnEvent, UserMessage } from "../types";
+import type {
+  AuditEvent,
+  AuditTurn,
+  IndexedDocument,
+  ServerEvent,
+  TurnEvent,
+  UserMessage,
+} from "../types";
 
 export type BackendName = "custom" | "pydantic_ai" | "langgraph";
 
@@ -221,6 +228,73 @@ export const useChatStore = defineStore("chat", () => {
     }
   }
 
+  // --- knowledge base ------------------------------------------------------
+  // The index starts empty; documents are added here at runtime.
+  const documents = ref<IndexedDocument[]>([]);
+  const documentsLoading = ref(false);
+
+  function authHeaders(): Record<string, string> {
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function loadDocuments(): Promise<void> {
+    try {
+      const response = await fetch("/api/documents");
+      if (!response.ok) return;
+      documents.value = ((await response.json()) as { documents: IndexedDocument[] }).documents;
+    } catch {
+      /* backend unreachable — the panel just shows nothing */
+    }
+  }
+
+  async function uploadDocuments(files: File[], pasted?: { source: string; text: string }) {
+    if (files.length === 0 && !pasted?.text.trim()) return;
+    documentsLoading.value = true;
+    const body = new FormData();
+    for (const file of files) body.append("files", file);
+    if (pasted?.text.trim()) {
+      body.append("text", pasted.text);
+      body.append("source", pasted.source || "pasted.md");
+    }
+    try {
+      const response = await fetch("/api/documents", {
+        method: "POST",
+        headers: authHeaders(),
+        body,
+      });
+      const payload = await response.json();
+      if (response.ok) {
+        toast("ok", `Indexed ${payload.chunks} chunks from ${payload.indexed.length} document(s)`);
+        for (const skip of payload.skipped ?? []) toast("error", `Skipped ${skip}`);
+        await loadDocuments();
+      } else {
+        toast("error", `Upload failed: ${payload.detail ?? response.status}`);
+      }
+    } catch (error) {
+      toast("error", `Upload failed: ${String(error)}`);
+    } finally {
+      documentsLoading.value = false;
+    }
+  }
+
+  async function deleteDocument(source: string): Promise<void> {
+    try {
+      const response = await fetch(`/api/documents/${encodeURIComponent(source)}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (response.ok) {
+        toast("ok", `Removed ${source}`);
+        await loadDocuments();
+      } else {
+        toast("error", `Could not remove ${source}`);
+      }
+    } catch (error) {
+      toast("error", `Could not remove ${source}: ${String(error)}`);
+    }
+  }
+  void loadDocuments();
+
   function newSession(): void {
     sessionStorage.removeItem("session_id");
     sessionId.value = null;
@@ -242,5 +316,10 @@ export const useChatStore = defineStore("chat", () => {
     newSession,
     reindex,
     fetchTurnEvents,
+    documents,
+    documentsLoading,
+    loadDocuments,
+    uploadDocuments,
+    deleteDocument,
   };
 });
