@@ -63,6 +63,11 @@ and blocking CPU/IO moved off the event loop.
       fixed: happy-dom RCE (critical), pydantic-ai SSRF + path traversal,
       fastmcp command injection, diskcache pickle. Both audits now clean.
       *(Container image scanning and secret scanning are still not wired.)*
+- [ ] **CodeQL needs GitHub Advanced Security.** The workflow is written and
+      the analysis runs, but uploading results to a **private** repo requires
+      GHAS, so the job is gated on `github.event.repository.private == false`
+      and currently skips. It self-enables when the repo goes public or GHAS
+      is turned on. `pip-audit`/`npm audit` run unconditionally.
 - [ ] **Raise the coverage floor** — currently pinned at 82% (measured 82.7%).
       Ratchet upward as gaps close; never lower it.
 - [ ] **Prettier/ESLint for TS/Vue** — nothing formats or lints the frontend;
@@ -79,9 +84,17 @@ and blocking CPU/IO moved off the event loop.
       `.python-version` file was tried and reverted — it forces uv to rebuild
       the local venv, which failed on locked files. Decide the target, then
       add the file deliberately.
-- [ ] **TypeScript 7.** Held at 5.9.3 because `vue-tsc` cannot yet run against
-      the TypeScript 7 native rewrite. Revisit when vue-tsc supports it;
-      everything else is on latest.
+- [ ] **TypeScript 7.** On **6.0.3** — the last JS-based compiler, which is
+      what `vue-tsc` supports; TS 7's native rewrite ships no compiler API
+      yet (expected 7.1), and vue-tsc embeds the compiler to split SFCs into
+      virtual files, so it cannot move until then. 6.0 also lands the
+      deprecations as warnings, making the eventual 7 jump nearly free — our
+      tsconfig already satisfies its stricter defaults. If a non-SFC package
+      ever wants TS 7's `tsc`, alias it:
+      `"@typescript/native": "npm:typescript@^7"` +
+      `"typescript": "npm:@typescript/typescript6@^6"` — no benefit here
+      today since `vue-tsc --noEmit` covers the whole frontend.
+      Watch vuejs/language-tools (#6123 already merged TS 7 support).
 
 ## C. Hardening & repo standards
 

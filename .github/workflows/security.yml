@@ -20,9 +20,17 @@ jobs:
     name: codeql (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Uploading CodeQL results to a PRIVATE repository requires GitHub
+    # Advanced Security; without it the analysis runs fine but the upload
+    # 403s, leaving a permanently red workflow. Skip rather than fail — this
+    # turns itself on the moment the repo goes public or GHAS is enabled.
+    # The dependency audit below is unconditional and is what caught real
+    # vulnerabilities.
+    if: github.event.repository.private == false
     permissions:
       contents: read
-      security-events: write # required to upload the SARIF results
+      security-events: write # upload the SARIF results
+      actions: read # CodeQL reads workflow-run metadata when uploading
     strategy:
       fail-fast: false
       matrix:
