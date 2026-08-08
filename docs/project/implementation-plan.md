@@ -101,7 +101,7 @@ Goal: the real ReAct loop — the model decides when to call tools.
 
 Goal: tools come from MCP servers, not just local functions. Built **credential-free**: everything runs locally with zero env vars; real GitHub is a config swap later.
 
-- [x] `mcp` SDK (2.0); `mcp/registry.py` — connects configured servers (stdio + streamable HTTP), namespaces tools (`code__search_code`, `github__list_pull_requests`), adapts them into the shared `ToolRegistry` (backends can't tell MCP tools from native ones)
+- [x] `mcp` SDK (1.x; 1.29 at time of writing); `mcp/registry.py` — connects configured servers (stdio + streamable HTTP), namespaces tools (`code__search_code`, `github__list_pull_requests`), adapts them into the shared `ToolRegistry` (backends can't tell MCP tools from native ones)
 - [x] Bundled MCP server `assistant.mcp_servers.code_search`: `search_code` (pure-python regex over the repo — no ripgrep dependency) + `read_file` with path-traversal guard
 - [x] Bundled **mocked** GitHub MCP server `assistant.mcp_servers.fake_github`: same tool names as the official `ghcr.io/github/github-mcp-server` (`list_pull_requests`, `get_pull_request`, `list_issues`) with realistic canned data — swapping to the real server later is only an `ASSISTANT_MCP_SERVERS` config change (documented in .env.example)
 - [x] Graceful degradation: unreachable/disabled server → warning log, agent runs with the remaining tools (tested)
@@ -132,7 +132,7 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 - [x] Tools node executes through the shared `ToolRegistry` (identical capabilities across backends)
 - [x] Checkpointing: compiled with `InMemorySaver`, fresh `thread_id` per turn — native LangGraph persistence demonstrated while cross-turn memory stays in shared Redis
 - [x] Loop bound: `recursion_limit` → `GraphRecursionError` → same "limit" final message as the other backends
-- [x] `docs/backend-comparison.md` — measured LoC (re-measured since: custom 98 / pydantic-ai 194 / langgraph 278), adapter costs, streaming/tooling/memory/observability/debuggability dimensions, verdict table
+- [x] `docs/reference/backend-comparison.md` — measured LoC (re-measured since: custom 98 / pydantic-ai 194 / langgraph 278), adapter costs, streaming/tooling/memory/observability/debuggability dimensions, verdict table
 
 **Acceptance (verified):** 52/52 tests green — the whole WS suite parametrized ×3 backends, plus 5 direct LangGraph tests (streaming parity, history parity via the same "(N messages in context)" accounting, scripted tool loop, recursion bound, RAG roundtrip). Browser E2E: dropdown switched to langgraph (server log: reconnect `?backend=langgraph`, same session id) and "Show latest PRs" ran the MCP tool card end-to-end on the LangGraph runtime.
 
@@ -158,6 +158,6 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 - [x] `GET /api/info`: platform shape for the UI (backends, providers, retrieval mode, auth flag)
 - [x] UI polish: SVG favicon (console 404 gone), provider badge ("fake · hybrid" + collection tooltip), transient ok/error toasts (WS errors + reindex results), Re-index button; token capture from `?token=` persisted locally. *(Sessions sidebar descoped — needs a session-listing API; noted as future work.)*
 - [x] Full-platform compose: `docker compose --profile app up` adds api + worker + scheduler (one multi-stage image: Vue build → uv runtime); plain `docker compose up -d` still starts just redis+qdrant for dev
-- [x] `docs/workshop.md`: Part 1 slide outline (with our measured numbers), Part 2 click-by-click demo script (offline-capable), Part 3 implementation walkthrough map
+- [x] `docs/project/workshop.md`: Part 1 slide outline (with our measured numbers), Part 2 click-by-click demo script (offline-capable), Part 3 implementation walkthrough map
 
-**Acceptance (verified):** 72/72 tests green (info shape, inline reindex, 503 path, bearer auth on HTTP + WS ×token cases); browser E2E on the zero-infra path — favicon loads clean, badge renders from /api/info, Re-index button fires and the error toast appears and auto-dismisses (Qdrant intentionally down). *Caveat (resolved 2026-08-08):* the compose `app` profile was unbuilt at the time. It has since been built and run end-to-end — all services healthy, deep health `ok` through the container. Building it also surfaced a real break: `pyproject` declares `readme = "README.md"` but the Dockerfile never copied it, so `uv sync` failed at the project-install step.
+**Acceptance (verified):** 72/72 tests green at the time (info shape, inline reindex, 503 path, bearer auth on HTTP + WS ×token cases); browser E2E on the zero-infra path — favicon loads clean, badge renders from /api/info, Re-index button fires and the error toast appears and auto-dismisses (Qdrant intentionally down). *Caveat (resolved 2026-08-08):* the compose `app` profile was unbuilt at the time. It has since been built and run end-to-end — all services healthy, deep health `ok` through the container. Building it also surfaced a real break: `pyproject` declares `readme = "README.md"` but the Dockerfile never copied it, so `uv sync` failed at the project-install step.

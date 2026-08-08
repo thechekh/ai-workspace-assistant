@@ -55,7 +55,7 @@ lists (k≈60). RRF only uses *ranks*, so it needs no score calibration
 between the two very different similarity scales — simple and robust.
 
 Then a **reranker** re-orders the top ~20 candidates with a more careful
-(but slower) relevance judgment before returning the final top-5. Ours is a
+(but slower) relevance judgment before returning the final top-4. Ours is a
 deterministic lexical one ([`rag/rerank.py`](../../src/assistant/rag/rerank.py));
 API rerankers (voyage, Cohere) implement the same protocol.
 

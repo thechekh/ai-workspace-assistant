@@ -12,7 +12,7 @@ The knowledge base **starts empty**. Documents are added at runtime:
 | **Documents panel** in the UI header — drop files or paste text | day to day |
 | `POST /api/documents` (multipart `files=` and/or `text=`+`source=`); `GET` to list, `DELETE /api/documents/{source}` to remove | scripting, CI |
 | `uv run python -m assistant.rag.ingest <folder>` | bulk import |
-| `ASSISTANT_CORPUS_DIR=<folder>` | keep a folder synced (nightly job, Re-index button) |
+| `ASSISTANT_CORPUS_DIR=<folder>` | keep a folder synced — **required** for the nightly job and the Re-index button; without it `POST /api/reindex` returns 400 |
 
 Re-uploading a source **replaces** it rather than duplicating, because chunk
 ids are derived from `(source, index)`.

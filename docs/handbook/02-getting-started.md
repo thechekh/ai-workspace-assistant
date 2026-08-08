@@ -5,7 +5,7 @@
 | Tool | Why | Check |
 |---|---|---|
 | Python 3.12+ & [uv](https://docs.astral.sh/uv/) | backend deps & venv | `uv --version` |
-| Node.js 18+ | build the Vue UI once | `node --version` |
+| Node.js 22 | build the Vue UI once (vite 8 requires ≥20.19/≥22.12; `.nvmrc` and CI pin 22) | `node --version` |
 | Docker Desktop | Redis, Qdrant, observability stack (optional — see Mode A) | `docker info` |
 
 One-time setup:
@@ -87,9 +87,12 @@ uv run taskiq worker assistant.worker:broker        # processes queued re-index 
 uv run taskiq scheduler assistant.worker:scheduler  # fires the nightly cron (03:00)
 ```
 
-With real Redis, the UI's **Re-index** button queues a job (needs the worker
-running); with `fakeredis://` it re-indexes inline. CLI alternative:
-`uv run python -m assistant.rag.ingest <folder> [--recreate]`.
+Both only do something when **`ASSISTANT_CORPUS_DIR`** points at a folder;
+without it the nightly job is a no-op and the UI's **Re-index** button returns
+400, because documents added through `POST /api/documents` live in Qdrant and
+need no re-indexing. With a corpus configured and real Redis the button queues
+a job (needs the worker running); with `fakeredis://` it re-indexes inline.
+CLI alternative: `uv run python -m assistant.rag.ingest <folder> [--recreate]`.
 
 ## Frontend development
 
@@ -142,7 +145,7 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
    (this is what the UI's header dot polls every 10 s).
 3. Open http://localhost:8000/ → send `ping` → tokens stream, a stats line
    appears under the answer.
-4. `uv run pytest -q` → `129 passed` (fully offline, ~20 s).
+4. `uv run pytest -q` → `129 passed` (fully offline, ~13 s).
 
-Then work through [docs/testing.md](../reference/testing.md) — the feature-by-
+Then work through [the testing checklist](../reference/testing.md) — the feature-by-
 feature manual checklist for the mode you're in.

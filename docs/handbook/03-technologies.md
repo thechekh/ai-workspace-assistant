@@ -61,7 +61,7 @@ session — built to *compare* frameworks against a hand-written loop with
 identical behavior. The custom loop is the reference; pydantic-ai brings its
 own model layer and typed tools; langgraph models the loop as a state graph.
 *Where:* [agent/backends/](../../src/assistant/agent/backends/);
-measured comparison: [docs/backend-comparison.md](../reference/backend-comparison.md).
+measured comparison: [backend comparison](../reference/backend-comparison.md).
 
 ### taskiq + taskiq-redis
 Background jobs over the same Redis: the UI's Re-index button queues a job;
@@ -116,8 +116,10 @@ three backends via parametrized fixtures; provider quirks (429s, Groq
 *Where:* [tests/](../../tests/); chapter 09.
 
 ### GitHub Actions
-CI on every push: `uv sync` → ruff check → ruff format --check → pyright →
-pytest.
+Two workflows on every push. **CI**: ruff → format check → pyright →
+pytest with a coverage floor, across Python 3.12 **and** 3.13, plus a
+frontend job (typecheck → vitest → build) and a Docker image build.
+**Security**: CodeQL, `pip-audit` and `npm audit`, weekly as well as on push.
 
 ## Docker Compose profiles
 

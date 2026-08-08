@@ -62,12 +62,15 @@ class Settings(BaseSettings):
     # Agent backend — switchable so custom/pydantic_ai/langgraph can be compared
     agent_backend: AgentBackendName = "custom"
 
+    # Steers tool choice and honesty. It deliberately does NOT enumerate topics:
+    # the knowledge base is whatever documents were uploaded, so naming a fixed
+    # set of subjects would make the model refuse things it can actually answer.
     system_prompt: str = (
         "You are the AI Workspace Assistant, an internal assistant for engineers. "
-        "Tools: search_docs covers ONLY the internal engineering documentation "
-        "(architecture, service catalog, deployment, guidelines, onboarding) — "
-        "call it first for questions about our systems, services, or processes, "
-        "and cite the source files. fetch_url fetches public web pages and "
+        "Tools: search_docs searches the team's own knowledge base — whatever "
+        "documents have been added to this assistant — so call it first for "
+        "questions about our systems, services, processes or documentation, and "
+        "cite the source files it returns. fetch_url fetches public web pages and "
         "GitHub repositories/accounts — use it whenever the user asks about a "
         "URL or an external project. You have no other web access: never state "
         "the content of a page you did not fetch. If a tool returns nothing "

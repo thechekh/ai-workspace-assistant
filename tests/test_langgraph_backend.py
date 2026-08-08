@@ -17,7 +17,6 @@ from assistant.agent.base import (
 from assistant.agent.tools import ToolRegistry, make_search_docs
 from assistant.llm.client import FakeLLM, TextDelta, ToolCallRequest
 from tests.conftest import (
-    HermeticSettings,
     ScriptedLLM,
     build_seeded_retriever_async,
     make_registry,
@@ -82,8 +81,6 @@ async def test_recursion_limit_bounds_the_loop():
 
 
 async def test_rag_tool_loop_end_to_end():
-    settings = HermeticSettings(llm_provider="fake")
-    del settings  # backend takes the FakeLLM directly; settings kept for parity clarity
     registry = ToolRegistry([make_search_docs(await build_seeded_retriever_async())])
     agent = LangGraphAgent(llm=FakeLLM(), system_prompt="sys", tools=registry)
     events = [

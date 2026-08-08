@@ -10,7 +10,9 @@ the "modern Python stack" half of the project's mandate.
 the LLM API, Qdrant, Redis, MCP subprocesses. With `async`/`await`, one
 process interleaves thousands of such waits instead of blocking a thread per
 chat. WebSockets (long-lived connections) make async practically mandatory.
-**Where:** [`main.py`](../../src/assistant/main.py) — note the `create_app()`
+**Where:** [`main.py`](../../src/assistant/main.py) — note that `create_app()`
+delegates all wiring to `build_runtime()`, which returns a `Runtime` dataclass
+owning teardown via `Runtime.aclose()`; the factory
 factory (tests inject fakes) and the lifespan block (connect/cleanup of
 Redis, Qdrant, MCP).
 
@@ -67,8 +69,13 @@ The modern Python toolchain, each replacing an older pile:
 - **ruff** — linter *and* formatter in one (replaces flake8+isort+black).
 - **pyright** — static type checker; with Pydantic models end-to-end, whole
   bug classes die before runtime.
-- **pytest** (+asyncio) — 72 deterministic tests (chapter 09).
-- **GitHub Actions** — every push: ruff → format check → pyright → pytest.
+- **pytest** (+asyncio, +cov) — 204 deterministic tests with a coverage
+  floor (chapter 09).
+- **GitHub Actions** — every push runs two workflows. *CI*: ruff → format
+  check → pyright → pytest+coverage on Python **3.12 and 3.13** (the image
+  ships 3.13), a frontend job (vue-tsc → vitest → build), and a Docker image
+  build. *Security*: CodeQL plus `pip-audit` and `npm audit`, also weekly —
+  a dependency clean at merge time can rot later.
 - **pre-commit** — the same checks locally before each commit.
 
 ## Auth

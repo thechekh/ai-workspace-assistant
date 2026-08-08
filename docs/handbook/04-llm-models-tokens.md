@@ -51,7 +51,7 @@ against Groq:
    it's flushed as text. The chat never sees raw markup.
 
 If all of that fails, the WS layer maps the exception to a clear error frame
-(`_describe_llm_error` in [ws.py](../../src/assistant/api/ws.py)) by walking the
+(`describe_llm_error` in [llm/errors.py](../../src/assistant/llm/errors.py)) by walking the
 exception chain and duck-typing `status_code` — so it works for openai *and*
 pydantic-ai errors:
 

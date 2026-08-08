@@ -105,7 +105,7 @@ Branches work for a quick spike, but for a lasting comparison they have real dow
 ```
 src/assistant/agent/
 ├── base.py           # AgentBackend protocol: async def run(session, message) -> AsyncIterator[AgentEvent]
-├── tools.py          # shared tool definitions (RAG search, MCP tools)
+├── tools/          # shared tool definitions (RAG search, MCP tools)
 └── backends/
     ├── custom.py     # Phase A — hand-written ReAct loop
     ├── pydantic_ai.py# Phase B

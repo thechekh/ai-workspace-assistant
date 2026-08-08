@@ -7,7 +7,6 @@ they exercise the real chunk -> embed -> upsert path.
 
 from collections.abc import AsyncIterator
 
-import pytest
 from fakeredis import FakeAsyncRedis
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
@@ -154,8 +153,7 @@ async def test_search_docs_says_the_index_is_empty_rather_than_no_match():
     assert await tool.handler({"query": "anything at all"}) == NOTHING_INDEXED
 
 
-@pytest.mark.parametrize("path", ["/api/documents"])
-def test_documents_api_needs_a_store(path: str):
+def test_documents_api_needs_a_store():
     """With no retriever and no Qdrant, the endpoint says so instead of crashing."""
     settings = HermeticSettings(llm_provider="fake", mcp_enabled=False)
 
@@ -172,4 +170,4 @@ def test_documents_api_needs_a_store(path: str):
         agent=DummyAgent(),
     )
     with TestClient(app) as client:
-        assert client.get(path).status_code == 503
+        assert client.get("/api/documents").status_code == 503

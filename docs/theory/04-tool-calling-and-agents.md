@@ -20,7 +20,7 @@ and a **JSON Schema** for its arguments:
   "type": "function",
   "function": {
     "name": "search_docs",
-    "description": "Search the internal engineering documentation ... Call this whenever the user asks about our systems, services, or processes.",
+    "description": "Search the knowledge base: documents the team has added to this assistant ... Call this whenever the user asks about our systems, services, or processes.",
     "parameters": {
       "type": "object",
       "properties": {"query": {"type": "string"}},

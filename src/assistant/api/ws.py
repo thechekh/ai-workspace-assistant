@@ -1,4 +1,3 @@
-import time
 import uuid
 
 import structlog
@@ -27,10 +26,6 @@ from assistant.telemetry import (
 
 router = APIRouter()
 logger = structlog.get_logger("assistant.ws")
-
-
-def _elapsed_ms(started: float) -> int:
-    return round((time.perf_counter() - started) * 1000)
 
 
 @router.websocket("/chat")

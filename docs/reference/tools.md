@@ -50,8 +50,8 @@ of re-executing. Fresh turn, fresh set; different arguments always execute.
   — tools surface through the `LLMClientChatModel` adapter and are executed
   against the same registry.
 
-**Native vs MCP.** `search_docs` is native (constructed in-process over the
-RAG retriever). Everything else arrives over **MCP**: at startup
+**Native vs MCP.** `search_docs` and `fetch_url` are native (constructed in-process). The
+remaining five arrive over **MCP**: at startup
 [`MCPRegistry`](../../src/assistant/mcp/registry.py) spawns each configured
 server (default: two local stdio subprocesses, `{python}` resolving to the
 current interpreter), lists its tools, and wraps each one as a registry
@@ -71,7 +71,7 @@ degradation). Servers are configured via `ASSISTANT_MCP_SERVERS` JSON
 |---|---|
 | Purpose | Answer questions from the knowledge base — whatever documents were added via the UI Documents panel, `POST /api/documents`, or the ingest CLI. Starts empty. |
 | Parameters | `query` *(string, required)* — natural-language search query |
-| Returns | Up to 4 chunks, each as `[source.md — heading] (score 0.87)` + chunk text (truncated ~1200 chars), separated by `---`. `"No matching documents found."` when nothing matches |
+| Returns | Up to 4 chunks, each as `[source.md — heading] (score 0.87)` + chunk text (truncated at 1500 chars), separated by `---`. `NOTHING_INDEXED` when the knowledge base is empty, `NO_RELEVANT_DOCS` when nothing matches |
 | Errors | `error: the 'query' argument is required` on an empty query |
 | Implementation | [`make_search_docs`](../../src/assistant/agent/tools/search_docs.py) → [`Retriever.search`](../../src/assistant/rag/retriever.py) |
 
@@ -214,10 +214,10 @@ One `search_docs` call, across every surface:
 
 **Native:** build a `Tool` (name, description the model will read, JSON
 Schema, async handler returning `str`; prefix failures with `error:`) and add
-it to the list in `create_app` next to `make_search_docs`. Telemetry comes
+it to `native_tools` in `build_runtime()`. Telemetry comes
 free via `Tool.run`.
 
-**MCP:** write a server with `MCPServer` + `@mcp.tool()` functions (see
+**MCP:** write a server with `FastMCP` + `@mcp.tool()` functions (see
 `code_search.py` — docstrings become tool descriptions, type hints become the
 schema), then add it to `ASSISTANT_MCP_SERVERS`. Or point at any third-party
 MCP server (stdio command or streamable-HTTP URL) — its tools appear as

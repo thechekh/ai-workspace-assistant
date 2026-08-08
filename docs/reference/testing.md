@@ -23,13 +23,32 @@ uv run uvicorn assistant.main:app --port 8000
 - [ ] **Details timeline**: click `details` → for a plain echo just a
       `final` row; after a tool turn (below) also `tool_call`/`tool_result`
       rows with `+ms` offsets.
+- [ ] **Knowledge base starts empty**: open the **Documents** panel in the
+      header → "Nothing indexed yet". Ask `Which service generates PDF
+      invoices?` → the assistant says the knowledge base is empty and asks you
+      to upload documents (it does *not* invent an answer).
+- [ ] **Add a document in flight**: drop
+      `evals/corpus/architecture/services.md` on the panel's dropzone (or
+      click to pick it) → toast `Indexed N chunks from 1 document(s)`, and the
+      file appears in the list with its chunk count.
+- [ ] **It becomes searchable immediately**: ask the *same* question again →
+      `search_docs` card with real chunks, answer cites
+      `architecture/services.md`. This is the strongest single demo.
+- [ ] **Paste instead of upload**: expand "or paste text", name it
+      `runbook.md`, paste a heading + a line, **Add** → appears in the list.
+- [ ] **Re-upload replaces**: drop the same file again → chunk count stays
+      the same (ids are deterministic), it does not double.
+- [ ] **Remove**: click ✕ on a document → toast, it leaves the list, and
+      asking about it again returns "no relevant documents".
+- [ ] **Rejected uploads explain themselves**: try a `.png` → 400 with
+      `unsupported type` rather than a silent no-op.
 - [ ] **Tools offline** (FakeLLM heuristics, see [tools.md](tools.md)):
       - `Show latest PRs` → tool card `github__list_pull_requests`, answer
         quotes `#142 …`
       - `search code for class CustomAgent` → tool card `code__search_code`
         with real hits from this repo
       - `Which service generates PDF invoices?` → `search_docs` card; with no
-        Qdrant the result is an `error: tool 'search_docs' failed…` string —
+        Qdrant at all the result is an `error: tool 'search_docs' failed…` —
         **the turn must still answer** (graceful degradation)
 - [ ] **fetch_url** *(needs internet)*: paste
       `what is https://github.com/thechekh/awsomequiz-streamlit about?` →
@@ -69,9 +88,9 @@ uv run uvicorn assistant.main:app --port 8000
 - [ ] **Health dot goes green**: all components `ok`; qdrant shows the
       `docs` collection with a points count.
 - [ ] **Real RAG**: `Which service generates PDF invoices?` → `search_docs`
-      returns actual chunks like `[services/billing.md — billing-service]
+      returns actual chunks like `[architecture/services.md — billing-service]
       (score …)`; the answer cites the source file.
-- [ ] **Re-index button**: toast `Re-index queued` (real Redis → taskiq path;
+- [ ] **Re-index button** *(only with `ASSISTANT_CORPUS_DIR` set — without it the endpoint returns 400 by design, because uploaded documents need no re-indexing)*: toast `Re-index queued` (real Redis → taskiq path;
       run `uv run taskiq worker assistant.worker:broker` to process it) or
       `Re-indexed N chunks` inline when on fakeredis.
 - [ ] **Sessions survive restarts**: restart uvicorn, reload page — history

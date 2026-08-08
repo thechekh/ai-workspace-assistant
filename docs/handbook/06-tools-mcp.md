@@ -1,11 +1,11 @@
 # 06 — Tools & MCP: what the agent can *do*
 
 Full per-tool schemas, examples, and failure modes live in
-**[docs/tools.md](../reference/tools.md)** — that's the reference. This chapter is
+**[the tool reference](../reference/tools.md)** — that's the reference. This chapter is
 the working understanding: the inventory, how execution flows, and the
 guards.
 
-## The inventory (6 tools, 2 origins)
+## The inventory (7 tools, 2 origins)
 
 | Tool | Origin | One line |
 |---|---|---|
@@ -82,9 +82,9 @@ Transport can also be `http` (streamable-HTTP URL) for remote servers.
 
 - **Native**: build a `Tool(name, description, JSON-schema params, async
   handler -> str)` (prefix failures with `error:`), append it in
-  `create_app`'s `native_tools`. Telemetry, guards, and all three backends
+  `native_tools` in `build_runtime()`. Telemetry, guards, and all three backends
   come free.
-- **MCP**: write `@mcp.tool()` functions on an `MCPServer` (docstring =
+- **MCP**: write `@mcp.tool()` functions on a `FastMCP` server (docstring =
   description, type hints = schema — see
   [code_search.py](../../src/assistant/mcp_servers/code_search.py)), add the
   server to `ASSISTANT_MCP_SERVERS`. Or point at any existing MCP server.

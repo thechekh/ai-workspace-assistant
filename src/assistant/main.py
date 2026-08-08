@@ -57,7 +57,6 @@ class Runtime:
     session_store: SessionStore
     memory: ConversationMemory
     agents: dict[str, AgentBackend]
-    tools: ToolRegistry
     http_client: httpx.AsyncClient
     qdrant: AsyncQdrantClient | None = None
     # The document store backing /api/documents; None when a retriever was
@@ -148,7 +147,6 @@ async def build_runtime(
             keep_recent=settings.history_keep_recent,
         ),
         agents=agents,
-        tools=tools,
         http_client=http_client,
         qdrant=qdrant,
         vector_store=vector_store,

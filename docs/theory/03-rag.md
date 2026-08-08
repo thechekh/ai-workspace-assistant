@@ -20,11 +20,16 @@ generate an answer grounded in what was retrieved.
 
 ## Ingestion — done once (and re-run when docs change)
 
-**In this project:** [`rag/ingest.py`](../../src/assistant/rag/ingest.py); run
-`uv run python -m assistant.rag.ingest evals/corpus --recreate`.
+**In this project** the knowledge base starts **empty**. Documents arrive
+three ways, all landing in the same pipeline: the Documents panel in the UI,
+`POST /api/documents`, or the CLI
+[`rag/ingest.py`](../../src/assistant/rag/ingest.py)
+(`uv run python -m assistant.rag.ingest <folder> --recreate`). The examples
+below use `evals/corpus/` because that is the fixture the retrieval eval
+measures against — 5 sample internal docs: deployment, service catalog,
+standards, incident response, onboarding.
 
-1. **Load** every `*.md` under `evals/corpus/` (5 sample internal docs:
-   deployment, service catalog, standards, incident response, onboarding).
+1. **Load** the documents (files from disk, or uploaded text).
 2. **Chunk** ([`rag/chunking.py`](../../src/assistant/rag/chunking.py)) —
    split along headings; pack paragraphs to ~1800 chars (~450 tokens).
    Details that matter:

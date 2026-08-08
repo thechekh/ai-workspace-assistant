@@ -23,7 +23,7 @@ the default; history carries over because it lives in Redis, not the agent).
 | `langgraph` | [backends/langgraph.py](../../src/assistant/agent/backends/langgraph.py) | LangGraph state graph | Wraps our LLM client as a LangChain chat model; checkpointing in-memory (Redis saver is backlog) |
 
 Measured comparison (code size, latency, behavior parity):
-[docs/backend-comparison.md](../reference/backend-comparison.md). The custom
+[backend comparison](../reference/backend-comparison.md). The custom
 loop's rule: **max 6 tool-loop iterations**, then it answers with what it
 has; every backend gets the identical tool registry and system prompt.
 
@@ -82,9 +82,21 @@ the server.
 
 ## Where the turn logic lives
 
-[`api/ws.py`](../../src/assistant/api/ws.py) `_handle_turn` is the conductor:
-builds context, streams agent events to the socket, tracks first-token
-latency and the audit timeline, closes the `agent.turn` span, computes
-stats/cost, sends the `turn` frame, writes `turn.summary`, stores the audit
+Two objects, deliberately split.
+
+[`api/ws.py`](../../src/assistant/api/ws.py) `_handle_turn` is the
+**conductor**: it owns the socket, the `agent.turn` span, the error mapping
+and persistence. It builds the bounded context, streams agent events to the
+client, sends the `turn` frame, writes `turn.summary`, stores the audit
 record — and converts any exception into a friendly `error` frame without
-killing the socket. Read that one function and you understand the runtime.
+killing the socket.
+
+[`api/turn_recorder.py`](../../src/assistant/api/turn_recorder.py)
+`TurnRecorder` owns the **accounting**: feed it each event with `observe()`,
+then ask for a `summary()` (the `turn` WS frame) and a `record()` (the
+persisted audit row). It touches neither socket nor Redis, so the maths —
+first-token latency, tool list, token totals, cost — is unit-testable
+without a live WebSocket.
+
+That split exists because the two used to be one 154-line function in which
+every new event kind or metric meant editing the same block.

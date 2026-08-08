@@ -33,8 +33,14 @@ server → client   {type: "session", session_id}        connection bootstrap
                   {type: "tool_call", tool, arguments} agent is acting
                   {type: "tool_result", tool, result}  what came back
                   {type: "final", content}             the finished answer
+                  {type: "turn", turn_id, duration_ms,  per-turn stats, sent
+                        llm_steps, tokens, cost_usd…}   right after `final`
                   {type: "error", message}             something failed
 ```
+
+The `turn` frame is what the UI renders as the stats line under an answer
+(duration, first-token latency, LLM steps, real-or-estimated tokens, cost,
+tools used) — see [handbook 07](../handbook/07-observability.md).
 
 The event stream is exactly what the agent loop emits (chapter 04) — the WS
 layer ([`api/ws.py`](../../src/assistant/api/ws.py)) forwards it verbatim. The

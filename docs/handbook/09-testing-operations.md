@@ -1,9 +1,9 @@
 # 09 — Testing, operations & troubleshooting
 
-## The automated suite (203 tests, fully offline)
+## The automated suite (204 tests, fully offline)
 
 ```sh
-uv run pytest -q          # ~20s. No network, no Docker, no keys.
+uv run pytest -q          # ~13s. No network, no Docker, no keys.
 ```
 
 Determinism comes from swappable fakes: `FakeLLM` (scripted heuristics),
@@ -22,12 +22,17 @@ scripted provider errors. Map of the suite:
 | test_mcp.py | real stdio MCP servers spawn + tools round-trip |
 | test_memory.py | rolling summarization math |
 | test_api_routes.py / test_config.py | REST + auth + settings |
+| test_documents_api.py | documents added at runtime: upload (file + pasted), list, re-upload replaces rather than duplicates, delete, rejected types, auth, and the empty-knowledge-base message |
+| test_fake_parity.py | all three backends route the same prompt to the same tool — the regression guard for the drift that made one backend's offline fake miss a tool |
+| test_docs_links.py | the documentation itself: every relative link resolves, no stray prose outside `docs/`, the index covers every folder |
 
-Quality gates (all in CI on every push): `ruff check` · `ruff format
---check` · `pyright` (0 errors) · `pytest`.
+Quality gates (CI, every push): `ruff check` · `ruff format --check` ·
+`pyright` (0 errors) · `pytest` with a coverage floor — on Python 3.12 **and**
+3.13 — plus a frontend job (typecheck, vitest, build) and a Docker image
+build. A second workflow runs CodeQL, `pip-audit` and `npm audit` weekly.
 
 **Manual testing** is scripted feature-by-feature in
-[docs/testing.md](../reference/testing.md) (tiers: zero-infra → Docker → real
+[the testing checklist](../reference/testing.md) (tiers: zero-infra → Docker → real
 model → observability).
 
 ## Operating it
@@ -41,9 +46,11 @@ model → observability).
 | Retrieval quality | `uv run python evals/run_retrieval.py --memory` |
 | Everything in containers | `docker compose --profile app up --build` |
 
-**Auth mode**: set `ASSISTANT_AUTH_TOKEN=<secret>` → `/api/reindex` and
-`/api/sessions/{id}/turns` need `Authorization: Bearer`, the WS needs
-`?token=`; open the UI once as `/?token=<secret>` (persisted). `/api/info`,
+**Auth mode**: set `ASSISTANT_AUTH_TOKEN=<secret>` → `POST`/`DELETE
+/api/documents`, both `/api/sessions/{id}/turns[...]` routes and
+`/api/reindex` need `Authorization: Bearer`, and the WS needs `?token=`.
+Deliberately open: `GET /api/documents` (the panel lists before you
+authenticate), open the UI once as `/?token=<secret>` (persisted). `/api/info`,
 `/api/health`, `/healthz`, `/metrics` stay open by design. Production path:
 replace with OIDC at a gateway.
 
@@ -61,7 +68,7 @@ keeps them out of logs. The `log_prompts` toggle is dev-only by policy
 | Chat: *"model failed to generate a valid tool call"* (rare) | llama emitted malformed tool JSON 3× and `failed_generation` was unparseable | resend / rephrase; already auto-retried + salvage-attempted |
 | Answer contains raw `<function…>` text | should **never** happen now (salvage layer) — if seen, it's a new llama syntax variant | add it to `_LEAKED_CALL_PREFIX` in [llm/client.py](../../src/assistant/llm/client.py) + a test |
 | *"duplicate call — … use the result you already received"* in a tool card | model repeated an identical call; guard answered | cosmetic; the model continues with the earlier result |
-| *"No relevant documents found in the internal docs …"* | relevance gate: the query shares no meaningful token with any chunk | expected for off-topic questions — the honest answer |
+| *"No relevant documents found in the knowledge base …"* | relevance gate: the query shares no meaningful token with any chunk | expected for off-topic questions — the honest answer |
 | `search_docs` returns chunks from a repo you tested with | you ingested extra sources into `docs` | `uv run python -m assistant.rag.ingest evals/corpus --recreate` |
 | Chat: *"LLM authentication failed"* / *"Model not available"* | bad key / model name typo | fix `ASSISTANT_LLM_API_KEY` / `ASSISTANT_LLM_MODEL`, restart |
 | UI loads but "disconnected" | server down, or auth on and no `?token=` | start server / open `/?token=<secret>` |

@@ -95,7 +95,7 @@ with the UI dropdown (WS `?backend=` — reconnects keeping your history):
 - `pydantic_ai` — Pydantic AI (graph iteration API)
 - `langgraph` — LangGraph state graph with per-turn checkpointing
 
-Measured three-way comparison: [docs/backend-comparison.md](docs/reference/backend-comparison.md).
+Measured three-way comparison: [backend comparison](docs/reference/backend-comparison.md).
 
 ## Observability
 
@@ -197,7 +197,8 @@ header and the chat WS a `?token=`; open the UI once as
 src/assistant/
 ├── main.py            # create_app() factory, lifespan wiring, /healthz, /dev
 ├── config.py          # pydantic-settings (ASSISTANT_* env vars)
-├── api/               # WS protocol schemas + /chat endpoint
+├── api/               # WS /chat + turn recorder; HTTP: info, health,
+│                   #   documents, sessions/turns, reindex, metrics
 ├── agent/             # AgentBackend protocol, events, backends/ (custom | pydantic_ai | langgraph)
 ├── llm/               # provider-agnostic LLM client (fake | groq | ollama | gemini | openai)
 ├── memory/            # Redis-backed session history
@@ -207,11 +208,11 @@ src/assistant/
 └── static/dev.html    # minimal WS dev console
 docs/                  # ALL documentation (see docs/README.md)
 ├── handbook/          #   operating this project — 9 chapters
-├── theory/            #   every concept from zero — 13 chapters
-├── reference/         #   tools, manual testing checklist, backend comparison
+├── theory/            #   every concept from zero — 12 chapters
+├── reference/         #   tools, testing checklist, backend comparison, security
 └── project/           #   roadmap/TODO, tech decisions, build history, workshop
-evals/corpus/           # RAG *data*: sample internal docs (demo + eval corpus)
-evals/                 # golden question set + retrieval metrics runner
+evals/                 # golden question set, retrieval metrics runner, and
+└── corpus/            #   the fixture those questions are measured on
 frontend/              # Vue 3 + Vite + TS SPA (Pinia, @vueuse/core, markdown-it)
 observability/         # Prometheus config + provisioned Grafana dashboard
 tests/                 # pytest (fake LLM + fakeredis + in-memory Qdrant)

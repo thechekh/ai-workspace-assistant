@@ -3,25 +3,11 @@
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from starlette.websockets import WebSocketDisconnect
 
 import assistant.api.routes as routes
-from assistant.llm.client import FakeLLM
-from assistant.main import create_app
-from tests.conftest import HermeticSettings, build_seeded_retriever
-
-
-def make_client(**settings_overrides) -> TestClient:
-    settings = HermeticSettings(
-        llm_provider="fake",
-        mcp_enabled=False,
-        redis_url="fakeredis://",
-        **settings_overrides,
-    )
-    app = create_app(settings, llm=FakeLLM(), retriever=build_seeded_retriever())
-    return TestClient(app)
+from tests.conftest import make_client
 
 
 def test_info_reports_platform_shape(client):

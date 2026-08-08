@@ -91,10 +91,11 @@ backlog (features, code quality, hardening) plus a record of what's done.
 
 Two sets of Markdown files live elsewhere on purpose:
 
-- **[`evals/corpus/`](../evals/corpus/)** — the *data* the RAG system ingests
-  into Qdrant. It is referenced by path in code
-  ([routes.py](../src/assistant/api/routes.py), the ingest CLI, and
-  [evals/golden.yaml](../evals/golden.yaml)); moving it would break retrieval.
+- **[`evals/corpus/`](../evals/corpus/)** — the retrieval **test fixture**:
+  the documents the golden set's expected answers live in. Referenced by
+  [evals/run_retrieval.py](../evals/run_retrieval.py) and
+  [evals/golden.yaml](../evals/golden.yaml). The running app does not load it —
+  the knowledge base starts empty and is filled at runtime.
 - **[`evals/results-embeddings.md`](../evals/results-embeddings.md)** —
   generated output, written by `evals/compare_embeddings.py` next to the
   script that produces it.

@@ -111,9 +111,8 @@ export const useChatStore = defineStore("chat", () => {
   setInterval(() => void loadHealth(), 10_000);
 
   async function reindex(): Promise<void> {
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const response = await fetch("/api/reindex", { method: "POST", headers });
+      const response = await fetch("/api/reindex", { method: "POST", headers: authHeaders() });
       const payload = await response.json();
       if (response.ok) {
         toast("ok", payload.mode === "inline" ? `Re-indexed ${payload.chunks} chunks` : "Re-index queued");
@@ -216,10 +215,11 @@ export const useChatStore = defineStore("chat", () => {
   /** Audit timeline for one turn of the current session ("explain this turn"). */
   async function fetchTurnEvents(turnId: string): Promise<AuditEvent[] | null> {
     if (!sessionId.value) return null;
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     try {
       // Ask for the single turn rather than downloading all 50 and filtering.
-      const response = await fetch(`/api/sessions/${sessionId.value}/turns/${turnId}`, { headers });
+      const response = await fetch(`/api/sessions/${sessionId.value}/turns/${turnId}`, {
+        headers: authHeaders(),
+      });
       if (!response.ok) return null;
       const turn = (await response.json()) as AuditTurn;
       return turn.events ?? null;
@@ -308,7 +308,6 @@ export const useChatStore = defineStore("chat", () => {
     sessionId,
     backend,
     connected,
-    status,
     info,
     health,
     toasts,

@@ -91,15 +91,17 @@ User sends *"Which service generates PDF invoices?"* in the UI:
 src/assistant/
   main.py              app factory: wiring, lifespan, /metrics, static UI
   config.py            all settings (pydantic-settings, ASSISTANT_* env vars)
-  api/  ws.py          WebSocket chat: turns, telemetry, audit, error mapping
+  api/  ws.py          WebSocket chat: the turn conductor
+        turn_recorder.py  per-turn accounting -> stats frame + audit record
         routes.py      /api/info /api/health /api/sessions/{id}/turns /api/reindex
         schemas.py     typed WS protocol (incl. TurnSummary)
   agent/ base.py       the AgentBackend contract + event types
         registry.py    settings -> {custom, pydantic_ai, langgraph}
         backends/      the three runtimes
-        tools.py       Tool + registry + search_docs + fetch_url (+ guards)
-  llm/  client.py      OpenAI-compatible streaming client, FakeLLM, retries,
-                       tool-call salvage, usage capture
+        tools/         Tool + registry seam, search_docs, fetch_url
+  llm/  client.py      OpenAI-compatible streaming client, retries, salvage
+        errors.py      provider-error -> (metric kind, user message)
+        fake.py        offline heuristics shared by both fake providers
   rag/  ingest.py chunking.py embeddings.py sparse.py store.py retriever.py rerank.py
   mcp/  registry.py    MCP client: connect servers, adapt tools
   mcp_servers/         bundled stdio servers: code_search, fake_github
@@ -111,7 +113,7 @@ evals/corpus/          retrieval test fixture (golden-set answers live here)
 observability/         Prometheus config + Grafana provisioning + dashboard
 evals/                 golden set + retrieval quality + embedding comparison
 tests/                 129 deterministic tests (no network, no Docker needed)
-theory/  docs/  info/  documentation
+docs/                  ALL documentation (handbook, theory, reference, project)
 ```
 
 ## How it was built (phase history)

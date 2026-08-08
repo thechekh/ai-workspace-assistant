@@ -46,7 +46,7 @@ What actually happens when our app starts:
 
 **In this project:**
 [`mcp/registry.py`](../../src/assistant/mcp/registry.py) (the client side,
-~130 lines), configured via `ASSISTANT_MCP_SERVERS` JSON. Design points to
+~100 lines), configured via `ASSISTANT_MCP_SERVERS` JSON. Design points to
 defend: per-server connect **timeouts**; a server that fails to start is
 logged and **skipped** — the agent runs with whatever tools are reachable
 (graceful degradation, tested); per-call timeouts; `isError` results become

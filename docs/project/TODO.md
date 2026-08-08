@@ -22,7 +22,7 @@ All 9 planned phases are **complete**, plus a code-quality pass:
 | Platform | taskiq worker + nightly re-index, optional bearer auth, /api/info + /api/reindex, Vue UI |
 | Observability | structlog JSON + correlation IDs, OTel spans → Jaeger, /metrics + Grafana, deep health, audit trail, per-turn stats + cost in UI |
 | Provider hardening | 429 backoff, Groq `tool_use_failed` retry + salvage, leaked-tool-syntax parsing, friendly WS errors, 60s timeout |
-| Quality | 145 Python tests (82.7% coverage, floor enforced) + 16 frontend tests; ruff (strict rules) + pyright clean |
+| Quality | 204 Python tests (83.8% coverage, floor enforced) + 16 frontend tests; ruff (strict rules) + pyright clean |
 | CI | Python 3.12 **and** 3.13 matrix, frontend typecheck/test/build, Docker image build, coverage gate, dependabot |
 | Docker | Multi-stage build ✅ verified; non-root; healthchecks; pinned tags; `--profile app` stack ✅ verified end-to-end |
 | Docs | All under [docs/](../README.md): [handbook](../handbook/README.md) (9 chapters), [theory](../theory/README.md) course (13), [reference](../reference/tools.md), project/ |
@@ -68,7 +68,7 @@ and blocking CPU/IO moved off the event loop.
       GHAS, so the job is gated on `github.event.repository.private == false`
       and currently skips. It self-enables when the repo goes public or GHAS
       is turned on. `pip-audit`/`npm audit` run unconditionally.
-- [ ] **Raise the coverage floor** — currently pinned at 82% (measured 82.7%).
+- [ ] **Raise the coverage floor** — currently pinned at 82% (measured 83.8%).
       Ratchet upward as gaps close; never lower it.
 - [ ] **Prettier/ESLint for TS/Vue** — nothing formats or lints the frontend;
       pre-commit and CI only cover Python.
@@ -77,7 +77,7 @@ and blocking CPU/IO moved off the event loop.
 - [ ] **`pyright` strict mode** — currently `standard`; nearly free on an
       already-clean codebase.
 - [ ] **`pytest-xdist`** — the suite looks xdist-ready (no shared files,
-      per-test in-memory stores, `tmp_path` used correctly). 203 tests in ~13s
+      per-test in-memory stores, `tmp_path` used correctly). 204 tests in ~13s
       is fine today, so this is a later-scale item.
 - [ ] **Decide one Python version.** There are currently three: local venv
       **3.14**, CI matrix **3.12 + 3.13**, Docker image **3.13**. A
@@ -153,7 +153,7 @@ was done about it.
 
 - **`retry-after: 0` was silently discarded.** `_retry_after_seconds(exc) or
   ...` treated a valid `0.0` ("retry now") as absent and slept 2s then 4s.
-  Also the reason 12.5s of the ~20s suite was real sleeping — the suite is now
+  Also the reason 12.5s of the ~13s suite was real sleeping — the suite is now
   **~9s**, and backoff is asserted rather than waited on.
 - **Closing a browser tab was recorded as a server error.**
   `WebSocketDisconnect` subclasses `Exception`, so routine disconnects
@@ -208,7 +208,7 @@ was done about it.
 
 ### Tests & tooling ✅
 
-- **Coverage measurement added**: 82.7%, floor enforced at 82% in CI.
+- **Coverage measurement added**: 82.7% at the time, floor enforced at 82% in CI (83.8% today).
 - **16 frontend tests** (vitest + happy-dom): `markdown.ts` sanitization —
   the app's main XSS surface, since it renders model output — and the Pinia
   WS-event reducer.
