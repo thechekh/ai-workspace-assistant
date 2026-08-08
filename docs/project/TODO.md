@@ -45,90 +45,24 @@ All 9 planned phases are **complete**, plus a code-quality pass:
 
 # Active backlog
 
-## A. Code quality — structural refactors
+## A. Code quality — structural refactors ✅ *(all done 2026-08-08)*
 
-Deferred deliberately: these are safe to do now that the suite is stronger,
-but none of them is letting a bug through today.
-
-- [ ] **`_handle_turn` is 154 lines with 8 positional parameters** 🔍
-      — [api/ws.py:151](../../src/assistant/api/ws.py#L151). Owns turn-id,
-      contextvars, span attrs, memory fetch, a 5-branch dispatch that
-      simultaneously forwards frames *and* builds audit dicts *and* counts
-      tokens, error classification, cost math, summary assembly, logging, and
-      Redis persistence.
-      **Fix:** extract a `TurnRecorder` (`observe(event)` + `summary()`) and
-      `_persist_turn(...)`; pass a `TurnContext` dataclass instead of 8 args.
-
-- [ ] **`stream_step` is ~96 lines with two interleaved retry mechanisms** 🔍
-      — [llm/client.py:207](../../src/assistant/llm/client.py#L207). Six mutable
-      flags across `while True` → `async for` → `except APIError`; `pending`/
-      `usage`/`held` are initialized twice.
-      **Fix:** extract `_LeakedTextBuffer` and `_ToolCallAccumulator`, leaving
-      `stream_step` as the retry shell. Use
-      `async with await self._create_stream(...) as stream:` so the HTTP
-      response closes deterministically rather than at asyncgen GC.
-
-- [ ] **`create_app` is 109 lines with a 68-line nested `lifespan`** 🔍
-      — [main.py:42](../../src/assistant/main.py#L42). Test-injection params gate
-      production wiring (passing `agent=` disables both Qdrant and MCP).
-      **Fix:** a `build_runtime(settings) -> Runtime` that tests override
-      wholesale.
-
-- [ ] **Duplicated constants and builders across the three backends** 🔍
-      — `_EVENT_RESULT_LIMIT = 1500` in all three backends (three backends can
-      silently diverge on how much tool output the UI sees — the same bug
-      class as the fake-LLM drift already fixed); `_to_openai_tools`
-      duplicated inline in `langgraph.py:171-181`; dead
-      `if self._tools is None` branches in `custom.py` and `langgraph.py`
-      (unreachable since `fetch_url` is always registered).
-      **Fix:** `truncate_for_event()` in `agent/base.py`; reuse
-      `_to_openai_tools`; make `ToolRegistry` non-optional and delete the
-      dead branches.
-
-- [ ] **HTTP clients created per call** 🔍 — `make_fetch_url` builds a fresh
-      `httpx.AsyncClient` per invocation ([tools/fetch.py](../../src/assistant/agent/tools/fetch.py)),
-      so every call pays a TCP+TLS handshake (twice on the GitHub path); same
-      in `VoyageEmbedder.embed`. `OpenAIEmbedder._client` is never closed.
-      **Fix:** one pooled client in the lifespan, injected; `aclose()` in the
-      lifespan `finally`. (`OpenAICompatibleLLM.aclose()` now exists but is
-      not yet called.)
-
-- [ ] **`dict[str, object]` on real wire boundaries** 🔍 — audit records
-      round-trip untyped through `SessionStore.append_turn` and out of
-      `GET /api/sessions/{id}/turns`; `/api/info` and `/api/health` return
-      bare dicts with no `response_model`. The audit schema is a real contract
-      the frontend consumes.
-      **Fix:** `TurnAuditEvent`/`TurnRecord` models beside `TurnSummary`; add
-      `response_model=` to the three routes.
-
-- [ ] **Module organization** 🔍
-      — `_describe_llm_error` (50 lines of *provider* error classification)
-      lives in the WebSocket transport and imports from the LLM package to do
-      it → move to `assistant/llm/errors.py`.
-      — The RAG relevance gate runs inside the tool handler → move into
-      `Retriever.search` (the retriever shouldn't return chunks it knows are
-      irrelevant).
-      — `agent/tools.py` (277 lines) is a grab-bag: registry + telemetry seam
-      + GitHub REST client + HTML stripper → split into `agent/tools/fetch.py`.
-
-- [ ] **Blocking CPU/IO on the event loop** 🔍 — `HashEmbedder.embed` is
-      `async` but never awaits (pure-Python loop, md5 per token);
-      `load_chunks` does sync `read_text` per file; `POST /api/reindex` runs
-      `ingest(...)` inline in fakeredis mode — all on the loop serving live
-      chats. Latent today (corpus is 24 KB).
-      **Fix:** `asyncio.to_thread(...)` around embed + chunk loading.
-
-- [ ] **Details panel over-fetches: 50 turns to render 1** ✅
-      — [stores/chat.ts:214](../../frontend/src/stores/chat.ts#L214) downloads the
-      whole audit list and filters client-side.
-      **Fix:** `GET /api/sessions/{id}/turns/{turn_id}` (or `?turn_id=`).
+Every item in this section is complete; details are in "Completed in the
+code-quality pass" below. Summary: TurnRecorder extracted from `_handle_turn`
+(154→81 lines), `stream_step` split into a retry shell plus two helpers,
+`build_runtime()` extracted from `create_app` (109→62), backend duplication
+removed, one pooled HTTP client, typed audit wire contract with a per-turn
+endpoint, `agent/tools.py` split into a package, `llm/errors.py` extracted,
+and blocking CPU/IO moved off the event loop.
 
 ## B. Quality tooling — remaining
 
-- [ ] **Security scanning** — dependabot now covers version bumps, but there
-      is no CodeQL, `pip-audit`, `npm audit`, container scan, or secret scan.
-      The app makes outbound fetches and spawns subprocesses. *(Highest-value
-      item in this section.)*
+- [x] **Security scanning** ✅ *(2026-08-08)* — `.github/workflows/security.yml`:
+      CodeQL (python + javascript-typescript), `pip-audit` over the resolved
+      runtime tree, `npm audit`, weekly schedule. It immediately found and we
+      fixed: happy-dom RCE (critical), pydantic-ai SSRF + path traversal,
+      fastmcp command injection, diskcache pickle. Both audits now clean.
+      *(Container image scanning and secret scanning are still not wired.)*
 - [ ] **Raise the coverage floor** — currently pinned at 82% (measured 82.7%).
       Ratchet upward as gaps close; never lower it.
 - [ ] **Prettier/ESLint for TS/Vue** — nothing formats or lints the frontend;
@@ -145,6 +79,9 @@ but none of them is letting a bug through today.
       `.python-version` file was tried and reverted — it forces uv to rebuild
       the local venv, which failed on locked files. Decide the target, then
       add the file deliberately.
+- [ ] **TypeScript 7.** Held at 5.9.3 because `vue-tsc` cannot yet run against
+      the TypeScript 7 native rewrite. Revisit when vue-tsc supports it;
+      everything else is on latest.
 
 ## C. Hardening & repo standards
 
