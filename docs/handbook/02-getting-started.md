@@ -102,7 +102,7 @@ npm run build    # vue-tsc type check + production bundle -> frontend/dist
 ## `.env` reference — every variable
 
 All variables use the `ASSISTANT_` prefix and map 1:1 to
-[config.py](../src/assistant/config.py). Unset = the shown default.
+[config.py](../../src/assistant/config.py). Unset = the shown default.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -140,5 +140,5 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
    appears under the answer.
 4. `uv run pytest -q` → `129 passed` (fully offline, ~20 s).
 
-Then work through [docs/testing.md](../docs/testing.md) — the feature-by-
+Then work through [docs/testing.md](../reference/testing.md) — the feature-by-
 feature manual checklist for the mode you're in.

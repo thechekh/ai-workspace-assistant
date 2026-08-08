@@ -28,7 +28,7 @@ metadata — we filter by `source` file), named vectors (below), and native
 hybrid-search support. Alternatives we considered: pgvector (fine if you
 already run Postgres), Chroma (prototyping), Weaviate (heavier).
 
-**In this project:** [`rag/store.py`](../src/assistant/rag/store.py) wraps
+**In this project:** [`rag/store.py`](../../src/assistant/rag/store.py) wraps
 one Qdrant collection; each stored point = one document chunk with its
 text, source path, and heading as payload.
 
@@ -42,7 +42,7 @@ text, source path, and heading as payload.
   ("ArgoCD", "SEV1") score very strongly — precisely where dense search
   can be weakest.
 
-**In this project:** [`rag/sparse.py`](../src/assistant/rag/sparse.py) —
+**In this project:** [`rag/sparse.py`](../../src/assistant/rag/sparse.py) —
 each token maps to a stable 32-bit index (hash of the token), value =
 1 + log(term frequency). Every chunk is stored with **both** a dense and a
 sparse vector (Qdrant "named vectors").
@@ -56,7 +56,7 @@ between the two very different similarity scales — simple and robust.
 
 Then a **reranker** re-orders the top ~20 candidates with a more careful
 (but slower) relevance judgment before returning the final top-5. Ours is a
-deterministic lexical one ([`rag/rerank.py`](../src/assistant/rag/rerank.py));
+deterministic lexical one ([`rag/rerank.py`](../../src/assistant/rag/rerank.py));
 API rerankers (voyage, Cohere) implement the same protocol.
 
 Measured effect on our golden set (chapter 03 explains the metrics):
@@ -66,7 +66,7 @@ recall@1 went **0.56 → 0.67 (hybrid) → 0.83 (+rerank)**; recall@5 hit
 ## Our `hash-512` dense embedder — an honest disclosure to make proactively
 
 The offline default dense "embedder"
-([`rag/embeddings.py`](../src/assistant/rag/embeddings.py)) is **not a
+([`rag/embeddings.py`](../../src/assistant/rag/embeddings.py)) is **not a
 neural model**. It's *feature hashing*: hash each token into one of 512
 slots (with a ± sign to reduce collision bias), count, L2-normalize. Two
 texts are "similar" if they share words — lexical overlap, not semantics.

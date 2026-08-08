@@ -8,11 +8,11 @@ Two companion folders:
 - **[theory/](../theory/README.md)** — concept explanations *from zero* (what an
   LLM/embedding/agent/MCP even is). Read a theory chapter when a concept here
   is new to you; this folder assumes them and focuses on *this* project.
-- **[docs/](../docs/)** — deep single-topic references:
-  [tools.md](../docs/tools.md) (full tool schemas),
-  [testing.md](../docs/testing.md) (manual click-through checklist),
-  [backend-comparison.md](../docs/backend-comparison.md),
-  [workshop.md](../docs/workshop.md).
+- **[docs/](../)** — deep single-topic references:
+  [tools.md](../reference/tools.md) (full tool schemas),
+  [testing.md](../reference/testing.md) (manual click-through checklist),
+  [backend-comparison.md](../reference/backend-comparison.md),
+  [workshop.md](../project/workshop.md).
 
 ## The chapters
 

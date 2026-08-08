@@ -1,7 +1,7 @@
 # 06 — Tools & MCP: what the agent can *do*
 
 Full per-tool schemas, examples, and failure modes live in
-**[docs/tools.md](../docs/tools.md)** — that's the reference. This chapter is
+**[docs/tools.md](../reference/tools.md)** — that's the reference. This chapter is
 the working understanding: the inventory, how execution flows, and the
 guards.
 
@@ -24,7 +24,7 @@ The GitHub mock exposes the **same tool names** as the official
 ## How a tool call executes (the seam)
 
 Every call — from any of the three backends — funnels through **`Tool.run`**
-([agent/tools.py](../src/assistant/agent/tools.py)):
+([agent/tools.py](../../src/assistant/agent/tools.py)):
 
 ```
 model emits tool_call
@@ -53,7 +53,7 @@ Three properties to remember:
 
 ## How MCP wiring works
 
-At startup, [`MCPRegistry`](../src/assistant/mcp/registry.py):
+At startup, [`MCPRegistry`](../../src/assistant/mcp/registry.py):
 
 1. reads `ASSISTANT_MCP_SERVERS` (default: the two bundled servers, spawned
    as stdio subprocesses; `{python}` resolves to the current interpreter so
@@ -71,7 +71,7 @@ Transport can also be `http` (streamable-HTTP URL) for remote servers.
 - A **real model** picks from the tool descriptions (that's why descriptions
   are written as instructions: *"Search the INTERNAL engineering
   documentation only … use fetch_url for external URLs"*), steered by the
-  system prompt ([config.py](../src/assistant/config.py)): search_docs first
+  system prompt ([config.py](../../src/assistant/config.py)): search_docs first
   for internal questions, fetch_url for URLs, never invent page content,
   never repeat a fruitless search.
 - **FakeLLM** (offline) uses keyword heuristics — PR words → github tool,
@@ -86,5 +86,5 @@ Transport can also be `http` (streamable-HTTP URL) for remote servers.
   come free.
 - **MCP**: write `@mcp.tool()` functions on an `MCPServer` (docstring =
   description, type hints = schema — see
-  [code_search.py](../src/assistant/mcp_servers/code_search.py)), add the
+  [code_search.py](../../src/assistant/mcp_servers/code_search.py)), add the
   server to `ASSISTANT_MCP_SERVERS`. Or point at any existing MCP server.

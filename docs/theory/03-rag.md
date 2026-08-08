@@ -20,12 +20,12 @@ generate an answer grounded in what was retrieved.
 
 ## Ingestion — done once (and re-run when docs change)
 
-**In this project:** [`rag/ingest.py`](../src/assistant/rag/ingest.py); run
+**In this project:** [`rag/ingest.py`](../../src/assistant/rag/ingest.py); run
 `uv run python -m assistant.rag.ingest docs_corpus --recreate`.
 
 1. **Load** every `*.md` under `docs_corpus/` (5 sample internal docs:
    deployment, service catalog, standards, incident response, onboarding).
-2. **Chunk** ([`rag/chunking.py`](../src/assistant/rag/chunking.py)) —
+2. **Chunk** ([`rag/chunking.py`](../../src/assistant/rag/chunking.py)) —
    split along headings; pack paragraphs to ~1800 chars (~450 tokens).
    Details that matter:
    - Each chunk is prefixed with its **heading breadcrumb**
@@ -45,9 +45,9 @@ prompt budget. Heading-bounded ~300–500 tokens is the well-tested middle.
 
 ## Query time — every question
 
-**In this project:** [`rag/retriever.py`](../src/assistant/rag/retriever.py),
+**In this project:** [`rag/retriever.py`](../../src/assistant/rag/retriever.py),
 exposed to the agent as the `search_docs` tool
-([`agent/tools.py`](../src/assistant/agent/tools.py)).
+([`agent/tools.py`](../../src/assistant/agent/tools.py)).
 
 1. The agent decides the question needs docs and calls
    `search_docs(query=...)` (chapter 04 — the *model* makes this decision).
@@ -67,7 +67,7 @@ question — and the user can always inspect the evidence in the tool card.
 
 Vibes don't survive a Q&A session; numbers do.
 
-- **Golden set** ([`evals/golden.yaml`](../evals/golden.yaml)): 18 real
+- **Golden set** ([`evals/golden.yaml`](../../evals/golden.yaml)): 18 real
   engineer questions, each annotated with the file (and text) that contains
   the answer.
 - **recall@k** — fraction of questions whose correct chunk appears in the

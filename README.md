@@ -2,7 +2,11 @@
 
 Internal AI assistant for engineers: agentic FastAPI backend, MCP tools, Qdrant RAG, real-time WebSocket chat.
 
-Docs: **[info — the complete operator's handbook](info/README.md)** · [project description](project-description-en.md) · [tech stack & decisions](tech-stack.md) · [implementation plan](implementation-plan.md) · [roadmap / TODO](TODO.md) · [backend comparison](docs/backend-comparison.md) · [workshop materials](docs/workshop.md) · **[theory — every concept from zero](theory/README.md)**
+📚 **All documentation lives in [docs/](docs/README.md)** — one source of truth:
+[handbook](docs/handbook/README.md) (run & operate it) ·
+[theory](docs/theory/README.md) (concepts from zero) ·
+[reference](docs/reference/tools.md) (tools, testing, backend comparison) ·
+[project](docs/project/TODO.md) (roadmap, decisions, workshop)
 
 ## Quickstart
 
@@ -81,7 +85,7 @@ with the UI dropdown (WS `?backend=` — reconnects keeping your history):
 - `pydantic_ai` — Pydantic AI (graph iteration API)
 - `langgraph` — LangGraph state graph with per-turn checkpointing
 
-Measured three-way comparison: [docs/backend-comparison.md](docs/backend-comparison.md).
+Measured three-way comparison: [docs/backend-comparison.md](docs/reference/backend-comparison.md).
 
 ## Observability
 
@@ -191,8 +195,14 @@ src/assistant/
 ├── mcp_servers/       # bundled MCP servers: code_search + mocked fake_github
 ├── rag/               # chunking, embedders, Qdrant store, retriever, ingest CLI
 └── static/dev.html    # minimal WS dev console
-docs_corpus/           # sample internal docs (demo + eval corpus)
+docs/                  # ALL documentation (see docs/README.md)
+├── handbook/          #   operating this project — 9 chapters
+├── theory/            #   every concept from zero — 13 chapters
+├── reference/         #   tools, manual testing checklist, backend comparison
+└── project/           #   roadmap/TODO, tech decisions, build history, workshop
+docs_corpus/           # RAG *data*: sample internal docs (demo + eval corpus)
 evals/                 # golden question set + retrieval metrics runner
 frontend/              # Vue 3 + Vite + TS SPA (Pinia, @vueuse/core, markdown-it)
+observability/         # Prometheus config + provisioned Grafana dashboard
 tests/                 # pytest (fake LLM + fakeredis + in-memory Qdrant)
 ```

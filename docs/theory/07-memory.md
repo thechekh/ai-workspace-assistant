@@ -11,7 +11,7 @@ amnesia between messages.
 ## Short-term memory: the transcript in Redis
 
 **In this project:**
-[`memory/session.py`](../src/assistant/memory/session.py) — each session is
+[`memory/session.py`](../../src/assistant/memory/session.py) — each session is
 a Redis list of JSON messages (plus a TTL refreshed on every write, so
 abandoned sessions expire). The WebSocket layer appends the user message and
 the final answer each turn; reconnecting with the same `session_id` resumes
@@ -28,7 +28,7 @@ and mostly irrelevant to the current question.
 ## The fix: rolling summarization
 
 The standard pattern, implemented in
-[`memory/conversation.py`](../src/assistant/memory/conversation.py):
+[`memory/conversation.py`](../../src/assistant/memory/conversation.py):
 
 ```
 full transcript (Redis, never modified — the audit trail)
@@ -56,12 +56,12 @@ Two properties worth pointing at:
 - **Bounded** — prompt size stops growing. Our test proves it across all
   three backends: with a tiny budget, the model-visible message count pins
   at exactly `system + summary + recent + current` no matter how long the
-  chat runs ([`tests/test_ws.py`](../tests/test_ws.py) →
+  chat runs ([`tests/test_ws.py`](../../tests/test_ws.py) →
   `test_long_conversations_stay_bounded_by_summary`).
 
 ## Who writes the summary?
 
-[`memory/summarizer.py`](../src/assistant/memory/summarizer.py), two
+[`memory/summarizer.py`](../../src/assistant/memory/summarizer.py), two
 strategies behind one protocol:
 
 - **ExtractiveSummarizer** (offline default): deterministic one-line digests

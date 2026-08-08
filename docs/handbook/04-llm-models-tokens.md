@@ -4,7 +4,7 @@
 
 The provider is **config, not code** — every hosted option speaks the
 OpenAI-compatible chat API through one client
-([llm/client.py](../src/assistant/llm/client.py)):
+([llm/client.py](../../src/assistant/llm/client.py)):
 
 | `ASSISTANT_LLM_PROVIDER` | Endpoint | Typical models | Key |
 |---|---|---|---|
@@ -51,7 +51,7 @@ against Groq:
    it's flushed as text. The chat never sees raw markup.
 
 If all of that fails, the WS layer maps the exception to a clear error frame
-(`_describe_llm_error` in [ws.py](../src/assistant/api/ws.py)) by walking the
+(`_describe_llm_error` in [ws.py](../../src/assistant/api/ws.py)) by walking the
 exception chain and duck-typing `status_code` — so it works for openai *and*
 pydantic-ai errors:
 
@@ -75,7 +75,7 @@ Every turn's stats line shows `prompt→completion tok`. The source:
   model layer, so the wrapper can't see its usage — turn totals fall back to
   structural estimates).
 
-`InstrumentedLLM` ([telemetry.py](../src/assistant/telemetry.py)) accumulates
+`InstrumentedLLM` ([telemetry.py](../../src/assistant/telemetry.py)) accumulates
 per-turn totals in a `ContextVar` (`TurnStats`): steps, LLM ms, tokens, and
 whether anything was estimated. Those feed the `turn` WS frame, the
 `turn.summary` log line, Prometheus (`assistant_tokens_total{direction}`),

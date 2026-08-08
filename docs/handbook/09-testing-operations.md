@@ -27,7 +27,7 @@ Quality gates (all in CI on every push): `ruff check` · `ruff format
 --check` · `pyright` (0 errors) · `pytest`.
 
 **Manual testing** is scripted feature-by-feature in
-[docs/testing.md](../docs/testing.md) (tiers: zero-infra → Docker → real
+[docs/testing.md](../reference/testing.md) (tiers: zero-infra → Docker → real
 model → observability).
 
 ## Operating it
@@ -59,7 +59,7 @@ keeps them out of logs. The `log_prompts` toggle is dev-only by policy
 | Chat: *"LLM rate limit hit (429). Provider says: … tokens per day (TPD): Limit 100000 …"* | Groq **daily** budget for the model is spent (a long session can do it) | switch `ASSISTANT_LLM_MODEL=llama-3.1-8b-instant` (own budget) or wait for reset / paid tier |
 | Brief stalls mid-turn, logs show `LLM rate limited (429) — retry …` | per-minute limit; automatic backoff riding it out | nothing — working as designed |
 | Chat: *"model failed to generate a valid tool call"* (rare) | llama emitted malformed tool JSON 3× and `failed_generation` was unparseable | resend / rephrase; already auto-retried + salvage-attempted |
-| Answer contains raw `<function…>` text | should **never** happen now (salvage layer) — if seen, it's a new llama syntax variant | add it to `_LEAKED_CALL_PREFIX` in [llm/client.py](../src/assistant/llm/client.py) + a test |
+| Answer contains raw `<function…>` text | should **never** happen now (salvage layer) — if seen, it's a new llama syntax variant | add it to `_LEAKED_CALL_PREFIX` in [llm/client.py](../../src/assistant/llm/client.py) + a test |
 | *"duplicate call — … use the result you already received"* in a tool card | model repeated an identical call; guard answered | cosmetic; the model continues with the earlier result |
 | *"No relevant documents found in the internal docs …"* | relevance gate: the query shares no meaningful token with any chunk | expected for off-topic questions — the honest answer |
 | `search_docs` returns chunks from a repo you tested with | you ingested extra sources into `docs` | `uv run python -m assistant.rag.ingest docs_corpus --recreate` |

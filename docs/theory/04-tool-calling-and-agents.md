@@ -61,7 +61,7 @@ The loop terminates when a step produces no tool calls. Harder questions may
 take several tool rounds; trivial ones take one step with zero calls.
 
 **In this project:**
-[`agent/backends/custom.py`](../src/assistant/agent/backends/custom.py) —
+[`agent/backends/custom.py`](../../src/assistant/agent/backends/custom.py) —
 the whole loop is ~100 lines with no framework. Read it top to bottom once;
 every agent framework is a wrapper around exactly this.
 
@@ -75,16 +75,16 @@ every agent framework is a wrapper around exactly this.
   A crashing tool → `error: tool failed: ...`. Malformed JSON arguments →
   empty dict, the tool responds with its own validation error. The loop
   never dies because the model misbehaved — the model is told what went
-  wrong and usually self-corrects. ([`tests/test_tool_loop.py`](../tests/test_tool_loop.py)
+  wrong and usually self-corrects. ([`tests/test_tool_loop.py`](../../tests/test_tool_loop.py)
   covers every branch with a scripted LLM.)
 - **The registry is an allowlist.** The model can only request tools we
-  registered ([`agent/tools.py`](../src/assistant/agent/tools.py)); there is
+  registered ([`agent/tools.py`](../../src/assistant/agent/tools.py)); there is
   no "run arbitrary code" escape hatch.
 
 ## Streaming events, not just text
 
 The loop yields a typed event stream — `token`, `tool_call`, `tool_result`,
-`final` ([`agent/base.py`](../src/assistant/agent/base.py)) — which the
+`final` ([`agent/base.py`](../../src/assistant/agent/base.py)) — which the
 WebSocket forwards verbatim and the UI renders as streaming text plus tool
 cards. Users *see* the agent working: which tool, which arguments, what came
 back. Transparency is a feature — it's also your live debugging view.

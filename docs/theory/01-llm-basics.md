@@ -81,7 +81,7 @@ OpenAI, Groq (free tier, serves open models like Llama fast), Ollama (models
 on your own laptop), Google's Gemini compatibility endpoint. Same request
 format — only the base URL, key, and model name differ.
 
-**In this project:** [`llm/client.py`](../src/assistant/llm/client.py) —
+**In this project:** [`llm/client.py`](../../src/assistant/llm/client.py) —
 one `OpenAICompatibleLLM` class covers all hosted providers via a base-URL
 map, so switching provider is a `.env` change, never a code change. The
 `LLMClient` protocol (`stream_step(messages, tools)`) is the seam the rest

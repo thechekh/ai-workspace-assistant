@@ -10,7 +10,7 @@ the "modern Python stack" half of the project's mandate.
 the LLM API, Qdrant, Redis, MCP subprocesses. With `async`/`await`, one
 process interleaves thousands of such waits instead of blocking a thread per
 chat. WebSockets (long-lived connections) make async practically mandatory.
-**Where:** [`main.py`](../src/assistant/main.py) — note the `create_app()`
+**Where:** [`main.py`](../../src/assistant/main.py) — note the `create_app()`
 factory (tests inject fakes) and the lifespan block (connect/cleanup of
 Redis, Qdrant, MCP).
 
@@ -19,7 +19,7 @@ Redis, Qdrant, MCP).
 **What:** data validation from type annotations; the backbone of FastAPI.
 **Why:** every boundary is a typed model — WS frames, chunks, settings — so
 malformed data fails loudly at the edge, not deep inside.
-**Where:** [`config.py`](../src/assistant/config.py) — one `Settings` class,
+**Where:** [`config.py`](../../src/assistant/config.py) — one `Settings` class,
 every knob an `ASSISTANT_*` env var, validated at startup. "Config is a
 typed object, not scattered `os.environ` reads."
 
@@ -46,7 +46,7 @@ Celery/arq/Dramatiq in our decision table.
 **Why:** work that shouldn't block a request: re-indexing the docs corpus.
 `POST /api/reindex` (or the UI button) enqueues; a worker executes; a
 scheduler fires the same task nightly at 03:00 (cron label).
-**Where:** [`worker.py`](../src/assistant/worker.py); graceful zero-infra
+**Where:** [`worker.py`](../../src/assistant/worker.py); graceful zero-infra
 fallback — on `fakeredis://` the reindex runs inline instead of queuing.
 
 ## Docker & compose profiles
@@ -55,7 +55,7 @@ fallback — on `fakeredis://` the reindex runs inline instead of queuing.
 **Why profiles:** `docker compose up -d` starts only infra (redis+qdrant) —
 the dev loop keeps hot-reload on the host. `--profile app` adds api, worker,
 scheduler — the whole platform containerized from one multi-stage
-[`Dockerfile`](../Dockerfile) (Node builds the Vue SPA → uv-based Python
+[`Dockerfile`](../../Dockerfile) (Node builds the Vue SPA → uv-based Python
 runtime serves it).
 
 ## uv, ruff, pyright, pytest, CI
@@ -85,7 +85,7 @@ comments and README, which shows the boundary was considered, not missed.
 ## Vue 3 frontend (brief — it has its own stack)
 
 Vite + TypeScript + Pinia; the store owns the WebSocket
-([`frontend/src/stores/chat.ts`](../frontend/src/stores/chat.ts)); the
+([`frontend/src/stores/chat.ts`](../../frontend/src/stores/chat.ts)); the
 protocol types mirror the backend's Pydantic models; tool calls render as
 cards; markdown renders with `html: false` (model output is never injected
 as raw HTML — the XSS answer).

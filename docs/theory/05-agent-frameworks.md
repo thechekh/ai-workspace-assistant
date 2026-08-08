@@ -37,7 +37,7 @@ same event stream. Consequences:
 
 ## Pydantic AI in five points
 
-([`backends/pydantic_ai.py`](../src/assistant/agent/backends/pydantic_ai.py))
+([`backends/pydantic_ai.py`](../../src/assistant/agent/backends/pydantic_ai.py))
 
 1. From the team behind Pydantic; agents and tools are **typed** objects,
    validated like everything else in FastAPI-world.
@@ -57,7 +57,7 @@ this backend doesn't speak our `LLMClient` protocol.
 
 ## LangGraph in five points
 
-([`backends/langgraph.py`](../src/assistant/agent/backends/langgraph.py))
+([`backends/langgraph.py`](../../src/assistant/agent/backends/langgraph.py))
 
 1. From the LangChain ecosystem; you model the agent as an **explicit state
    graph** — ours: `START → agent ⇄ tools → END`, nodes are async functions
@@ -79,7 +79,7 @@ this backend doesn't speak our `LLMClient` protocol.
 ## What the comparison actually showed
 
 Full write-up with measured numbers:
-[`docs/backend-comparison.md`](../docs/backend-comparison.md). The verdict
+[`docs/backend-comparison.md`](../reference/backend-comparison.md). The verdict
 in one breath:
 
 - **custom** — best for learning and debugging; smallest surface; you own

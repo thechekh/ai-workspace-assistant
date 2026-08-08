@@ -25,7 +25,7 @@ All 9 planned phases are **complete**, plus a code-quality pass:
 | Quality | 145 Python tests (82.7% coverage, floor enforced) + 16 frontend tests; ruff (strict rules) + pyright clean |
 | CI | Python 3.12 **and** 3.13 matrix, frontend typecheck/test/build, Docker image build, coverage gate, dependabot |
 | Docker | Multi-stage build ✅ verified; non-root; healthchecks; pinned tags; `--profile app` stack ✅ verified end-to-end |
-| Docs | README, [info/](info/README.md) handbook (9 chapters), [theory/](theory/README.md) course (13), docs/tools.md, docs/testing.md |
+| Docs | All under [docs/](../README.md): [handbook](../handbook/README.md) (9 chapters), [theory](../theory/README.md) course (13), [reference](../reference/tools.md), project/ |
 | Git | https://github.com/thechekh/ai-workspace-assistant (private), CI green |
 
 ## Recently done
@@ -51,7 +51,7 @@ Deferred deliberately: these are safe to do now that the suite is stronger,
 but none of them is letting a bug through today.
 
 - [ ] **`_handle_turn` is 154 lines with 8 positional parameters** 🔍
-      — [api/ws.py:151](src/assistant/api/ws.py#L151). Owns turn-id,
+      — [api/ws.py:151](../../src/assistant/api/ws.py#L151). Owns turn-id,
       contextvars, span attrs, memory fetch, a 5-branch dispatch that
       simultaneously forwards frames *and* builds audit dicts *and* counts
       tokens, error classification, cost math, summary assembly, logging, and
@@ -60,7 +60,7 @@ but none of them is letting a bug through today.
       `_persist_turn(...)`; pass a `TurnContext` dataclass instead of 8 args.
 
 - [ ] **`stream_step` is ~96 lines with two interleaved retry mechanisms** 🔍
-      — [llm/client.py:207](src/assistant/llm/client.py#L207). Six mutable
+      — [llm/client.py:207](../../src/assistant/llm/client.py#L207). Six mutable
       flags across `while True` → `async for` → `except APIError`; `pending`/
       `usage`/`held` are initialized twice.
       **Fix:** extract `_LeakedTextBuffer` and `_ToolCallAccumulator`, leaving
@@ -69,7 +69,7 @@ but none of them is letting a bug through today.
       response closes deterministically rather than at asyncgen GC.
 
 - [ ] **`create_app` is 109 lines with a 68-line nested `lifespan`** 🔍
-      — [main.py:42](src/assistant/main.py#L42). Test-injection params gate
+      — [main.py:42](../../src/assistant/main.py#L42). Test-injection params gate
       production wiring (passing `agent=` disables both Qdrant and MCP).
       **Fix:** a `build_runtime(settings) -> Runtime` that tests override
       wholesale.
@@ -86,7 +86,7 @@ but none of them is letting a bug through today.
       dead branches.
 
 - [ ] **HTTP clients created per call** 🔍 — `make_fetch_url` builds a fresh
-      `httpx.AsyncClient` per invocation ([tools.py:236](src/assistant/agent/tools.py#L236)),
+      `httpx.AsyncClient` per invocation ([tools.py:236](../../src/assistant/agent/tools.py#L236)),
       so every call pays a TCP+TLS handshake (twice on the GitHub path); same
       in `VoyageEmbedder.embed`. `OpenAIEmbedder._client` is never closed.
       **Fix:** one pooled client in the lifespan, injected; `aclose()` in the
@@ -119,7 +119,7 @@ but none of them is letting a bug through today.
       **Fix:** `asyncio.to_thread(...)` around embed + chunk loading.
 
 - [ ] **Details panel over-fetches: 50 turns to render 1** ✅
-      — [stores/chat.ts:214](frontend/src/stores/chat.ts#L214) downloads the
+      — [stores/chat.ts:214](../../frontend/src/stores/chat.ts#L214) downloads the
       whole audit list and filters client-side.
       **Fix:** `GET /api/sessions/{id}/turns/{turn_id}` (or `?turn_id=`).
 
@@ -190,7 +190,7 @@ but none of them is letting a bug through today.
       tool) with review — touches every layer once.
 - [ ] Interactive code-reading sessions (pick a file, interrogate it).
 - [ ] Mermaid sequence diagrams in the theory chapters (also slide-ready).
-- [ ] Mock Q&A rehearsal against [theory/12-defense-qa.md](theory/12-defense-qa.md).
+- [ ] Mock Q&A rehearsal against [the defense Q&A](../theory/12-defense-qa.md).
 
 ---
 
@@ -213,8 +213,8 @@ was done about it.
   hand-copied version of the demo heuristics that never learned `fetch_url`,
   so offline it behaved differently from the other two backends — undermining
   the backend comparison. Both now share
-  [`llm/fake.py`](src/assistant/llm/fake.py), with
-  [test_fake_parity.py](tests/test_fake_parity.py) asserting identical routing
+  [`llm/fake.py`](../../src/assistant/llm/fake.py), with
+  [test_fake_parity.py](../../tests/test_fake_parity.py) asserting identical routing
   end-to-end on all three runtimes.
 - **The Docker build was broken** (never previously verified): `pyproject`
   declares `readme = "README.md"` but the Dockerfile never copied it, so

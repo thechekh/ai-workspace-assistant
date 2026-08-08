@@ -35,11 +35,10 @@ htmlcov/
 .coverage
 coverage.xml
 
-# Session artifacts and docs that don't belong in the runtime image
+# Session artifacts and docs that don't belong in the runtime image.
+# docs_corpus/ is NOT excluded — it is the RAG data the image ingests.
 .playwright-mcp/
 *.png
-theory/
-info/
 docs/
 *.md
 !README.md

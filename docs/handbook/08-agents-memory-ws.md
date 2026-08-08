@@ -3,7 +3,7 @@
 ## The agent contract (one interface, three runtimes)
 
 Every backend implements the same tiny protocol
-([agent/base.py](../src/assistant/agent/base.py)):
+([agent/base.py](../../src/assistant/agent/base.py)):
 
 ```python
 class AgentBackend(Protocol):
@@ -18,19 +18,19 @@ the default; history carries over because it lives in Redis, not the agent).
 
 | Backend | File | What it is | Notable |
 |---|---|---|---|
-| `custom` *(default)* | [backends/custom.py](../src/assistant/agent/backends/custom.py) | Hand-written ReAct loop over the LLM client | The reference: smallest, fully instrumented via `InstrumentedLLM` |
-| `pydantic_ai` | [backends/pydantic_ai.py](../src/assistant/agent/backends/pydantic_ai.py) | Pydantic AI `Agent` | Runs its **own** model layer (token stats fall back to estimates); tools adapted via `Tool.from_schema` → still hit `Tool.run` |
-| `langgraph` | [backends/langgraph.py](../src/assistant/agent/backends/langgraph.py) | LangGraph state graph | Wraps our LLM client as a LangChain chat model; checkpointing in-memory (Redis saver is backlog) |
+| `custom` *(default)* | [backends/custom.py](../../src/assistant/agent/backends/custom.py) | Hand-written ReAct loop over the LLM client | The reference: smallest, fully instrumented via `InstrumentedLLM` |
+| `pydantic_ai` | [backends/pydantic_ai.py](../../src/assistant/agent/backends/pydantic_ai.py) | Pydantic AI `Agent` | Runs its **own** model layer (token stats fall back to estimates); tools adapted via `Tool.from_schema` → still hit `Tool.run` |
+| `langgraph` | [backends/langgraph.py](../../src/assistant/agent/backends/langgraph.py) | LangGraph state graph | Wraps our LLM client as a LangChain chat model; checkpointing in-memory (Redis saver is backlog) |
 
 Measured comparison (code size, latency, behavior parity):
-[docs/backend-comparison.md](../docs/backend-comparison.md). The custom
+[docs/backend-comparison.md](../reference/backend-comparison.md). The custom
 loop's rule: **max 6 tool-loop iterations**, then it answers with what it
 has; every backend gets the identical tool registry and system prompt.
 
 ## The WebSocket protocol (`/chat`)
 
-Typed frames, defined in [api/schemas.py](../src/assistant/api/schemas.py)
-and mirrored in [frontend/src/types.ts](../frontend/src/types.ts).
+Typed frames, defined in [api/schemas.py](../../src/assistant/api/schemas.py)
+and mirrored in [frontend/src/types.ts](../../frontend/src/types.ts).
 
 **Client → server:** `{"type": "user_message", "content": "..."}`
 
@@ -53,7 +53,7 @@ Connection query params: `?session_id=` (resume), `?backend=` (runtime),
 ## Conversation memory (why prompts don't grow forever)
 
 Full transcripts live in Redis (`SessionStore`, 24 h TTL) — but the model
-never sees all of it. [`ConversationMemory`](../src/assistant/memory/conversation.py)
+never sees all of it. [`ConversationMemory`](../../src/assistant/memory/conversation.py)
 builds each turn's context as:
 
 ```
@@ -82,7 +82,7 @@ the server.
 
 ## Where the turn logic lives
 
-[`api/ws.py`](../src/assistant/api/ws.py) `_handle_turn` is the conductor:
+[`api/ws.py`](../../src/assistant/api/ws.py) `_handle_turn` is the conductor:
 builds context, streams agent events to the socket, tracks first-token
 latency and the audit timeline, closes the `agent.turn` span, computes
 stats/cost, sends the `turn` frame, writes `turn.summary`, stores the audit

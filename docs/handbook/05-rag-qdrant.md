@@ -5,7 +5,7 @@ project-specific pipeline, end to end.
 
 ## The corpus
 
-[docs_corpus/](../docs_corpus/) — Markdown files in three areas
+[docs_corpus/](../../docs_corpus/) — Markdown files in three areas
 (`architecture/`, `guidelines/`, `onboarding/`), ~30 chunks after splitting.
 This is the "internal engineering documentation" the system prompt promises.
 Only `*.md` files under the corpus directory are ingested; the chunk's
@@ -20,23 +20,23 @@ Only `*.md` files under the corpus directory are ingested; the chunk's
                                    ──> Qdrant upsert (deterministic ids)
 ```
 
-1. **Chunking** ([rag/chunking.py](../src/assistant/rag/chunking.py)) —
+1. **Chunking** ([rag/chunking.py](../../src/assistant/rag/chunking.py)) —
    heading-aware Markdown splitting; each chunk keeps its `source` file and
    `heading` path (both shown in citations). Code fences stay intact.
    Deterministic chunk ids → re-running ingest overwrites in place
    (idempotent); `--recreate` drops the collection first (use it to *remove*
    stale sources).
-2. **Dense embedding** ([rag/embeddings.py](../src/assistant/rag/embeddings.py)) —
+2. **Dense embedding** ([rag/embeddings.py](../../src/assistant/rag/embeddings.py)) —
    provider-switched:
    - `hash` *(default)*: offline feature-hashing into 512 dims — zero cost,
      deterministic, good enough for lexical-ish matching; the reason the
      whole platform runs without keys.
    - `openai` (`text-embedding-3-small`) or `voyage` (voyage-3): real
      semantic embeddings; set the key and **re-ingest**.
-3. **Sparse encoding** ([rag/sparse.py](../src/assistant/rag/sparse.py)) —
+3. **Sparse encoding** ([rag/sparse.py](../../src/assistant/rag/sparse.py)) —
    classic keyword signal: each token maps to a stable 32-bit index
    (md5-based) with sublinear term-frequency values.
-4. **Storage** ([rag/store.py](../src/assistant/rag/store.py)) — one Qdrant
+4. **Storage** ([rag/store.py](../../src/assistant/rag/store.py)) — one Qdrant
    collection (`docs`) with **named vectors** `dense` (cosine) + `sparse`;
    payload carries text/source/heading.
 
@@ -61,10 +61,10 @@ query ──> embed (dense) ──> Qdrant hybrid search ──> RRF fusion (ser
                        "[source — heading] (score 0.87)\n<chunk>" blocks
 ```
 
-- **Hybrid + RRF** ([rag/retriever.py](../src/assistant/rag/retriever.py)):
+- **Hybrid + RRF** ([rag/retriever.py](../../src/assistant/rag/retriever.py)):
   dense and sparse searches run as one Qdrant query; Reciprocal Rank Fusion
   merges the two rankings. `ASSISTANT_RETRIEVAL_MODE=dense` disables sparse.
-- **Rerank** ([rag/rerank.py](../src/assistant/rag/rerank.py)): deterministic
+- **Rerank** ([rag/rerank.py](../../src/assistant/rag/rerank.py)): deterministic
   lexical reranker reorders the top-20 by meaningful-token overlap with the
   query (stopwords ignored), retrieval score as tie-break. Offline stand-in
   for API rerankers (voyage/cohere slot into the same protocol).
@@ -82,7 +82,7 @@ query ──> embed (dense) ──> Qdrant hybrid search ──> RRF fusion (ser
 
 ## Measured quality (golden set)
 
-18 golden questions ([evals/golden.yaml](../evals/golden.yaml)), hash-512
+18 golden questions ([evals/golden.yaml](../../evals/golden.yaml)), hash-512
 embedder — each pipeline stage earns its place:
 
 | config | recall@1 | recall@5 | MRR |
@@ -93,7 +93,7 @@ embedder — each pipeline stage earns its place:
 
 Reproduce: `uv run python evals/run_retrieval.py --memory` (no Docker
 needed). Compare embedders: `uv run python -m evals.compare_embeddings` →
-writes [evals/results-embeddings.md](../evals/results-embeddings.md).
+writes [evals/results-embeddings.md](../../evals/results-embeddings.md).
 
 ## Watching Qdrant itself
 

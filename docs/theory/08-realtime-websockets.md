@@ -22,9 +22,9 @@ The task spec also names WebSocket explicitly (`ws://…/chat`).
 
 Both sides exchange small JSON frames tagged by `type`. Defined once as
 Pydantic models on the backend
-([`api/schemas.py`](../src/assistant/api/schemas.py)) and mirrored as
+([`api/schemas.py`](../../src/assistant/api/schemas.py)) and mirrored as
 TypeScript types in the frontend
-([`frontend/src/types.ts`](../frontend/src/types.ts)):
+([`frontend/src/types.ts`](../../frontend/src/types.ts)):
 
 ```
 client → server   {type: "user_message", content: "..."}
@@ -37,7 +37,7 @@ server → client   {type: "session", session_id}        connection bootstrap
 ```
 
 The event stream is exactly what the agent loop emits (chapter 04) — the WS
-layer ([`api/ws.py`](../src/assistant/api/ws.py)) forwards it verbatim. The
+layer ([`api/ws.py`](../../src/assistant/api/ws.py)) forwards it verbatim. The
 UI renders tokens as they arrive, tool frames as cards, and reconciles the
 streamed text with `final`.
 
@@ -47,7 +47,7 @@ The server issues a `session_id` on connect; the client persists it and
 reconnects with `?session_id=...` — history comes back from Redis
 (chapter 07), so a refresh or a backend-dropdown switch **continues the
 same conversation**. The frontend WS client
-([`frontend/src/stores/chat.ts`](../frontend/src/stores/chat.ts), VueUse
+([`frontend/src/stores/chat.ts`](../../frontend/src/stores/chat.ts), VueUse
 `useWebSocket`) auto-reconnects with backoff.
 
 Query params also carry `backend=` (per-session runtime switch, chapter 05)

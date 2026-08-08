@@ -22,7 +22,7 @@ call → tool call → Qdrant query), each carrying attributes (model, token
 counts, latency). Instrument once, export anywhere.
 
 **In this project:**
-[`observability.py`](../src/assistant/observability.py) — one pipeline, two
+[`observability.py`](../../src/assistant/observability.py) — one pipeline, two
 specialized backends:
 
 - **Logfire** (from the Pydantic team) — the *application* view: FastAPI
@@ -45,7 +45,7 @@ deliberately evaluating.
 1. **Unit tests with scripted models** — `ScriptedLLM` plays exact
    sequences ("request this tool, then say this"), so every loop branch —
    happy path, unknown tool, malformed JSON, crashing tool, iteration limit
-   — is asserted exactly ([`tests/test_tool_loop.py`](../tests/test_tool_loop.py)).
+   — is asserted exactly ([`tests/test_tool_loop.py`](../../tests/test_tool_loop.py)).
 2. **Protocol tests** — the WS suite drives full conversations against
    FakeLLM + fakeredis + in-memory Qdrant: streaming reassembly, session
    resume, summarization bounds, auth. Parametrized **×3 backends** — the

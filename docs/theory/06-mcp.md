@@ -45,7 +45,7 @@ What actually happens when our app starts:
    ordinary tool result.
 
 **In this project:**
-[`mcp/registry.py`](../src/assistant/mcp/registry.py) (the client side,
+[`mcp/registry.py`](../../src/assistant/mcp/registry.py) (the client side,
 ~130 lines), configured via `ASSISTANT_MCP_SERVERS` JSON. Design points to
 defend: per-server connect **timeouts**; a server that fails to start is
 logged and **skipped** — the agent runs with whatever tools are reachable
@@ -54,7 +54,7 @@ logged and **skipped** — the agent runs with whatever tools are reachable
 
 ## Our two bundled servers
 
-([`mcp_servers/`](../src/assistant/mcp_servers/) — each ~100 lines, runnable
+([`mcp_servers/`](../../src/assistant/mcp_servers/) — each ~100 lines, runnable
 standalone: `python -m assistant.mcp_servers.code_search`)
 
 - **`code_search`** — a *real* server, zero credentials: regex `search_code`

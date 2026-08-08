@@ -26,7 +26,7 @@ docker compose --profile observability up -d      # Jaeger + Prometheus + Grafan
 
 ## 1) Structured logs — the narrative
 
-[logs.py](../src/assistant/logs.py): structlog renders **pretty console** in
+[logs.py](../../src/assistant/logs.py): structlog renders **pretty console** in
 dev, **JSON lines** with `ASSISTANT_LOG_JSON=true` (same pipeline reformats
 uvicorn/stdlib logs; JSON mode renders exception tracebacks too).
 
@@ -49,7 +49,7 @@ carries them automatically. Grep one `turn_id` and you get the whole story:
 
 ## 2) Metrics — the aggregates (`/metrics` → Prometheus → Grafana)
 
-Defined in [telemetry.py](../src/assistant/telemetry.py):
+Defined in [telemetry.py](../../src/assistant/telemetry.py):
 
 | Series | Labels | Meaning |
 |---|---|---|
@@ -75,7 +75,7 @@ sum by (kind) (increase(assistant_errors_total[1h]))          # what's failing
 ```
 
 **Grafana** auto-provisions the *AI Workspace Assistant* dashboard
-([observability/grafana/dashboards/assistant.json](../observability/grafana/dashboards/assistant.json)):
+([observability/grafana/dashboards/assistant.json](../../observability/grafana/dashboards/assistant.json)):
 stat tiles (turns/tokens/tool-calls/errors) + turn rate, p50/p95 by backend,
 LLM p95 by provider, tokens/min, tool calls + p95, retrieval p95, errors —
 5 s refresh. Prometheus scrapes `/metrics` every 5 s (host-run server via
@@ -97,7 +97,7 @@ agent.turn  (session.id, turn.id, agent.backend, tool_calls, answer_chars)
 MCP SDK client spans (`MCP send tools/call …`) appear nested too. Finding a
 trace: Jaeger → service `ai-workspace-assistant` → operation `agent.turn` →
 Find Traces; or take `turn <id>` from the UI stats-line tooltip and search by
-tag. Destinations ([observability.py](../src/assistant/observability.py)):
+tag. Destinations ([observability.py](../../src/assistant/observability.py)):
 OTLP→Jaeger, Logfire, Langfuse — any combination, same spans; **no
 destination configured = fully inert** (no-op tracer, zero overhead).
 

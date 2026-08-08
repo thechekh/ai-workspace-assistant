@@ -7,14 +7,14 @@ one registry — a tool is written once and works everywhere.
 
 ## How tools work (the plumbing)
 
-**One shape.** A tool is a [`Tool`](../src/assistant/agent/tools.py) dataclass:
+**One shape.** A tool is a [`Tool`](../../src/assistant/agent/tools.py) dataclass:
 `name`, `description`, `parameters` (a JSON Schema), and an async `handler`
 that takes a `dict` of arguments and returns a `str`. `Tool.spec` converts it
 to the OpenAI function-calling wire format that every LLM provider we use
 understands (Groq, OpenAI, Ollama, Gemini — and `FakeLLM` mimics it offline).
 
 **One execution seam.** Every call — from any backend — goes through
-[`Tool.run`](../src/assistant/agent/tools.py), which is where all telemetry
+[`Tool.run`](../../src/assistant/agent/tools.py), which is where all telemetry
 lives:
 
 1. opens an OTel span `tool.execute` (attrs: `tool.name`, `tool.status`,
@@ -40,19 +40,19 @@ of re-executing. Fresh turn, fresh set; different arguments always execute.
 
 **How each backend consumes the registry.**
 
-- *custom* ([backends/custom.py](../src/assistant/agent/backends/custom.py)) —
+- *custom* ([backends/custom.py](../../src/assistant/agent/backends/custom.py)) —
   its loop passes `registry.specs` to the LLM step and executes
   `ToolCallRequest`s via `registry.execute(name, args)`.
-- *pydantic_ai* ([backends/pydantic_ai.py](../src/assistant/agent/backends/pydantic_ai.py))
+- *pydantic_ai* ([backends/pydantic_ai.py](../../src/assistant/agent/backends/pydantic_ai.py))
   — each registry tool is adapted with `Tool.from_schema(...)`; the adapter
   calls `tool.run`, so telemetry is identical.
-- *langgraph* ([backends/langgraph.py](../src/assistant/agent/backends/langgraph.py))
+- *langgraph* ([backends/langgraph.py](../../src/assistant/agent/backends/langgraph.py))
   — tools surface through the `LLMClientChatModel` adapter and are executed
   against the same registry.
 
 **Native vs MCP.** `search_docs` is native (constructed in-process over the
 RAG retriever). Everything else arrives over **MCP**: at startup
-[`MCPRegistry`](../src/assistant/mcp/registry.py) spawns each configured
+[`MCPRegistry`](../../src/assistant/mcp/registry.py) spawns each configured
 server (default: two local stdio subprocesses, `{python}` resolving to the
 current interpreter), lists its tools, and wraps each one as a registry
 `Tool` named `<server>__<tool>` — the backends cannot tell the difference.
@@ -73,7 +73,7 @@ degradation). Servers are configured via `ASSISTANT_MCP_SERVERS` JSON
 | Parameters | `query` *(string, required)* — natural-language search query |
 | Returns | Up to 4 chunks, each as `[source.md — heading] (score 0.87)` + chunk text (truncated ~1200 chars), separated by `---`. `"No matching documents found."` when nothing matches |
 | Errors | `error: the 'query' argument is required` on an empty query |
-| Implementation | [`make_search_docs`](../src/assistant/agent/tools.py) → [`Retriever.search`](../src/assistant/rag/retriever.py) |
+| Implementation | [`make_search_docs`](../../src/assistant/agent/tools.py) → [`Retriever.search`](../../src/assistant/rag/retriever.py) |
 
 Under the hood the retriever embeds the query (hash embedder by default,
 OpenAI/Voyage when configured), runs **hybrid** search in Qdrant (dense +
@@ -85,7 +85,7 @@ tool's `tool.execute` span, plus a `rag.retrieved` log line and the
 
 **Relevance gate.** Vector search always returns *something*, and RRF/hash
 scores are not calibrated — so the tool drops chunks that share no meaningful
-token with the query (`query_overlap` in [rerank.py](../src/assistant/rag/rerank.py),
+token with the query (`query_overlap` in [rerank.py](../../src/assistant/rag/rerank.py),
 prefix-tolerant: "deploy" matches "deployment"). If nothing survives, the
 model gets an explicit "no relevant documents — don't retry, tell the user"
 message instead of confident-looking noise about unrelated topics.
@@ -101,7 +101,7 @@ about internal systems and to cite the source files it gets back.
 | Parameters | `url` *(string, required)* — absolute http(s) URL |
 | Returns | Readable text of the page (HTML stripped), capped at 8 000 chars. **GitHub special cases** via the API: `github.com/{owner}/{repo}` → description, language, stars, topics + README (first 6 000 chars); `github.com/{owner}` → account info + list of public repositories |
 | Errors | `error: only http(s) URLs are supported`, `error: refusing to fetch private or loopback addresses`, `error: GET <url> returned HTTP <status>`, `error: could not fetch <url>: <why>` |
-| Implementation | [`make_fetch_url`](../src/assistant/agent/tools.py) — httpx, 15 s timeout, redirects followed |
+| Implementation | [`make_fetch_url`](../../src/assistant/agent/tools.py) — httpx, 15 s timeout, redirects followed |
 
 Notes: the loopback/private-range block is a **dev-grade** SSRF guard (string
 match on the host; production would resolve DNS and enforce an egress
@@ -116,7 +116,7 @@ for chat use; on rate-limit the tool falls back to fetching the HTML page.
 | Parameters | `pattern` *(string, required)* — regex, case-insensitive; `max_results` *(int, default 20)* |
 | Returns | One `path:line: content` per match (content trimmed to 200 chars), or `no matches for '<pattern>'` |
 | Errors | `error: invalid regex '<pattern>': <why>` |
-| Implementation | [`mcp_servers/code_search.py`](../src/assistant/mcp_servers/code_search.py), pure Python (no ripgrep dependency) |
+| Implementation | [`mcp_servers/code_search.py`](../../src/assistant/mcp_servers/code_search.py), pure Python (no ripgrep dependency) |
 
 The search root is `CODE_SEARCH_ROOT` (env of the *server subprocess*;
 default = the API server's working directory, i.e. this repository). It walks
@@ -143,7 +143,7 @@ that server's `env` block in `ASSISTANT_MCP_SERVERS`.
 | Purpose | Demo "workspace" data: 5 canned PRs with realistic states |
 | Parameters | `state` *(string, default `"open"`; `open`/`merged`/`all`/`any`)*; `limit` *(int, default 5)* |
 | Returns | One line per PR: `#142 [open] title — by author, CI status, reviews, updated date` |
-| Implementation | [`mcp_servers/fake_github.py`](../src/assistant/mcp_servers/fake_github.py) — static in-memory data |
+| Implementation | [`mcp_servers/fake_github.py`](../../src/assistant/mcp_servers/fake_github.py) — static in-memory data |
 
 ### `github__get_pull_request` — one PR in detail (MCP: `github`, **mocked**)
 
@@ -171,7 +171,7 @@ unchanged.
 ## Offline demo triggers (FakeLLM)
 
 With the default `fake` provider there's no real model, so
-[`FakeLLM`](../src/assistant/llm/client.py) plays a one-round agent on keyword
+[`FakeLLM`](../../src/assistant/llm/client.py) plays a one-round agent on keyword
 heuristics — useful when testing tools without a key:
 
 | You type | Tool it calls |
@@ -187,7 +187,7 @@ A real model (e.g. Groq) chooses tools from the descriptions above on its own.
 **Reliability on Groq/llama.** llama models sometimes fumble the tool-call
 protocol: they emit the call as plain text (`<function.name>{…}</function>`,
 `<function=name>{…}`, `<function(name){…}`) or trip Groq's `tool_use_failed`
-stream error. [`OpenAICompatibleLLM`](../src/assistant/llm/client.py) absorbs
+stream error. [`OpenAICompatibleLLM`](../../src/assistant/llm/client.py) absorbs
 both: leaked text is held back and parsed into real tool calls
 (`parse_leaked_tool_calls`), failed steps are retried up to 2× and, as a last
 resort, the call is recovered from Groq's `failed_generation` payload. The

@@ -5,7 +5,7 @@ demo script, and the implementation walkthrough map. Everything runs
 offline with zero API keys (fake LLM + hash embedder); with a Groq key the
 same demos run on a real model.
 
-**Presenter prep:** the [`theory/`](../theory/README.md) folder explains
+**Presenter prep:** the [theory course](../theory/README.md) explains
 every concept from zero (LLMs, embeddings, RAG, agents, MCP, memory…) with
 per-chapter Q&A, plus a dedicated [defense Q&A](../theory/12-defense-qa.md)
 for the hard questions.

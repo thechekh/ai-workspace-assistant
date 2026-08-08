@@ -63,7 +63,7 @@ User sends *"Which service generates PDF invoices?"* in the UI:
 1. **WS in** — the browser sends `{"type":"user_message","content":...}` over
    `/chat`. The server assigns a 12-hex `turn_id`, binds
    `session_id`/`turn_id`/`backend` into the logging context, and opens the
-   `agent.turn` span. ([ws.py](../src/assistant/api/ws.py))
+   `agent.turn` span. ([ws.py](../../src/assistant/api/ws.py))
 2. **Memory** — `ConversationMemory.context_for()` builds the bounded prompt:
    system prompt + rolling summary + recent verbatim turns from Redis.
 3. **LLM step 1** — the agent backend calls the LLM with the message history
@@ -124,7 +124,7 @@ spans → Jaeger, /metrics + Grafana, deep health, audit trail, per-turn UI
 stats), followed by provider hardening (rate-limit backoff, llama tool-call
 salvage, cost accounting, `fetch_url`, retrieval relevance gate, duplicate
 guard) — all verified live against Groq. Full details:
-[implementation-plan.md](../implementation-plan.md) and [TODO.md](../TODO.md).
+[implementation-plan.md](../project/implementation-plan.md) and [TODO.md](../project/TODO.md).
 
 ## Design principles (why it looks like this)
 
