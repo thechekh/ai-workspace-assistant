@@ -1,134 +1,330 @@
 # 12 — Defense Q&A
 
-The questions most likely to come up, with answers that hold. General
-technique: answer with a **decision + reason + evidence in the repo**, and
-concede trade-offs proactively — the honest concession is what makes the
-rest credible.
+The questions most likely to come up, with answers that hold.
+
+**General technique:** answer with a **decision → reason → evidence in the
+repo**, and concede trade-offs proactively. The honest concession is what
+makes the rest credible. Every number below is real and reproducible; if you
+cite one, be ready to run the command.
+
+**Numbers worth memorising**
+
+| Claim | Value | How to prove it |
+|---|---|---|
+| Tests | 203 backend + 16 frontend | `uv run pytest -q`, `npm run test:run` |
+| Coverage | 83.7%, floor enforced in CI | `uv run pytest --cov` |
+| Retrieval quality | recall@1 **0.83**, recall@5 **1.00**, MRR **0.92** | `uv run python evals/run_retrieval.py --memory` |
+| Agent backends | 98 / 194 / 278 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
+| Real-model cost | ~$0.012 for a full 8-case acceptance run | the stats line under every answer |
+| Suite runtime | ~13 s, fully offline | no network, no Docker |
+
+---
 
 ## Architecture
 
 **Q: Why implement the agent three times? Isn't once enough?**
-Because "which framework?" was a real open question, and we wanted an
-evidence-based answer instead of a blog-post opinion. The marginal cost was
-low (backends are 103/209/282 lines; everything else is shared), and the
-payoff is `docs/backend-comparison.md` with measured numbers — plus the
-choice stays reversible via config. That comparison *is* a deliverable of
-the bench project.
+Because "which framework?" was a real open question and we wanted an
+evidence-based answer, not a blog-post opinion. The marginal cost was low —
+98/194/278 lines; everything else (tools, memory, telemetry, protocol) is
+shared — and the payoff is [backend-comparison.md](../reference/backend-comparison.md)
+with measured numbers, plus the choice stays reversible via one config value.
+The comparison *is* a deliverable, not a detour.
 
 **Q: Why a custom loop at all when frameworks exist?**
 It's ~100 lines, it's the ground truth the frameworks wrap, and it makes
 every debugging session easier because we know what "correct" looks like
-underneath. It also became the teaching artifact for this workshop.
+underneath. It's also the teaching artifact for this workshop.
 
-**Q: Why WebSockets instead of REST/SSE?**
-Chat is bidirectional and session-shaped: one connection carries messages
-up and tokens/tool-events down, with session resume on reconnect. SSE would
-need a POST side-channel per message. (And the task spec names `ws://`.)
+**Q: Why WebSockets instead of REST or SSE?**
+Chat is bidirectional and session-shaped: one connection carries messages up
+and tokens/tool-events/stats down, with session resume on reconnect. SSE
+would need a POST side-channel per message. (The task spec also names
+`ws://`.)
+
+**Q: How does the abstraction actually stay honest?**
+The WS test suite is parametrized across all three backends — identical
+assertions, including memory-bounding. And after a regression where the
+offline fake for one backend drifted from the others,
+[test_fake_parity.py](../../tests/test_fake_parity.py) now asserts all three
+route the same prompt to the same tool end-to-end. That bug is the reason
+the test exists; say so.
 
 **Q: What breaks first in production?**
-Honest list: (1) single shared auth token → replace with OIDC at the
-gateway; (2) MemorySaver-style in-process state in the LangGraph backend →
-Redis/Postgres checkpointer; (3) no rate limiting/quotas per user; (4) the
-sessions sidebar and multi-user session management are future work. None of
-these are architectural — the stateful parts (Redis, Qdrant) are already
-externalized, so API pods scale horizontally today.
+Honest list: (1) a single shared bearer token → replace with OIDC at the
+gateway; (2) no rate limiting or per-user quotas; (3) LangGraph's in-process
+checkpointer → needs a Redis/Postgres saver to be durable; (4) no session
+management UI. None are architectural — the stateful parts (Redis, Qdrant)
+are already externalised, so API pods scale horizontally today.
 
-## LLM & cost
+---
+
+## LLM & AI
 
 **Q: Which model does this run on, and what does it cost?**
-The model is a config value behind an OpenAI-compatible layer. Everything
-you saw today ran on a deterministic offline fake — **the entire project
-was built and tested for $0 in API costs**. Flip one env var for Groq's
-free tier (real Llama model), or a paid key for OpenAI. That cost story is
-itself a design outcome: fakes for plumbing, real models only where quality
-is being evaluated.
+The provider is a **config value**, not a code decision: one
+OpenAI-compatible client covers Groq, OpenAI, Ollama and Gemini, plus a
+deterministic offline `fake` used as the dev/test default. The whole test
+suite and all plumbing work runs at **$0**. Real-model work runs on Groq's
+free tier (`llama-3.3-70b-versatile`); a full 8-case acceptance pass costs
+about **$0.012** at listed prices — and the app *tells you*, per turn, in
+the stats line and in `assistant_cost_usd_total`.
+
+**Q: So is the cost real or estimated?**
+Both, labelled. When the provider reports usage (Groq does, via
+`stream_options.include_usage`) the numbers are real; otherwise we fall back
+to a `chars/4` estimate and flag it `(est)` in the UI. Cost is priced from a
+small per-model table — indicative at list prices, since the free tier
+actually bills $0.
 
 **Q: How do you prevent hallucinations?**
-Grounding + transparency: the agent retrieves doc chunks and answers from
-them, the tool card shows the user exactly what evidence was retrieved
-(source file, heading, score), and the system prompt instructs "if the docs
-don't cover it, say so". Retrieval quality is measured (recall@5 = 1.00 on
-the golden set), so the right evidence reaching the model is a number, not
-a hope.
+Three layers. **Grounding**: the agent retrieves chunks and answers from
+them, citing source and heading. **Transparency**: the tool card shows the
+user exactly what evidence was retrieved, and "details" replays the whole
+turn. **Refusal paths**: the system prompt forbids stating the content of a
+page it did not fetch, and the tools return explicit "nothing indexed" /
+"nothing relevant" messages that instruct the model not to retry and to say
+so. That last one came from a real failure — the model invented a plausible
+description of a GitHub repo it had never fetched; `fetch_url` plus the
+honesty instructions exist because of it.
 
-**Q: What about prompt injection — a doc that says "ignore your instructions"?**
-Real concern, honestly scoped: our corpus is trusted internal docs, and the
-blast radius is bounded structurally — the model can only call allowlisted
-read-only tools, execution is server-side, and tool arguments are
-schema-validated. For untrusted corpora you'd add content sanitization and
-tool-permission tiers; the registry is the natural enforcement point.
+**Q: What about prompt injection — a document that says "ignore your instructions"?**
+A real concern, and note the threat model *changed*: documents are now
+uploaded at runtime, so the corpus is no longer necessarily trusted. What
+bounds the blast radius is structural: the model can only call allowlisted,
+**read-only** tools; execution is server-side; tool arguments are
+schema-validated; `read_file` is jailed to the repo root (path-traversal
+test in the suite); and `fetch_url` refuses loopback and private ranges.
+What we have *not* built: content sanitisation on ingest and
+tool-permission tiers. The `ToolRegistry` is the natural enforcement point
+for both.
+
+**Q: Real models are flaky. How did you handle that?**
+This is where most of the hardening went, and all of it came from live
+failures against Groq, not speculation:
+- **429s** → backoff that honours `Retry-After` (including `retry-after: 0`,
+  which a naive truthiness check silently discards — that was a real bug),
+  and the provider's own message surfaced to the user, because per-minute
+  and per-day limits need different advice.
+- **`tool_use_failed`** → llama sometimes emits malformed tool-call JSON;
+  the step is retried, then the call is salvaged from Groq's
+  `failed_generation` payload.
+- **Leaked tool syntax** → llama sometimes prints `<function.name>{…}` as
+  *text*; that text is withheld, parsed into a real tool call, and never
+  reaches the chat.
+- **Repeated identical calls** → a per-turn duplicate guard; we measured the
+  same URL being fetched three times in one turn, burning the rate budget.
+
+---
 
 ## RAG
 
 **Q: Why RAG and not fine-tuning?**
-Facts change weekly; re-ingest is minutes and free, retraining is neither.
-RAG cites sources; fine-tuned knowledge is opaque and unauditable.
-Fine-tuning is the tool for style/behavior, not for living documentation.
+Facts change weekly; re-ingest is seconds and free, retraining is neither.
+RAG cites sources, so answers are auditable; fine-tuned knowledge is opaque.
+Fine-tuning is the tool for style and behaviour, not for living
+documentation.
+
+**Q: Walk me through the pipeline.**
+Ingest: heading-aware Markdown chunking → dense embedding + sparse lexical
+vector → upsert to Qdrant with deterministic ids (so re-ingesting replaces
+in place). Query: embed the query → hybrid dense+sparse search with RRF
+fusion → lexical rerank of the top-20 → relevance gate → top-4 chunks with
+source, heading and score.
 
 **Q: Your embedder isn't a real embedding model.**
-Correct, and it's disclosed in the docs: `hash-512` is lexical feature
-hashing — a deterministic, $0 stand-in that let us build and *measure* the
-whole pipeline (0.83/1.00/0.92 on the golden set with hybrid+rerank).
-Semantic models (OpenAI, voyage-3) are a config switch, and
-`evals/compare_embeddings.py` prints the comparison table the day a key
-exists. The pipeline is the deliverable; the embedder is a plug.
+Correct, and it's disclosed everywhere: `hash-512` is lexical feature
+hashing — deterministic, $0, and good enough to build *and measure* the
+whole pipeline. Semantic models (OpenAI `text-embedding-3-small`, voyage-3)
+are a config switch plus a re-ingest, and `evals/compare_embeddings.py`
+prints the comparison table the day a key exists. The pipeline is the
+deliverable; the embedder is a plug.
 
-**Q: How do you know retrieval is good?**
-We measure it: 18-question golden set, recall@1/recall@5/MRR, three
-configurations compared (dense 0.56/0.94/0.72 → hybrid 0.67/1.00/0.80 →
-+rerank 0.83/1.00/0.92). The eval runs self-contained in seconds
-(`evals/run_retrieval.py --memory`) so it's a regression gate, not a
-one-off benchmark.
+**Q: How do you know retrieval is any good?**
+We measure it: an 18-question golden set, recall@1 / recall@5 / MRR, three
+configurations compared — dense 0.56/0.94/0.72 → hybrid 0.67/1.00/0.80 →
+hybrid+rerank **0.83/1.00/0.92**. Every stage earns its place with a number.
+It runs self-contained in seconds (`evals/run_retrieval.py --memory`), so
+it's a regression gate rather than a one-off benchmark.
 
-## MCP
+**Q: Where does the knowledge base come from?**
+It starts **empty** — no seed data ships with the app. Documents are added
+at runtime: a Documents panel in the UI, `POST /api/documents`, or an
+ingest CLI, with an optional `ASSISTANT_CORPUS_DIR` for a folder you want
+kept in sync. `evals/corpus/` exists only as the retrieval test fixture that
+the golden set's answers live in.
+
+**Q: What happens when retrieval finds nothing useful?**
+It says so, and distinguishes two cases the model must handle differently:
+*nothing indexed yet* (the user's problem — upload documents) versus
+*nothing relevant* (the docs don't cover it — don't retry). This exists
+because vector search **always** returns its top-k, even for a query about
+something the corpus has never heard of. The relevance gate drops chunks
+sharing no meaningful token with the query, so "empty" means the same thing
+to every caller.
+
+---
+
+## Vector database
+
+**Q: Why Qdrant over pgvector, Weaviate, or Chroma?**
+Native **named vectors** — one point carries both a dense and a sparse
+vector — plus server-side **RRF fusion** through the Query API, which is
+exactly the hybrid search we wanted without hand-rolling fusion in Python.
+It runs as one container locally and has a first-class async client. The
+honest counter-argument: if you already run Postgres, pgvector avoids a new
+datastore, and at this corpus size you would not feel the difference.
+
+**Q: What are dense and sparse vectors actually doing?**
+Dense captures *meaning* — "invoice" near "billing" even with no shared
+words. Sparse is classic keyword matching, so exact tokens like a service
+name or an error code score highly. They fail in opposite directions, which
+is why fusing them beats either: our own numbers show recall@1 going
+0.56 → 0.67 from adding sparse alone.
+
+**Q: What is RRF, in one sentence?**
+Reciprocal Rank Fusion merges two ranked lists by scoring each document on
+`1/(k + rank)` in each list and summing — so it combines *rankings* rather
+than incomparable similarity scores.
+
+**Q: How would this scale?**
+Qdrant handles millions of vectors on one node; the current corpus is tens
+of chunks. The parts that would need attention first are re-ingest strategy
+(incremental rather than full), embedding cost at volume (batching is
+already there), and the `list_sources` scroll in the documents API, which is
+fine for hundreds of documents and would need a payload index beyond that.
+
+---
+
+## Agents, tools & MCP
+
+**Q: What actually is the "agent" here?**
+A ReAct loop: the model sees the conversation plus tool schemas, may emit
+tool calls, the loop executes them and appends the results, and repeats —
+bounded at 6 iterations — until it produces a final answer. Everything
+streams to the browser as typed events.
 
 **Q: The GitHub demo is mocked — so what did you actually prove?**
 Everything except GitHub's data: subprocess spawn, MCP handshake, tool
-discovery, namespacing, call forwarding, error handling — all real (and the
-code-search MCP server is fully real, searching this repo). The mock
-deliberately uses the official GitHub server's tool names, so the swap to
-real GitHub is one config line with a PAT — no code changes. That swap line
-is on the slide.
+discovery, namespacing, argument passing, result handling, error handling —
+all real. The code-search MCP server is *fully* real and searches this
+repository. The mock deliberately uses the official GitHub server's tool
+names, so the swap is one config line plus a PAT, with no code changes.
 
 **Q: Why MCP instead of writing integrations directly?**
-N+M instead of N×M: the GitHub MCP server already exists and is maintained
-by GitHub — we never write or maintain that integration. And our own
-`code_search` server is instantly reusable by any MCP client (Claude
-Desktop, editors), not just this app.
+N+M instead of N×M. GitHub's MCP server already exists and is maintained by
+GitHub — we never write or maintain that integration. And our `code_search`
+server is instantly reusable by any MCP client, not just this app.
 
 **Q: Is running MCP servers safe?**
-They're dependencies — same trust model as a pip package: run trusted ones,
-least privilege. Ours are local and ours; `read_file` is jailed to the repo
-root (path-traversal test in the suite); secrets go to servers via
-environment, never through the model's context; and unreachable servers
-degrade gracefully instead of taking the app down.
+They're dependencies — the same trust model as a pip package: run trusted
+ones, least privilege. Ours are local; `read_file` is jailed to the repo
+root; secrets reach servers through environment variables, never through the
+model's context; and an unreachable server is skipped with a warning rather
+than taking the app down (`/api/health` reports `degraded` when an enabled
+server failed to connect).
+
+**Q: How do you stop a tool from taking the whole turn down?**
+`Tool.run` is a single execution seam for every tool on every backend: a
+crash becomes an `error:` *result* the model can react to, never an
+exception that kills the loop. It's also where the span, metrics, structured
+log and duplicate guard live — added once, not per tool.
+
+---
+
+## Observability
+
+**Q: Why so much observability for a demo?**
+Because "the model said something wrong" is unactionable without it. The
+goal was that every answer can be explained: what was retrieved, which tools
+ran, how long each step took, how many tokens, what it cost. That's a
+product feature here, not just ops — the stats line and the "details"
+timeline are in the UI.
+
+**Q: What can you actually see?**
+Five surfaces on the same data. **Logs** — structured, with
+`session_id`/`turn_id`/`backend` auto-bound to every line, one greppable
+`turn.summary` per turn. **Metrics** — `/metrics` exposes 9 `assistant_*`
+metric families (turns, turn/LLM/tool/retrieval latency histograms, tokens,
+cost, tool calls by status, errors by kind), labelled by
+backend/provider/tool/mode.
+**Traces** — OTel spans on the seams that explain the agent:
+`agent.turn → llm.step → tool.execute → rag.retrieve`, in Jaeger. **Product**
+— per-turn stats and an expandable timeline in the chat. **Audit** — the
+last 50 turns per session, replayable via the API.
+
+**Q: Why manual spans instead of auto-instrumentation?**
+Auto-instrumentation shows you HTTP calls. It cannot tell you *why the agent
+did that* — which tool it chose, what retrieval returned, how many
+reasoning steps it took. The four manual spans are the ones that make a
+trace explain the agent rather than the transport.
+
+**Q: Does all this cost anything when it's off?**
+No. Tracing is inert with no destination configured — no SDK import, no
+network, a no-op tracer. Metrics are in-process counters. It's offline-first
+by design: Jaeger, Prometheus and Grafana all run locally with zero
+accounts.
+
+---
 
 ## Engineering quality
 
 **Q: How do you test something nondeterministic?**
 Remove the nondeterminism from every layer except the one under evaluation:
-scripted LLMs for the loop's branches, FakeLLM + fakeredis + in-memory
+scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-72 tests, ~10 seconds, offline. Model *quality* is deliberately out of unit
-scope — that's what the eval harness with real models is for.
+**203 tests in ~13 seconds, fully offline** — no network, no containers, no
+keys. Model *quality* is deliberately out of unit scope; that's what the
+eval harness is for.
 
-**Q: The same tests pass on all three backends — why does that matter?**
-It's the proof that the abstraction is real. The WS suite is parametrized
-×3: identical assertions on custom, Pydantic AI, and LangGraph — including
-memory-bounding behavior. If a backend cheated on the contract, the suite
-would say so.
+**Q: What does CI actually enforce?**
+Ruff (lint + format), pyright, the test suite with a coverage floor, a
+frontend job (typecheck + tests + build), and a Docker image build — across
+Python 3.12 **and** 3.13, because 3.13 is what the image ships and testing
+only the floor version was a real gap. A separate security workflow runs
+CodeQL plus `pip-audit` and `npm audit` weekly.
+
+**Q: Did the security scanning find anything?**
+Yes, immediately — which is the point. Eight Python vulnerabilities across
+four packages and one critical frontend one: a `happy-dom` VM-context escape
+(RCE), SSRF and path traversal in `pydantic-ai`, command injection in
+`fastmcp`, pickle deserialisation in `diskcache`. All fixed by upgrading;
+both audits now report zero. The upgrade meant absorbing four upstream
+breaking changes, which is the honest cost of staying current.
 
 **Q: What was the hardest bug?**
-A real infra outage during development: Redis died mid-message and silently
-killed the WebSocket. The fix — every failure becomes a visible `error`
-frame and the socket keeps serving — is now a test. Second place: framework
-API drift (mcp 2.0 renames, LangGraph streaming needing the public astream
-for token callbacks) — solved by probing installed APIs before writing
-against them, which is why the adapters exist.
+Two worth telling. A **silent correctness bug**: `retry-after: 0` means
+"retry immediately", but `x or default` treats `0.0` as absent — so the
+client slept 2s then 4s while claiming to honour the header, and it also
+made 12 of the suite's 20 seconds real sleeping. And a **drift bug**: the
+offline fake for the pydantic-ai backend was a hand-copied twin that never
+learned about a new tool, so one backend silently behaved differently from
+the other two — invisible precisely because the duplication looked harmless.
+Both now have regression tests; the second produced a whole parity test file.
 
-**Q: What would you do next with more time?**
-In order: session management UI (list/switch conversations), real-model
-eval pass with Groq/OpenAI + the embedding comparison rows, long-term
-memory (facts store in Qdrant), OIDC, and a Redis checkpointer to make
-LangGraph runs durable — at which point its checkpointing becomes a genuine
-differentiator rather than a demo.
+**Q: How do you know the documentation is true?**
+Partly automated: `tests/test_docs_links.py` fails the build on any broken
+relative link, on stray prose outside `docs/`, and if the index stops
+covering a folder. It caught seven broken links the moment a module was
+split into a package. The prose claims are kept honest by re-verifying
+numbers before citing them — everything in the table at the top of this page
+is reproducible with one command.
+
+**Q: What would you do next, with more time?**
+In order: an interrupt/cancel button (the bidirectional-WS showcase),
+session management UI, a real-model eval pass plus the embedding comparison
+rows, long-term memory as a facts store in Qdrant, OIDC, and a Redis
+checkpointer to make LangGraph runs durable — at which point its
+checkpointing becomes a genuine differentiator rather than a demo.
+
+---
+
+## Questions to ask *back*
+
+Defence goes better when it's a conversation:
+
+- "Which part would you want to see running first — the RAG demo, the MCP
+  tool call, or the trace waterfall?"
+- "Is your team's constraint cost, latency, or data residency? Because the
+  provider is a config value, and that choice changes the answer."
+- "Would you want documents uploaded by users, or a synced folder? Both are
+  supported and they have different threat models."

@@ -42,7 +42,9 @@ the map of what's where once things run.
 | http://localhost:8000/api/health | **Deep health**: Redis/Qdrant ping + latency, LLM, MCP tools | API server |
 | http://localhost:8000/api/info | Platform info: backends, provider, retrieval mode | API server |
 | http://localhost:8000/metrics | **Prometheus metrics** (all `assistant_*` series) | API server |
+| http://localhost:8000/api/documents | **Knowledge base**: `GET` lists indexed documents, `POST` adds them (multipart `files=` and/or `text=`+`source=`), `DELETE /{source}` removes one | API server |
 | http://localhost:8000/api/sessions/{id}/turns | **Audit trail**: per-turn stats + event timeline | API server |
+| http://localhost:8000/api/sessions/{id}/turns/{turn_id} | One turn — what the UI's "details" panel fetches | API server |
 | http://localhost:16686 | **Jaeger** — trace waterfalls (service `ai-workspace-assistant`) | observability profile |
 | http://localhost:3000 | **Grafana** — provisioned dashboard *AI Workspace Assistant*, no login | observability profile |
 | http://localhost:9090 | **Prometheus** — raw queries; `/targets` shows scrape status | observability profile |
@@ -57,9 +59,11 @@ bench_project-redis-1 redis-cli`), Qdrant gRPC `6334`, Jaeger OTLP ingest
 
 FastAPI serves a WebSocket chat. Each user message becomes an **agent turn**:
 an LLM (Groq's llama by default, a deterministic fake offline) reasons in a
-loop, calling **tools** — `search_docs` (RAG over internal docs in Qdrant),
-`fetch_url` (public web/GitHub), and MCP servers (code search, GitHub mock) —
-until it has an answer, which streams back token by token. Redis keeps
+loop, calling **tools** — `search_docs` (RAG over the knowledge base in
+Qdrant, which starts empty and is filled at runtime through the Documents
+panel or `POST /api/documents`), `fetch_url` (public web/GitHub), and MCP
+servers (code search, GitHub mock) — until it has an answer, which streams
+back token by token. Redis keeps
 sessions and conversation memory (rolling summarization). Every step is
 observable: structured logs with correlation IDs, Prometheus metrics, OTel
 spans to Jaeger, per-turn stats + cost in the UI, and a replayable audit

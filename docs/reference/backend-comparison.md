@@ -13,14 +13,14 @@ Measured on this repository (line counts via `wc -l`, docstrings included).
 
 | | custom loop | Pydantic AI | LangGraph |
 |---|---:|---:|---:|
-| Backend file LoC | **103** | **209** | **282** |
+| Backend file LoC | **98** | **194** | **278** |
 | …of which framework-adapter code | 0 | ~45 (FunctionModel fake) + ~25 (model builder) | ~95 (`BaseChatModel` adapter) + ~35 (message conversion) |
 | Extra runtime deps | none (shares `llm/client.py`) | `pydantic-ai` (+ its provider SDKs) | `langgraph` + `langchain-core` |
-| Offline fake for tests/demo | free — FakeLLM speaks our protocol | had to re-implement heuristics as a `FunctionModel` twin | free — the adapter lets FakeLLM/ScriptedLLM run unchanged |
+| Offline fake for tests/demo | free — FakeLLM speaks our protocol | needs a `FunctionModel` twin; both now share `llm/fake.py` after the hand-copied version silently drifted | free — the adapter lets FakeLLM/ScriptedLLM run unchanged |
 | Loop bound | hand-written `for` loop | framework internal (usage limits available) | built-in `recursion_limit` → `GraphRecursionError` |
 
 Context for fairness: the custom loop leans on our shared `llm/client.py`
-(232 lines) — but that layer also serves LangGraph (via the adapter), the
+(445 lines, including the provider-hardening layer) — but it also serves LangGraph (via the adapter), the
 dev fake, and the test scripting, so it isn't a custom-loop-only cost.
 
 ## Dimension by dimension

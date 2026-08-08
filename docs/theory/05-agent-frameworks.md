@@ -20,16 +20,16 @@ argued from blog posts.
 agent/base.py        AgentBackend protocol + AgentEvent stream (the contract)
 agent/tools/         ToolRegistry — ONE tool source for all backends
 agent/backends/
-  custom.py     103 lines   the loop, no dependencies
-  pydantic_ai.py 209 lines  Pydantic AI runtime
-  langgraph.py   282 lines  LangGraph runtime
+  custom.py      98 lines   the loop, no dependencies
+  pydantic_ai.py 194 lines  Pydantic AI runtime
+  langgraph.py   278 lines  LangGraph runtime
 ```
 
 Every backend receives the same tools, the same history, and must emit the
 same event stream. Consequences:
 
 - The **same WebSocket test suite runs ×3** — identical assertions pass on
-  every runtime (72 tests total include the whole suite parametrized).
+  every runtime (the 203-test suite includes the WS suite parametrized ×3).
 - The UI **switches runtimes per session** with a dropdown — same question,
   three frameworks, live.
 - The choice of framework stays **reversible** — an architecture property,
