@@ -40,6 +40,31 @@ honest list of what is not built.
 **I want to know what's next** → [project/TODO.md](project/TODO.md) — the one
 backlog (features, code quality, hardening) plus a record of what's done.
 
+## By topic — preparing to explain or defend the project
+
+Each row is *concept first, then how this project does it, then the hard
+questions*. Read across.
+
+| Topic | Concept, from zero | How it works here | Depth / defence |
+|---|---|---|---|
+| **Purpose & scope** | — | [project/description.md](project/description.md) (the brief), [handbook/01](handbook/01-project-overview.md) | [theory/12 §Architecture](theory/12-defense-qa.md) |
+| **Stack & technologies** | [theory/10](theory/10-infrastructure.md) | [handbook/03](handbook/03-technologies.md) — what, why, where | [project/tech-stack.md](project/tech-stack.md) — the decisions |
+| **LLMs, tokens, cost** | [theory/01](theory/01-llm-basics.md) | [handbook/04](handbook/04-llm-models-tokens.md) — providers, retries, usage, pricing | [theory/12 §LLM & AI](theory/12-defense-qa.md) |
+| **RAG** | [theory/03](theory/03-rag.md) | [handbook/05](handbook/05-rag-qdrant.md) — ingest + query pipeline | [theory/12 §RAG](theory/12-defense-qa.md) |
+| **Embeddings & vector DB** | [theory/02](theory/02-embeddings-and-vector-search.md) | [handbook/05](handbook/05-rag-qdrant.md) — hybrid, RRF, rerank, gate | [theory/12 §Vector database](theory/12-defense-qa.md) |
+| **Tools / function calling** | [theory/04](theory/04-tool-calling-and-agents.md) | [reference/tools.md](reference/tools.md) — every tool in full | [handbook/06](handbook/06-tools-mcp.md) |
+| **MCP** | [theory/06](theory/06-mcp.md) | [handbook/06](handbook/06-tools-mcp.md) | [theory/12 §Agents, tools & MCP](theory/12-defense-qa.md) |
+| **Agents & frameworks** | [theory/04](theory/04-tool-calling-and-agents.md), [theory/05](theory/05-agent-frameworks.md) | [handbook/08](handbook/08-agents-memory-ws.md) | [reference/backend-comparison.md](reference/backend-comparison.md) — measured |
+| **Memory** | [theory/07](theory/07-memory.md) | [handbook/08](handbook/08-agents-memory-ws.md) | — |
+| **Real-time / WebSocket** | [theory/08](theory/08-realtime-websockets.md) | [handbook/08](handbook/08-agents-memory-ws.md) — the frame protocol | — |
+| **Observability & cost** | [theory/09](theory/09-observability-and-evals.md) | [handbook/07](handbook/07-observability.md) — every surface + PromQL | [theory/12 §Observability](theory/12-defense-qa.md) |
+| **Testing & evals** | [theory/09](theory/09-observability-and-evals.md) | [handbook/09](handbook/09-testing-operations.md) | [reference/testing.md](reference/testing.md) — manual checklist |
+| **Security** | — | [reference/security.md](reference/security.md) — threat model + controls | [theory/12 §LLM & AI](theory/12-defense-qa.md) |
+| **Any unfamiliar term** | [theory/11 — glossary](theory/11-glossary.md) | — | — |
+
+**Presenting it?** [project/workshop.md](project/workshop.md) has the slide
+outline, a click-by-click demo script, and the file-map walkthrough.
+
 ## Full index
 
 ### handbook/ — operating this project
