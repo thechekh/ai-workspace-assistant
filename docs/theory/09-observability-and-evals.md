@@ -57,7 +57,7 @@ deliberately evaluating.
 4. **Browser E2E** — Playwright drives the real UI against the real server
    per phase (tool cards render, backends switch, toasts fire).
 
-204 tests, ~13 seconds, fully offline, $0. The fakes aren't a compromise —
+212 tests, ~13 seconds, fully offline, $0. The fakes aren't a compromise —
 they're what makes the suite *possible*.
 
 ## What we deliberately do NOT test with fakes

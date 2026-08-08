@@ -21,12 +21,18 @@ watch(
 <template>
   <main ref="scroller" class="chat">
     <p v-if="chat.items.length === 0" class="empty">
-      Ask about the codebase, docs, or tools.<br />
-      The default <code>fake</code> provider echoes offline — set
-      <code>ASSISTANT_LLM_PROVIDER=groq</code> in <code>.env</code> for a real model.
+      Ask about your documents, the codebase, or a URL.<br />
+      Add documents with the <strong>Documents</strong> panel — the knowledge base starts empty.<br />
+      Turn on <strong>Dev</strong> in the header to see tools, timings, tokens and cost.
     </p>
     <template v-for="(item, i) in chat.items" :key="i">
-      <ToolCard v-if="item.kind === 'tool'" :item="item" />
+      <template v-if="item.kind === 'tool'">
+        <!-- Dev mode shows the full tool card; standard mode shows only a
+             quiet "working" hint while the call is still in flight, so the
+             UI isn't silent during a slow tool. -->
+        <ToolCard v-if="chat.devMode" :item="item" />
+        <div v-else-if="item.result === null" class="tool-working">working…</div>
+      </template>
       <div v-else-if="item.kind === 'error'" class="error">⚠ {{ item.text }}</div>
       <ChatMessage v-else :item="item" />
     </template>

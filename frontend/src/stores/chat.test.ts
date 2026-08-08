@@ -34,6 +34,7 @@ describe("chat store — WS frame reducer", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     sessionStorage.clear();
+    localStorage.clear();
   });
 
   it("accumulates token frames into one streaming message, then seals it on final", () => {
@@ -42,7 +43,11 @@ describe("chat store — WS frame reducer", () => {
     send({ type: "token", content: " world" });
 
     expect(chat.items).toHaveLength(1);
-    expect(chat.items[0]).toMatchObject({ kind: "assistant", text: "Hello world", streaming: true });
+    expect(chat.items[0]).toMatchObject({
+      kind: "assistant",
+      text: "Hello world",
+      streaming: true,
+    });
 
     send({ type: "final", content: "Hello world" });
     expect(chat.items).toHaveLength(1);
@@ -112,5 +117,62 @@ describe("chat store — WS frame reducer", () => {
 
     expect(chat.items).toHaveLength(2);
     expect(chat.items[1]).toMatchObject({ text: "second" });
+  });
+});
+
+describe("chat store — standard vs dev mode", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    localStorage.clear();
+  });
+
+  it("defaults to standard mode", () => {
+    expect(useChatStore().devMode).toBe(false);
+  });
+
+  it("toggles and persists the choice", () => {
+    const chat = useChatStore();
+    chat.toggleDevMode();
+    expect(chat.devMode).toBe(true);
+    expect(localStorage.getItem("assistant_dev_mode")).toBe("true");
+
+    chat.toggleDevMode();
+    expect(chat.devMode).toBe(false);
+    expect(localStorage.getItem("assistant_dev_mode")).toBe("false");
+  });
+
+  it("restores dev mode from a previous session", () => {
+    localStorage.setItem("assistant_dev_mode", "true");
+    setActivePinia(createPinia());
+    expect(useChatStore().devMode).toBe(true);
+  });
+
+  it("still records stats and tool calls in standard mode", () => {
+    // The toggle is presentational only: hiding must not drop data, so
+    // switching to dev reveals it retroactively.
+    const chat = useChatStore();
+    expect(chat.devMode).toBe(false);
+
+    send({ type: "tool_call", tool: "search_docs", arguments: { query: "x" } });
+    send({ type: "tool_result", tool: "search_docs", result: "found" });
+    send({ type: "final", content: "answer" });
+    send({
+      type: "turn",
+      turn_id: "abc123def456",
+      backend: "custom",
+      duration_ms: 1200,
+      first_token_ms: 900,
+      llm_steps: 2,
+      tool_calls: ["search_docs"],
+      prompt_tokens: 100,
+      completion_tokens: 20,
+      usage_estimated: false,
+      cost_usd: 0.0012,
+    });
+
+    expect(chat.items.find((i) => i.kind === "tool")).toMatchObject({ result: "found" });
+    expect(chat.items.find((i) => i.kind === "assistant")).toMatchObject({
+      stats: { cost_usd: 0.0012 },
+    });
   });
 });

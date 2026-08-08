@@ -5,6 +5,7 @@ import BackendSelect from "./components/BackendSelect.vue";
 import ChatInput from "./components/ChatInput.vue";
 import ChatWindow from "./components/ChatWindow.vue";
 import DocumentsPanel from "./components/DocumentsPanel.vue";
+import ModeToggle from "./components/ModeToggle.vue";
 import { useChatStore } from "./stores/chat";
 
 const chat = useChatStore();
@@ -30,12 +31,17 @@ const healthTitle = computed(() => {
         <span v-if="chat.info" class="badge" :title="`collection: ${chat.info.collection}`">
           {{ chat.info.llm_provider }} · {{ chat.info.retrieval_mode }}
         </span>
+        <ModeToggle />
         <DocumentsPanel />
         <BackendSelect />
         <span class="status" :class="chat.connected ? 'on' : 'off'">
           {{ chat.connected ? "connected" : "disconnected" }}
         </span>
-        <button class="ghost" title="Re-ingest ASSISTANT_CORPUS_DIR (only if a corpus folder is configured)" @click="chat.reindex()">
+        <button
+          class="ghost"
+          title="Re-ingest ASSISTANT_CORPUS_DIR (only if a corpus folder is configured)"
+          @click="chat.reindex()"
+        >
           Re-index
         </button>
         <button class="ghost" @click="chat.newSession()">New session</button>

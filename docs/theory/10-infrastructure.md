@@ -69,7 +69,7 @@ The modern Python toolchain, each replacing an older pile:
 - **ruff** — linter *and* formatter in one (replaces flake8+isort+black).
 - **pyright** — static type checker; with Pydantic models end-to-end, whole
   bug classes die before runtime.
-- **pytest** (+asyncio, +cov) — 204 deterministic tests with a coverage
+- **pytest** (+asyncio, +cov) — 212 deterministic tests with a coverage
   floor (chapter 09).
 - **GitHub Actions** — every push runs two workflows. *CI*: ruff → format
   check → pyright → pytest+coverage on Python **3.12 and 3.13** (the image

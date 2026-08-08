@@ -20,7 +20,10 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.55 system-ui, "Segoe UI", sans-serif;
+  font:
+    15px/1.55 system-ui,
+    "Segoe UI",
+    sans-serif;
 }
 
 #app {
@@ -550,4 +553,41 @@ select:focus {
 .docs-empty {
   color: var(--muted);
   margin: 0.7rem 0 0;
+}
+
+/* ---- standard / dev mode toggle ---- */
+.mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: 999px;
+}
+
+.mode-toggle.on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.mode-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.mode-toggle.on .mode-dot {
+  background: var(--accent);
+}
+
+/* standard mode: a quiet hint while a tool is still running */
+.tool-working {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: italic;
+  animation: blink 1.4s steps(1) infinite;
 }

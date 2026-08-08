@@ -18,7 +18,14 @@ uv run uvicorn assistant.main:app --port 8000
 - [ ] **Streaming chat**: send `hello` → tokens stream in word by word, then
       the line solidifies. The reply is the fake echo and reports
       `(2 messages in context)`.
-- [ ] **Stats line**: under the answer: duration, `first token N ms`,
+- [ ] **Standard mode is clean**: with the header toggle showing
+      **Standard**, a tool-using question renders no tool card and no stats
+      line — just a brief "working…" hint, then the answer.
+- [ ] **Dev mode reveals everything, retroactively**: click the toggle →
+      **Dev**. The tool cards and stats lines appear on messages that were
+      *already* on screen (nothing is re-sent). Reload the page — the mode
+      persists.
+- [ ] **Stats line** (Dev mode): under the answer: duration, `first token N ms`,
       `1 LLM step`, `N→M tok (est)`. No `$` figure (fake provider is free).
 - [ ] **Details timeline**: click `details` → for a plain echo just a
       `final` row; after a tool turn (below) also `tool_call`/`tool_result`

@@ -68,13 +68,7 @@ export interface AuditTurn {
 }
 
 export type ServerEvent =
-  | SessionEvent
-  | TokenEvent
-  | ToolCallEvent
-  | ToolResultEvent
-  | FinalEvent
-  | ErrorEvent
-  | TurnEvent;
+  SessionEvent | TokenEvent | ToolCallEvent | ToolResultEvent | FinalEvent | ErrorEvent | TurnEvent;
 
 export interface UserMessage {
   type: "user_message";

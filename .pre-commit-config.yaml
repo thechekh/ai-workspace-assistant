@@ -12,6 +12,19 @@ repos:
         entry: uv run ruff format
         language: system
         types_or: [python, pyi]
+      # Frontend: the same tools CI runs, so a commit cannot pass locally and
+      # fail in CI. pre-commit passes repo-root-relative paths, so the wrapper
+      # strips the `frontend/` prefix after cd-ing into it.
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npx eslint --fix "${@#frontend/}"' --
+        language: system
+        files: ^frontend/src/.*\.(ts|vue)$
+      - id: prettier
+        name: prettier (frontend)
+        entry: bash -c 'cd frontend && npx prettier --write "${@#frontend/}"' --
+        language: system
+        files: ^frontend/.*\.(ts|vue|json|css|html)$
 
   # Generic guards. Pinned by rev, unlike the local hooks above (these tools
   # are not project dependencies, so there is nothing to drift against).

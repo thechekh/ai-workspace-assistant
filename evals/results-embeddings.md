@@ -1,6 +1,6 @@
 # Embedding comparison — golden retrieval set
 
-Corpus: `docs_corpus/` · questions: 18 · mode: hybrid (dense + sparse RRF) + lexical rerank
+Corpus: `evals/corpus/` · questions: 18 · mode: hybrid (dense + sparse RRF) + lexical rerank
 
 | model | recall@1 | recall@5 | MRR |
 |---|---:|---:|---:|

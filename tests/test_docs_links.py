@@ -64,8 +64,14 @@ def test_relative_links_resolve(md: Path):
 
 def test_all_prose_docs_live_under_docs():
     """One source of truth: no stray .md outside docs/ except the allowed few."""
+    # GitHub looks for these at the repository root by convention, so they
+    # cannot move into docs/ — each is a short pointer into the docs tree.
     allowed = {
-        "README.md",  # GitHub landing page + packaging readme
+        "README.md",  # landing page + packaging readme
+        "CONTRIBUTING.md",
+        "SECURITY.md",
+        "CHANGELOG.md",
+        "CLAUDE.md",  # instructions for AI coding agents
         "evals/results-embeddings.md",  # generated next to its generator
     }
     # evals/corpus/ is the retrieval test fixture (the golden set's answers

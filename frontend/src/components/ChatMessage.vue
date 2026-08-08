@@ -59,7 +59,7 @@ function describeEvent(event: AuditEvent): string {
         <MarkdownContent :source="item.text" />
         <span v-if="item.streaming" class="cursor">▍</span>
         <div
-          v-if="item.stats"
+          v-if="item.stats && chat.devMode"
           class="turn-stats"
           :title="`turn ${item.stats.turn_id} · backend ${item.stats.backend}`"
         >

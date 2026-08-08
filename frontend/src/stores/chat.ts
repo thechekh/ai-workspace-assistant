@@ -39,6 +39,14 @@ export interface HealthInfo {
   components: Record<string, HealthComponent>;
 }
 
+/** Dev mode shows the instrumentation (tool cards, per-turn stats, the
+ *  audit timeline); standard mode is a plain chat. Persisted across reloads.
+ *  Nothing is filtered server-side — the frames always arrive, so flipping
+ *  the switch reveals the data for messages already on screen. */
+function resolveDevMode(): boolean {
+  return localStorage.getItem("assistant_dev_mode") === "true";
+}
+
 /** Optional bearer token: captured once from ?token=... and persisted. */
 function resolveToken(): string | null {
   const fromUrl = new URLSearchParams(location.search).get("token");
@@ -76,6 +84,12 @@ export const useChatStore = defineStore("chat", () => {
   const info = ref<PlatformInfo | null>(null);
   const toasts = ref<Toast[]>([]);
   const token = resolveToken();
+
+  const devMode = ref(resolveDevMode());
+  function toggleDevMode(): void {
+    devMode.value = !devMode.value;
+    localStorage.setItem("assistant_dev_mode", String(devMode.value));
+  }
 
   let toastSeq = 0;
   function toast(kind: Toast["kind"], text: string): void {
@@ -115,7 +129,10 @@ export const useChatStore = defineStore("chat", () => {
       const response = await fetch("/api/reindex", { method: "POST", headers: authHeaders() });
       const payload = await response.json();
       if (response.ok) {
-        toast("ok", payload.mode === "inline" ? `Re-indexed ${payload.chunks} chunks` : "Re-index queued");
+        toast(
+          "ok",
+          payload.mode === "inline" ? `Re-indexed ${payload.chunks} chunks` : "Re-index queued",
+        );
       } else {
         toast("error", `Re-index failed: ${payload.detail ?? response.status}`);
       }
@@ -167,7 +184,9 @@ export const useChatStore = defineStore("chat", () => {
       case "tool_result": {
         const pending = [...items.value]
           .reverse()
-          .find((i): i is ToolItem => i.kind === "tool" && i.tool === event.tool && i.result === null);
+          .find(
+            (i): i is ToolItem => i.kind === "tool" && i.tool === event.tool && i.result === null,
+          );
         if (pending) pending.result = event.result;
         break;
       }
@@ -310,6 +329,8 @@ export const useChatStore = defineStore("chat", () => {
     connected,
     info,
     health,
+    devMode,
+    toggleDevMode,
     toasts,
     sendMessage,
     newSession,

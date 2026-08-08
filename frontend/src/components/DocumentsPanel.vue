@@ -33,7 +33,10 @@ async function onDrop(event: DragEvent): Promise<void> {
 
 async function addPasted(): Promise<void> {
   if (!pastedText.value.trim()) return;
-  await chat.uploadDocuments([], { source: pastedName.value || "pasted.md", text: pastedText.value });
+  await chat.uploadDocuments([], {
+    source: pastedName.value || "pasted.md",
+    text: pastedText.value,
+  });
   pastedText.value = "";
   pastedName.value = "";
 }

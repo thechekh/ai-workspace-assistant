@@ -22,7 +22,7 @@ All 9 planned phases are **complete**, plus a code-quality pass:
 | Platform | taskiq worker + nightly re-index, optional bearer auth, /api/info + /api/reindex, Vue UI |
 | Observability | structlog JSON + correlation IDs, OTel spans → Jaeger, /metrics + Grafana, deep health, audit trail, per-turn stats + cost in UI |
 | Provider hardening | 429 backoff, Groq `tool_use_failed` retry + salvage, leaked-tool-syntax parsing, friendly WS errors, 60s timeout |
-| Quality | 204 Python tests (83.8% coverage, floor enforced) + 16 frontend tests; ruff (strict rules) + pyright clean |
+| Quality | 212 Python tests (83.8% coverage, floor enforced) + 16 frontend tests; ruff (strict rules) + pyright clean |
 | CI | Python 3.12 **and** 3.13 matrix, frontend typecheck/test/build, Docker image build, coverage gate, dependabot |
 | Docker | Multi-stage build ✅ verified; non-root; healthchecks; pinned tags; `--profile app` stack ✅ verified end-to-end |
 | Docs | All under [docs/](../README.md): [handbook](../handbook/README.md) (9 chapters), [theory](../theory/README.md) course (13), [reference](../reference/tools.md), project/ |
@@ -77,7 +77,7 @@ and blocking CPU/IO moved off the event loop.
 - [ ] **`pyright` strict mode** — currently `standard`; nearly free on an
       already-clean codebase.
 - [ ] **`pytest-xdist`** — the suite looks xdist-ready (no shared files,
-      per-test in-memory stores, `tmp_path` used correctly). 204 tests in ~13s
+      per-test in-memory stores, `tmp_path` used correctly). 212 tests in ~13s
       is fine today, so this is a later-scale item.
 - [ ] **Decide one Python version.** There are currently three: local venv
       **3.14**, CI matrix **3.12 + 3.13**, Docker image **3.13**. A

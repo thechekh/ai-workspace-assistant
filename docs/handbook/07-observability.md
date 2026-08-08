@@ -103,8 +103,21 @@ destination configured = fully inert** (no-op tracer, zero overhead).
 
 ## 4) Per-turn stats in the chat (the product layer)
 
-After every answer the server sends a `turn` WS frame; the UI renders it
-under the message:
+**Standard vs Dev.** The header carries a mode toggle. *Standard* is a plain
+conversation — no tool cards, no stats. *Dev* reveals the instrumentation:
+tool cards, the stats line below, and its expandable timeline. The choice
+persists across reloads.
+
+The distinction is presentational only: every frame is still received and
+stored, so flipping to Dev reveals the numbers for messages **already on
+screen**, and nothing has to be re-run. Standard mode still shows a quiet
+"working…" hint while a tool is in flight, so the UI is never silently busy.
+
+That split is deliberate — a demo audience wants the clean product, and an
+engineer debugging a bad answer wants everything.
+
+After every answer the server sends a `turn` WS frame; in Dev mode the UI
+renders it under the message:
 
 ```
 3.3s · first token 2995 ms · 2 LLM steps · 4313→115 tok · ~$0.0026 · fetch_url   details
