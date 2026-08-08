@@ -3,33 +3,10 @@
 import json
 
 from assistant.agent.backends.custom import CustomAgent
-from assistant.agent.base import ChatMessage, FinalEvent, ToolCallEvent, ToolResultEvent
+from assistant.agent.base import FinalEvent, ToolCallEvent, ToolResultEvent
 from assistant.agent.tools import Tool, ToolRegistry
-from assistant.llm.client import LLMEvent, TextDelta, ToolCallRequest, ToolSpec
-
-
-class ScriptedLLM:
-    """Plays a fixed sequence of steps; the last step repeats if the loop continues."""
-
-    def __init__(self, steps: list[list[LLMEvent]]) -> None:
-        self._steps = steps
-        self._cursor = 0
-
-    async def stream_step(self, messages: list[ChatMessage], tools: list[ToolSpec] | None = None):
-        step = self._steps[min(self._cursor, len(self._steps) - 1)]
-        self._cursor += 1
-        for event in step:
-            yield event
-
-
-def make_registry(record: list[dict[str, object]]) -> ToolRegistry:
-    async def handler(arguments: dict[str, object]) -> str:
-        record.append(arguments)
-        return "tool says: 42"
-
-    return ToolRegistry(
-        [Tool(name="search_docs", description="d", parameters={"type": "object"}, handler=handler)]
-    )
+from assistant.llm.client import TextDelta, ToolCallRequest
+from tests.conftest import ScriptedLLM, make_registry
 
 
 async def test_loop_executes_tool_then_finalizes():

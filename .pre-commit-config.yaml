@@ -12,3 +12,21 @@ repos:
         entry: uv run ruff format
         language: system
         types_or: [python, pyi]
+
+  # Generic guards. Pinned by rev, unlike the local hooks above (these tools
+  # are not project dependencies, so there is nothing to drift against).
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        # Compose uses YAML merge keys (<<: *app-env), which the strict
+        # parser rejects; --unsafe still catches malformed YAML.
+        args: [--unsafe]
+      - id: check-toml
+      - id: check-json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512] # screenshots and dumps do not belong in git

@@ -16,8 +16,12 @@ from assistant.agent.base import (
 )
 from assistant.agent.tools import ToolRegistry, make_search_docs
 from assistant.llm.client import FakeLLM, TextDelta, ToolCallRequest
-from tests.conftest import HermeticSettings, build_seeded_retriever_async
-from tests.test_tool_loop import ScriptedLLM, make_registry
+from tests.conftest import (
+    HermeticSettings,
+    ScriptedLLM,
+    build_seeded_retriever_async,
+    make_registry,
+)
 
 
 async def test_plain_chat_streams_and_finalizes():

@@ -97,49 +97,59 @@ class InstrumentedLLM:
         tool_calls = 0
         usage: UsageEvent | None = None
         completion_text: list[str] = []
+        # Bound up front so the outer `finally` can never raise NameError and
+        # mask the original exception if the span fails to open.
+        duration = 0.0
+        prompt_tokens = 0
+        completion_tokens = 0
 
-        with tracer.start_as_current_span("llm.step") as span:
-            span.set_attribute("llm.provider", self._provider)
-            span.set_attribute("llm.model", self._model)
-            span.set_attribute("llm.prompt_messages", len(messages))
-            async for event in self._inner.stream_step(messages, tools):
-                if isinstance(event, UsageEvent):
-                    usage = event  # consumed here; never forwarded to the agent loop
-                    continue
-                if isinstance(event, TextDelta):
-                    text_chars += len(event.text)
-                    if self._log_prompts:
-                        completion_text.append(event.text)
-                elif isinstance(event, ToolCallRequest):
-                    tool_calls += 1
-                yield event
+        # `finally` so an abandoned turn (client disconnects mid-stream ->
+        # GeneratorExit/CancelledError at the `yield`) still records its cost
+        # and latency instead of vanishing from metrics.
+        try:
+            with tracer.start_as_current_span("llm.step") as span:
+                span.set_attribute("llm.provider", self._provider)
+                span.set_attribute("llm.model", self._model)
+                span.set_attribute("llm.prompt_messages", len(messages))
+                try:
+                    async for event in self._inner.stream_step(messages, tools):
+                        if isinstance(event, UsageEvent):
+                            usage = event  # consumed here; never forwarded to the agent loop
+                            continue
+                        if isinstance(event, TextDelta):
+                            text_chars += len(event.text)
+                            if self._log_prompts:
+                                completion_text.append(event.text)
+                        elif isinstance(event, ToolCallRequest):
+                            tool_calls += 1
+                        yield event
+                finally:
+                    duration = time.perf_counter() - start
+                    prompt_tokens = usage.prompt_tokens if usage else prompt_chars // 4
+                    completion_tokens = usage.completion_tokens if usage else text_chars // 4
+                    span.set_attribute("llm.duration_ms", round(duration * 1000))
+                    span.set_attribute("llm.tool_calls", tool_calls)
+                    span.set_attribute("llm.completion_chars", text_chars)
+                    span.set_attribute("llm.prompt_tokens", prompt_tokens)
+                    span.set_attribute("llm.completion_tokens", completion_tokens)
+                    span.set_attribute("llm.usage_estimated", usage is None)
+        finally:
+            LLM_STEP_SECONDS.labels(provider=self._provider).observe(duration)
+            TOKENS_TOTAL.labels(direction="prompt").inc(prompt_tokens)
+            TOKENS_TOTAL.labels(direction="completion").inc(completion_tokens)
 
-            duration = time.perf_counter() - start
-            prompt_tokens = usage.prompt_tokens if usage else prompt_chars // 4
-            completion_tokens = usage.completion_tokens if usage else text_chars // 4
-            span.set_attribute("llm.duration_ms", round(duration * 1000))
-            span.set_attribute("llm.tool_calls", tool_calls)
-            span.set_attribute("llm.completion_chars", text_chars)
-            span.set_attribute("llm.prompt_tokens", prompt_tokens)
-            span.set_attribute("llm.completion_tokens", completion_tokens)
-            span.set_attribute("llm.usage_estimated", usage is None)
+            stats = current_turn_stats.get()
+            if stats is not None:
+                stats.llm_steps += 1
+                stats.llm_ms += duration * 1000
+                stats.prompt_tokens += prompt_tokens
+                stats.completion_tokens += completion_tokens
+                stats.usage_estimated = stats.usage_estimated or usage is None
 
-        LLM_STEP_SECONDS.labels(provider=self._provider).observe(duration)
-        TOKENS_TOTAL.labels(direction="prompt").inc(prompt_tokens)
-        TOKENS_TOTAL.labels(direction="completion").inc(completion_tokens)
-
-        stats = current_turn_stats.get()
-        if stats is not None:
-            stats.llm_steps += 1
-            stats.llm_ms += duration * 1000
-            stats.prompt_tokens += prompt_tokens
-            stats.completion_tokens += completion_tokens
-            stats.usage_estimated = stats.usage_estimated or usage is None
-
-        if self._log_prompts:
-            logger.info(
-                "llm.completion",
-                text="".join(completion_text),
-                tool_calls=tool_calls,
-                duration_ms=round(duration * 1000),
-            )
+            if self._log_prompts:
+                logger.info(
+                    "llm.completion",
+                    text="".join(completion_text),
+                    tool_calls=tool_calls,
+                    duration_ms=round(duration * 1000),
+                )

@@ -190,13 +190,14 @@ class LangGraphAgent:
             # Public astream fires token callbacks -> graph stream_mode="messages"
             response: AIMessageChunk | None = None
             async for chunk in self._model.astream(state["messages"]):
-                assert isinstance(chunk, AIMessageChunk)
-                response = chunk if response is None else response + chunk
+                # astream always yields chunks here; cast rather than assert so
+                # the narrowing survives `python -O`.
+                piece = cast("AIMessageChunk", chunk)
+                response = piece if response is None else response + piece
             return {"messages": [response or AIMessageChunk(content="")]}
 
         async def tools_node(state: MessagesState) -> dict[str, list[BaseMessage]]:
-            last = state["messages"][-1]
-            assert isinstance(last, AIMessage)
+            last = cast("AIMessage", state["messages"][-1])
             results: list[BaseMessage] = []
             for call in last.tool_calls:
                 if self._tools is None:

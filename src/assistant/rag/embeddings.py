@@ -40,7 +40,7 @@ class HashEmbedder:
     def _embed_one(self, text: str) -> list[float]:
         vector = [0.0] * self.dimension
         for token in _TOKEN_RE.findall(text.lower()):
-            digest = hashlib.md5(token.encode()).digest()  # deterministic, not security
+            digest = hashlib.md5(token.encode(), usedforsecurity=False).digest()
             slot = int.from_bytes(digest[:4], "little") % self.dimension
             sign = 1.0 if digest[4] % 2 == 0 else -1.0
             vector[slot] += sign

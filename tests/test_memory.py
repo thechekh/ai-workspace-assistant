@@ -7,7 +7,7 @@ from assistant.llm.client import TextDelta
 from assistant.memory.conversation import SUMMARY_PREFIX, ConversationMemory
 from assistant.memory.session import SessionStore
 from assistant.memory.summarizer import ExtractiveSummarizer, LLMSummarizer
-from tests.test_tool_loop import ScriptedLLM
+from tests.conftest import ScriptedLLM
 
 
 def make_store() -> SessionStore:

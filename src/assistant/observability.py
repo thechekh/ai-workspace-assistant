@@ -45,11 +45,8 @@ def configure_observability(app: FastAPI, settings: Settings) -> None:
     if has_otlp:
         endpoint = (settings.otlp_endpoint or "").rstrip("/")
         processors.append(BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")))
-    if has_langfuse:
-        assert settings.langfuse_secret_key is not None
-        credentials = (
-            f"{settings.langfuse_public_key}:{settings.langfuse_secret_key.get_secret_value()}"
-        )
+    if (langfuse_secret := settings.langfuse_secret_key) is not None and has_langfuse:
+        credentials = f"{settings.langfuse_public_key}:{langfuse_secret.get_secret_value()}"
         auth = base64.b64encode(credentials.encode()).decode()
         processors.append(
             BatchSpanProcessor(

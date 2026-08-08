@@ -11,8 +11,6 @@ The `fake` LLM provider maps to a pydantic-ai FunctionModel that mirrors
 FakeLLM's demo heuristics — the whole backend runs offline at zero cost.
 """
 
-import json
-import re
 from collections.abc import AsyncIterator
 
 from pydantic_ai import Agent as PydanticAgent
@@ -47,7 +45,8 @@ from assistant.agent.base import (
 from assistant.agent.tools import Tool as RegistryTool
 from assistant.agent.tools import ToolRegistry
 from assistant.config import Settings
-from assistant.llm.client import PROVIDER_BASE_URLS, _stream_words
+from assistant.llm.client import resolve_provider
+from assistant.llm.fake import decide_fake_tool_call, echo_reply, stream_words, tool_result_reply
 
 _EVENT_RESULT_LIMIT = 1500
 
@@ -149,14 +148,17 @@ class PydanticAIAgent:
 async def _fake_stream(
     messages: list[ModelMessage], info: AgentInfo
 ) -> AsyncIterator[str | dict[int, DeltaToolCall]]:
-    """FunctionModel twin of FakeLLM: same demo heuristics, zero cost, offline."""
+    """FunctionModel twin of FakeLLM.
+
+    Both share `llm.fake` for the routing decision — only the rendering into
+    pydantic-ai's delta shape differs — so the two can no longer drift.
+    """
     tool_names = {tool.name for tool in info.function_tools}
     last = messages[-1]
     last_part = last.parts[-1] if last.parts else None
 
     if isinstance(last_part, ToolReturnPart):
-        snippet = " ".join(str(last_part.content).split())[:400]
-        for piece in _stream_words(f"[fake-llm] Based on the tool results: {snippet}"):
+        for piece in stream_words(tool_result_reply(str(last_part.content))):
             yield piece
         return
 
@@ -165,48 +167,23 @@ async def _fake_stream(
         if isinstance(part, UserPromptPart):
             user_text = str(part.content)
             break
-    lowered = user_text.lower()
 
-    if "github__list_pull_requests" in tool_names and (
-        "pull request" in lowered or re.search(r"\bprs?\b", lowered)
-    ):
-        yield {0: DeltaToolCall(name="github__list_pull_requests", json_args="{}")}
-        return
-
-    if "code__search_code" in tool_names and "search code" in lowered:
-        start = lowered.find("search code") + len("search code")
-        pattern = user_text[start:].strip()
-        if pattern.lower().startswith("for "):
-            pattern = pattern[4:]
-        pattern = pattern.strip(" ?.\"'") or "def "
-        yield {
-            0: DeltaToolCall(name="code__search_code", json_args=json.dumps({"pattern": pattern}))
-        }
-        return
-
-    if "search_docs" in tool_names and user_text.rstrip().endswith("?"):
-        yield {0: DeltaToolCall(name="search_docs", json_args=json.dumps({"query": user_text}))}
+    call = decide_fake_tool_call(user_text, tool_names)
+    if call is not None:
+        yield {0: DeltaToolCall(name=call.name, json_args=call.arguments)}
         return
 
     total_parts = sum(len(message.parts) for message in messages)
-    reply = f"[fake-llm] ({total_parts} messages in context) You said: {user_text}"
-    for piece in _stream_words(reply):
+    for piece in stream_words(echo_reply(total_parts, user_text)):
         yield piece
 
 
 def build_pydantic_model(settings: Settings) -> Model:
-    """Settings -> pydantic-ai model, mirroring llm.client.build_llm exactly."""
-    provider = settings.llm_provider
-    if provider == "fake":
+    """Settings -> pydantic-ai model, sharing llm.client's provider resolution."""
+    if settings.llm_provider == "fake":
         return FunctionModel(stream_function=_fake_stream, model_name="fake-llm")
 
-    api_key = settings.llm_api_key.get_secret_value() if settings.llm_api_key else None
-    if provider == "ollama":
-        api_key = api_key or "ollama"
-    if api_key is None:
-        raise ValueError(f"ASSISTANT_LLM_API_KEY is required for provider {provider!r}")
-
-    base_url = settings.llm_base_url or PROVIDER_BASE_URLS[provider]
+    api_key, base_url = resolve_provider(settings)
     openai_provider = (
         OpenAIProvider(base_url=base_url, api_key=api_key)
         if base_url is not None

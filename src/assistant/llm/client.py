@@ -14,10 +14,11 @@ import asyncio
 import json
 import logging
 import re
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Protocol, cast
 
+import httpx
 from openai import APIError, AsyncOpenAI, AsyncStream, BadRequestError, RateLimitError
 from openai.types.chat import (
     ChatCompletionChunk,
@@ -27,6 +28,7 @@ from openai.types.chat import (
 
 from assistant.agent.base import ChatMessage
 from assistant.config import Settings
+from assistant.llm.fake import decide_fake_tool_call, echo_reply, stream_words, tool_result_reply
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +39,13 @@ PROVIDER_BASE_URLS: dict[str, str | None] = {
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
 }
 
-# Extra retries on 429 beyond the SDK's built-in quick ones: free tiers
-# (Groq: ~30 req/min) use per-minute windows that need longer backoff.
+# Retries on 429: free tiers (Groq: ~30 req/min) use per-minute windows that
+# need longer backoff than the SDK's built-in quick retries (which we disable).
 _RATE_LIMIT_RETRIES = 2
 _MAX_RETRY_DELAY_S = 15.0
+# Per-request ceiling. Generous enough for a slow first token on a large
+# prompt, short enough that a stalled provider cannot hold a turn open.
+_REQUEST_TIMEOUT_S = 60.0
 # Groq aborts a 200 stream with code "tool_use_failed" when the model emits
 # malformed tool-call JSON (a known llama flake) — a fresh attempt usually works.
 _TOOL_USE_RETRIES = 2
@@ -202,7 +207,20 @@ def _to_openai_tools(tools: list[ToolSpec]) -> list[ChatCompletionToolParam]:
 class OpenAICompatibleLLM:
     def __init__(self, model: str, api_key: str, base_url: str | None) -> None:
         self.model = model
-        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self._client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            # The SDK defaults to a 600s read timeout, which would pin a chat
+            # turn for ten minutes on a stalled provider. Its own retries are
+            # disabled because this class hand-rolls them below (otherwise the
+            # two multiply).
+            timeout=httpx.Timeout(_REQUEST_TIMEOUT_S, connect=5.0),
+            max_retries=0,
+        )
+
+    async def aclose(self) -> None:
+        """Release the underlying HTTP connection pool."""
+        await self._client.close()
 
     async def stream_step(
         self, messages: list[ChatMessage], tools: list[ToolSpec] | None = None
@@ -321,9 +339,11 @@ class OpenAICompatibleLLM:
                 if rate_limit_retries >= _RATE_LIMIT_RETRIES:
                     raise
                 rate_limit_retries += 1
-                delay = min(
-                    _retry_after_seconds(exc) or 2.0 * rate_limit_retries, _MAX_RETRY_DELAY_S
-                )
+                # `retry-after: 0` means "retry now" — it is a valid value, so
+                # test it against None rather than truthiness (0.0 is falsy).
+                retry_after = _retry_after_seconds(exc)
+                backoff = retry_after if retry_after is not None else 2.0 * rate_limit_retries
+                delay = min(backoff, _MAX_RETRY_DELAY_S)
                 logger.warning(
                     "LLM rate limited (429) — retry %d/%d in %.1fs",
                     rate_limit_retries,
@@ -333,23 +353,13 @@ class OpenAICompatibleLLM:
                 await asyncio.sleep(delay)
 
 
-def _stream_words(reply: str) -> Iterator[str]:
-    words = reply.split(" ")
-    for i, word in enumerate(words):
-        yield word if i == 0 else " " + word
-
-
 class FakeLLM:
     """Deterministic offline provider for tests and first-run development.
 
     Plain messages are echoed back (reporting prompt size, so tests can assert
     that session memory works). With tools offered, it plays a one-round agent
-    on simple keyword heuristics so the whole loop demos offline at zero cost:
-
-    - mentions of PRs / pull requests -> github__list_pull_requests
-    - "search code [for] X"           -> code__search_code(pattern=X)
-    - a question ending with "?"      -> search_docs(query=question)
-    - after any tool result           -> answer quoting the result
+    on the shared heuristics in `llm.fake` — the same ones the pydantic-ai
+    FunctionModel twin uses, so all backends behave identically offline.
     """
 
     async def stream_step(
@@ -359,68 +369,37 @@ class FakeLLM:
         tool_names = {tool.name for tool in tools or []}
 
         if last.role == "tool":
-            snippet = " ".join(last.content.split())[:400]
-            reply = f"[fake-llm] Based on the tool results: {snippet}"
-            for piece in _stream_words(reply):
+            for piece in stream_words(tool_result_reply(last.content)):
                 yield TextDelta(text=piece)
             return
 
         if last.role == "user" and tool_names:
-            lowered = last.content.lower()
-
-            if "github__list_pull_requests" in tool_names and (
-                "pull request" in lowered or re.search(r"\bprs?\b", lowered)
-            ):
-                yield ToolCallRequest(
-                    id="call_fake_github", name="github__list_pull_requests", arguments="{}"
-                )
+            call = decide_fake_tool_call(last.content, tool_names)
+            if call is not None:
+                yield ToolCallRequest(id=call.id, name=call.name, arguments=call.arguments)
                 return
 
-            if "code__search_code" in tool_names and "search code" in lowered:
-                start = lowered.find("search code") + len("search code")
-                pattern = last.content[start:].strip()
-                if pattern.lower().startswith("for "):
-                    pattern = pattern[4:]
-                pattern = pattern.strip(" ?.\"'") or "def "
-                yield ToolCallRequest(
-                    id="call_fake_code",
-                    name="code__search_code",
-                    arguments=json.dumps({"pattern": pattern}),
-                )
-                return
-
-            url_match = re.search(r"https?://\S+", last.content)
-            if "fetch_url" in tool_names and url_match:
-                yield ToolCallRequest(
-                    id="call_fake_fetch",
-                    name="fetch_url",
-                    arguments=json.dumps({"url": url_match.group(0).rstrip(".,;)?'\"")}),
-                )
-                return
-
-            if "search_docs" in tool_names and last.content.rstrip().endswith("?"):
-                yield ToolCallRequest(
-                    id="call_fake_docs",
-                    name="search_docs",
-                    arguments=json.dumps({"query": last.content}),
-                )
-                return
-
-        reply = f"[fake-llm] ({len(messages)} messages in context) You said: {last.content}"
-        for piece in _stream_words(reply):
+        for piece in stream_words(echo_reply(len(messages), last.content)):
             yield TextDelta(text=piece)
 
 
-def build_llm(settings: Settings) -> LLMClient:
-    provider = settings.llm_provider
-    if provider == "fake":
-        return FakeLLM()
+def resolve_provider(settings: Settings) -> tuple[str, str | None]:
+    """Credentials for a hosted provider: (api_key, base_url).
 
+    Shared by `build_llm` and the pydantic-ai model factory so adding a
+    provider or changing key handling is a single edit.
+    """
+    provider = settings.llm_provider
     api_key = settings.llm_api_key.get_secret_value() if settings.llm_api_key else None
     if provider == "ollama":
         api_key = api_key or "ollama"  # local Ollama ignores the key
     if api_key is None:
         raise ValueError(f"ASSISTANT_LLM_API_KEY is required for provider {provider!r}")
+    return api_key, settings.llm_base_url or PROVIDER_BASE_URLS[provider]
 
-    base_url = settings.llm_base_url or PROVIDER_BASE_URLS[provider]
+
+def build_llm(settings: Settings) -> LLMClient:
+    if settings.llm_provider == "fake":
+        return FakeLLM()
+    api_key, base_url = resolve_provider(settings)
     return OpenAICompatibleLLM(model=settings.llm_model, api_key=api_key, base_url=base_url)

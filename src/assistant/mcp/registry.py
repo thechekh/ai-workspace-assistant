@@ -31,6 +31,10 @@ class MCPRegistry:
     def __init__(self, configs: list[MCPServerConfig]) -> None:
         self._configs = configs
         self._stack = AsyncExitStack()
+        # Connection bookkeeping so /api/health can tell "no servers configured"
+        # apart from "every server failed to connect".
+        self.expected_servers: list[str] = [c.name for c in configs if c.enabled]
+        self.connected_servers: list[str] = []
 
     async def start(self) -> list[Tool]:
         """Connect every enabled server; return the adapted tools that are reachable."""
@@ -48,6 +52,7 @@ class MCPRegistry:
                 )
                 continue
             tools.extend(server_tools)
+            self.connected_servers.append(config.name)
             logger.info(
                 "MCP server %r connected: %s", config.name, [tool.name for tool in server_tools]
             )

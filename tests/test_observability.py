@@ -11,9 +11,12 @@ from pydantic import SecretStr
 from assistant.llm.client import FakeLLM, TextDelta, ToolCallRequest, UsageEvent
 from assistant.main import create_app
 from assistant.telemetry import InstrumentedLLM, TurnStats, current_turn_stats
-from tests.conftest import HermeticSettings, build_seeded_retriever
-from tests.test_api_routes import make_client
-from tests.test_ws import collect_until_final
+from tests.conftest import (
+    HermeticSettings,
+    build_seeded_retriever,
+    collect_until_final,
+    make_client,
+)
 
 
 def run_one_turn(ws, content: str) -> tuple[list[dict], dict]:
@@ -144,8 +147,8 @@ def test_turns_endpoint_requires_token_when_auth_enabled():
 # --- InstrumentedLLM unit behaviour ------------------------------------------
 
 
-class ScriptedLLM:
-    """Yields a fixed event sequence, including provider-reported usage."""
+class FlatScriptedLLM:
+    """Yields one fixed event sequence (unlike conftest's step-based ScriptedLLM)."""
 
     def __init__(self, events) -> None:
         self._events = events
@@ -156,7 +159,7 @@ class ScriptedLLM:
 
 
 async def test_instrumented_llm_consumes_usage_and_accumulates_stats():
-    inner = ScriptedLLM(
+    inner = FlatScriptedLLM(
         [
             TextDelta(text="hello "),
             TextDelta(text="world"),

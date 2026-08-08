@@ -1,7 +1,14 @@
-"""MCP integration tests — spawn the real bundled stdio servers (no credentials)."""
+"""MCP integration tests — spawn the real bundled stdio servers (no credentials).
+
+Marked `slow`: these fork subprocesses. Skip them with `pytest -m "not slow"`.
+"""
+
+import pytest
 
 from assistant.config import MCPServerConfig
 from assistant.mcp.registry import MCPRegistry
+
+pytestmark = pytest.mark.slow
 
 
 def _stdio(name: str, module: str) -> MCPServerConfig:

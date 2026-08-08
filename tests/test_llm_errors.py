@@ -21,8 +21,7 @@ from assistant.llm.client import (
 )
 from assistant.main import create_app
 from assistant.telemetry import estimate_cost_usd
-from tests.conftest import HermeticSettings
-from tests.test_ws import collect_until_final
+from tests.conftest import HermeticSettings, collect_until_final
 
 
 def _http_error(cls, status: int, headers: dict[str, str] | None = None):
@@ -133,7 +132,19 @@ def test_unknown_crash_keeps_the_generic_error_frame():
 # --- 429 retry inside OpenAICompatibleLLM -------------------------------------
 
 
-async def test_create_stream_retries_rate_limits_with_retry_after():
+@pytest.fixture
+def slept(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Record backoff delays instead of really sleeping (keeps the suite fast)."""
+    delays: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        delays.append(seconds)
+
+    monkeypatch.setattr("assistant.llm.client.asyncio.sleep", fake_sleep)
+    return delays
+
+
+async def test_create_stream_retries_rate_limits_with_retry_after(slept: list[float]):
     llm = OpenAICompatibleLLM(model="m", api_key="k", base_url="https://api.test/v1")
     attempts = 0
 
@@ -148,9 +159,40 @@ async def test_create_stream_retries_rate_limits_with_retry_after():
     stream = await llm._create_stream({"model": "m", "messages": []})
     assert stream == "the-stream"
     assert attempts == 3
+    # `retry-after: 0` means "retry now" — it must be honored, not treated as
+    # absent and replaced by the 2s/4s default backoff.
+    assert slept == [0.0, 0.0]
 
 
-async def test_create_stream_gives_up_after_retry_budget():
+async def test_create_stream_uses_default_backoff_without_retry_after(slept: list[float]):
+    llm = OpenAICompatibleLLM(model="m", api_key="k", base_url="https://api.test/v1")
+    attempts = 0
+
+    async def create(**kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts <= 2:
+            raise _http_error(RateLimitError, 429)  # no retry-after header
+        return "the-stream"
+
+    llm._client.chat.completions.create = create  # type: ignore[method-assign]
+    assert await llm._create_stream({"model": "m", "messages": []}) == "the-stream"
+    assert slept == [2.0, 4.0]
+
+
+async def test_create_stream_caps_absurd_retry_after(slept: list[float]):
+    llm = OpenAICompatibleLLM(model="m", api_key="k", base_url="https://api.test/v1")
+
+    async def create(**kwargs):
+        raise _http_error(RateLimitError, 429, headers={"retry-after": "3600"})
+
+    llm._client.chat.completions.create = create  # type: ignore[method-assign]
+    with pytest.raises(RateLimitError):
+        await llm._create_stream({"model": "m", "messages": []})
+    assert slept == [15.0, 15.0]  # _MAX_RETRY_DELAY_S, not an hour
+
+
+async def test_create_stream_gives_up_after_retry_budget(slept: list[float]):
     llm = OpenAICompatibleLLM(model="m", api_key="k", base_url="https://api.test/v1")
 
     async def create(**kwargs):
@@ -159,6 +201,7 @@ async def test_create_stream_gives_up_after_retry_budget():
     llm._client.chat.completions.create = create  # type: ignore[method-assign]
     with pytest.raises(RateLimitError):
         await llm._create_stream({"model": "m", "messages": []})
+    assert len(slept) == 2  # two retries, then give up
 
 
 async def test_create_stream_drops_stream_options_on_bad_request():
@@ -253,7 +296,9 @@ async def test_stream_step_never_retries_after_text_was_forwarded():
 
     llm._create_stream = fake_create_stream  # type: ignore[method-assign]
     received: list[str] = []
-    with pytest.raises(APIError):
+    # PT012: the loop must run *inside* the block — we assert both that the
+    # error escapes and exactly what was emitted before it did.
+    with pytest.raises(APIError):  # noqa: PT012
         async for event in llm.stream_step([ChatMessage(role="user", content="hi")]):
             if isinstance(event, TextDelta):
                 received.append(event.text)

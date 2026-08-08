@@ -151,4 +151,16 @@ def create_app(
     return app
 
 
-app = create_app()
+def __getattr__(name: str) -> object:
+    """Build the ASGI app lazily, on first attribute access.
+
+    uvicorn resolves `assistant.main:app` with getattr, so the documented run
+    command is unchanged — but merely *importing* this module (as the test
+    suite does) no longer reads `.env`, reconfigures global logging, or
+    installs an OTLP tracer provider pointed at a developer's local Jaeger.
+    """
+    if name == "app":
+        application = create_app()
+        globals()["app"] = application  # cache: later access skips this hook
+        return application
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

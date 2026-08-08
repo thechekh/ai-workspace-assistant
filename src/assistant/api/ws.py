@@ -230,6 +230,12 @@ async def _handle_turn(
                         )
                 span.set_attribute("turn.tool_calls", len(tool_names))
                 span.set_attribute("turn.answer_chars", answer_chars)
+        except WebSocketDisconnect:
+            # The client went away mid-turn (closed tab, navigation). That is
+            # routine, not a server error — let chat_endpoint end the loop
+            # without polluting error metrics or logging a traceback.
+            logger.info("turn.abandoned")
+            raise
         except Exception as exc:
             kind, message = _describe_llm_error(exc) or (
                 "turn_exception",

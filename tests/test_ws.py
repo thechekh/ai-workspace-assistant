@@ -6,16 +6,7 @@ from fastapi.testclient import TestClient
 
 from assistant.llm.client import FakeLLM
 from assistant.main import create_app
-from tests.conftest import HermeticSettings, build_seeded_retriever
-
-
-def collect_until_final(ws) -> list[dict]:
-    events: list[dict] = []
-    while True:
-        event = ws.receive_json()
-        events.append(event)
-        if event["type"] in {"final", "error"}:
-            return events
+from tests.conftest import HermeticSettings, build_seeded_retriever, collect_until_final
 
 
 def test_chat_roundtrip_streams_tokens_and_final(client):

@@ -85,11 +85,22 @@ async def health(request: Request) -> dict[str, object]:
         "model": settings.llm_model,
     }
 
-    if getattr(request.app.state, "mcp_registry", None) is None:
+    registry = getattr(request.app.state, "mcp_registry", None)
+    if registry is None:
         components["mcp"] = {"status": "disabled"}
     else:
-        tool_names: list[str] = request.app.state.mcp_tool_names
-        components["mcp"] = {"status": "ok", "tools": tool_names}
+        # Unreachable servers are skipped at startup, so "enabled but nothing
+        # connected" must read as degraded — that is precisely the case where
+        # every MCP tool is missing from the agent.
+        expected = registry.expected_servers
+        connected = registry.connected_servers
+        missing = [name for name in expected if name not in connected]
+        components["mcp"] = {
+            "status": "ok" if not missing else "error",
+            "tools": list(request.app.state.mcp_tool_names),
+            "servers_connected": f"{len(connected)}/{len(expected)}",
+            **({"unreachable": missing} if missing else {}),
+        }
 
     degraded = any(component["status"] == "error" for component in components.values())
     return {"status": "degraded" if degraded else "ok", "components": components}

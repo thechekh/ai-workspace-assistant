@@ -22,7 +22,9 @@ from assistant.agent.base import (
 
 class UserMessage(BaseModel):
     type: Literal["user_message"] = "user_message"
-    content: str = Field(min_length=1)
+    # Bounded so one pasted document cannot consume a whole token budget in a
+    # single turn (~2k tokens of prompt); the WS layer reports the rejection.
+    content: str = Field(min_length=1, max_length=8000)
 
 
 class SessionStarted(BaseModel):

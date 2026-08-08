@@ -15,7 +15,7 @@ _TOKEN_RE = re.compile(r"\w+")
 
 
 def _token_index(token: str) -> int:
-    digest = hashlib.md5(token.encode()).digest()  # deterministic, not security
+    digest = hashlib.md5(token.encode(), usedforsecurity=False).digest()
     return int.from_bytes(digest[:4], "little")
 
 
