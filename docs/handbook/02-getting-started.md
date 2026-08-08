@@ -120,6 +120,10 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 | `RERANK_ENABLED` | `true` | Lexical reranker over the top-20 candidates |
 | `HISTORY_CHAR_BUDGET` | `8000` | When un-summarized history exceeds this, old turns fold into the rolling summary |
 | `HISTORY_KEEP_RECENT` | `6` | Messages always kept verbatim |
+| `SESSION_TTL_SECONDS` | `86400` | How long transcript, summary and audit trail live in Redis |
+| `SYSTEM_PROMPT` | *(see config.py)* | Steers tool choice and the honesty rules — override to change persona/behaviour |
+| `DEBUG` | `true` | Also serves the minimal WS console at `/dev` |
+| `CORPUS_DIR` | *(unset)* | Optional folder to (re)ingest from; unset means the knowledge base is filled via `POST /api/documents` |
 | `MCP_ENABLED` | `true` | Master switch for MCP tool servers |
 | `MCP_SERVERS` | *(two bundled stdio servers)* | JSON list — see `.env.example` for the real-GitHub swap |
 | `REDIS_URL` | `redis://localhost:6379/0` | `fakeredis://` = in-memory, zero setup |
