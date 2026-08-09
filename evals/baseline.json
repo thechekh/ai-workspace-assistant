@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "Retrieval quality floor. CI runs `python evals/run_retrieval.py --memory --check`",
+    "and fails when any metric drops below these values (tolerance 0.005).",
+    "These are the measured results of the default configuration: hash-512 dense",
+    "+ sparse lexical vectors fused with RRF, then reranked lexically, k=5 over the",
+    "18-question golden set.",
+    "Lowering a number here is a deliberate act: do it in the same commit as the",
+    "change that caused it, and say in the message why the trade-off is worth it."
+  ],
+  "config": {
+    "embedder": "hash-512",
+    "mode": "hybrid",
+    "rerank": true,
+    "k": 5,
+    "questions": 18
+  },
+  "metrics": {
+    "recall@1": 0.8333,
+    "recall@5": 1.0,
+    "mrr": 0.9167
+  }
+}

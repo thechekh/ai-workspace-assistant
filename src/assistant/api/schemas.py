@@ -12,6 +12,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from assistant.agent.base import (
+    ChatMessage,
     ErrorEvent,
     FinalEvent,
     TokenEvent,
@@ -25,6 +26,15 @@ class UserMessage(BaseModel):
     # Bounded so one pasted document cannot consume a whole token budget in a
     # single turn (~2k tokens of prompt); the WS layer reports the rejection.
     content: str = Field(min_length=1, max_length=8000)
+
+
+class CancelRequest(BaseModel):
+    """Stop the turn currently in flight. Ignored when nothing is running."""
+
+    type: Literal["cancel"] = "cancel"
+
+
+ClientMessage = Annotated[UserMessage | CancelRequest, Field(discriminator="type")]
 
 
 class SessionStarted(BaseModel):
@@ -47,6 +57,9 @@ class TurnSummary(BaseModel):
     usage_estimated: bool = True
     # Indicative spend at listed pay-per-token prices (0.0 for fake/unknown models)
     cost_usd: float = 0.0
+    # True when the user stopped the turn: whatever streamed before the stop
+    # is kept, and the partial cost is still accounted for.
+    cancelled: bool = False
 
 
 class IndexedDocument(BaseModel):
@@ -102,8 +115,31 @@ class TurnRecord(BaseModel):
     completion_tokens: int = 0
     usage_estimated: bool = True
     cost_usd: float = 0.0
+    cancelled: bool = False
     tool_calls: list[str] = Field(default_factory=list)
     events: list[TurnAuditEvent] = Field(default_factory=list)
+
+
+class SessionSummary(BaseModel):
+    """One row of the conversations sidebar."""
+
+    session_id: str
+    #: Unix seconds of the last message — the sidebar's sort order.
+    updated_at: float
+    messages: int
+    #: Opening question, truncated: what makes a session recognisable at a glance.
+    preview: str = ""
+
+
+class SessionList(BaseModel):
+    sessions: list[SessionSummary]
+
+
+class SessionMessages(BaseModel):
+    """A conversation's transcript — what the UI renders when you reopen it."""
+
+    session_id: str
+    messages: list[ChatMessage]
 
 
 class SessionTurns(BaseModel):

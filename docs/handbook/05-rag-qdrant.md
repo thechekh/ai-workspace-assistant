@@ -104,9 +104,25 @@ embedder — each pipeline stage earns its place:
 
 | config | recall@1 | recall@5 | MRR |
 |---|---:|---:|---:|
-| dense only | 0.56 | 0.94 | 0.72 |
-| hybrid (RRF) | 0.67 | 1.00 | 0.80 |
+| dense only, no rerank | 0.78 | 0.94 | 0.86 |
+| hybrid (RRF), no rerank | 0.72 | 1.00 | 0.86 |
+| dense + rerank | 0.89 | 1.00 | 0.94 |
 | hybrid + rerank *(default)* | **0.83** | **1.00** | **0.92** |
+
+Read that honestly: **the rerank is what earns its place** (+0.11 recall@1,
+and it is the only stage that moves MRR much). Sparse fusion pays for
+recall@5 — every question lands in the top 5 — but on recall@1 dense+rerank
+is one question ahead of the default. One question out of 18 is noise, and
+the two configurations disagree in opposite directions: hybrid wins the
+lexical-gap question ("linter/formatter" vs the docs' "lint/format", rank
+3 → 2), dense wins "what accounts do I need in my first week" (rank 1 → 2).
+
+Hybrid stays the default because sparse vectors are insurance against
+vocabulary mismatch that costs nothing at query time, and because this
+ablation cannot really separate the two signals: `hash-512` is a *lexical*
+hash, so "dense" here is already keyword-ish. With a real semantic embedder
+the two channels diverge and the fusion matters more — which is exactly what
+`evals/compare_embeddings.py` is there to measure.
 
 Reproduce: `uv run python evals/run_retrieval.py --memory` (no Docker
 needed). Compare embedders: `uv run python -m evals.compare_embeddings` →

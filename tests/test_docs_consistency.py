@@ -77,17 +77,29 @@ def test_golden_set_question_count_matches_the_file() -> None:
 
 
 def test_retrieval_scores_do_not_contradict_each_other() -> None:
-    """recall@1 is quoted in ~7 files; only the three measured values are valid."""
-    measured = {"0.83", "0.67", "0.56"}  # +rerank, hybrid, dense baseline
+    """recall@1 is quoted in ~7 files; only the measured values are valid.
+
+    An audit caught the 0.56/0.67 ablation rows still being quoted as current
+    long after Phase 8's relevance gate had moved them — the headline 0.83 was
+    unchanged, which is exactly why nobody noticed. The dated acceptance
+    records in docs/project/ keep the old numbers on purpose and are skipped.
+    """
+    # default hybrid+rerank, dense+rerank, dense-only, hybrid-only
+    measured = {"0.83", "0.89", "0.78", "0.72"}
+    historical = {"0.56", "0.67"}  # Phase 2/7, superseded and labelled as such
     contradictions = [
         f"{_rel(path)}: recall@1 {match.group(1)}"
         for path, text in _all_docs()
-        for match in re.finditer(r"recall@1[^\n]*?(\d\.\d\d)", text)
-        if match.group(1) not in measured
+        # Dated acceptance records state what was true when they were written.
+        if "project/implementation-plan" not in _rel(path)
+        # `(?<![+-])` so a stated *delta* ("+0.11 recall@1") is not read as a
+        # claim about the metric's value.
+        for match in re.finditer(r"recall@1[^\n]*?(?<![+-])(\d\.\d\d)", text)
+        if match.group(1) not in measured | historical
     ]
     assert not contradictions, (
-        "recall@1 claims disagree with the measured 0.83 (or the documented "
-        "0.56/0.67 baselines):\n  " + "\n  ".join(contradictions)
+        f"recall@1 claims disagree with the measured {sorted(measured)}:\n  "
+        + "\n  ".join(contradictions)
     )
     headline = re.compile(r"0\.83\*{0,2}\s*/\s*\*{0,2}1\.00\*{0,2}\s*/\s*\*{0,2}0\.92")
     assert any(headline.search(text) for _, text in _all_docs()), (

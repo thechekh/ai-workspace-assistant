@@ -6,6 +6,7 @@ import ChatInput from "./components/ChatInput.vue";
 import ChatWindow from "./components/ChatWindow.vue";
 import DocumentsPanel from "./components/DocumentsPanel.vue";
 import ModeToggle from "./components/ModeToggle.vue";
+import SessionsPanel from "./components/SessionsPanel.vue";
 import { useChatStore } from "./stores/chat";
 
 const chat = useChatStore();
@@ -32,6 +33,7 @@ const healthTitle = computed(() => {
           {{ chat.info.llm_provider }} · {{ chat.info.retrieval_mode }}
         </span>
         <ModeToggle />
+        <SessionsPanel />
         <DocumentsPanel />
         <BackendSelect />
         <span class="status" :class="chat.connected ? 'on' : 'off'">
@@ -44,7 +46,6 @@ const healthTitle = computed(() => {
         >
           Re-index
         </button>
-        <button class="ghost" @click="chat.newSession()">New session</button>
       </div>
     </header>
     <ChatWindow />

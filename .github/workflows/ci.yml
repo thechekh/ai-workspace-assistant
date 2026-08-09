@@ -37,6 +37,23 @@ jobs:
       - run: uv run pyright
       - run: uv run pytest -q --cov --cov-report=term-missing
 
+  retrieval-quality:
+    name: retrieval quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --frozen
+      # No unit test can catch a chunking or fusion change that keeps every
+      # assertion green while making answers worse. This runs the 18-question
+      # golden set (in-process Qdrant, no services) and fails if any metric
+      # drops below evals/baseline.json.
+      - run: uv run python evals/run_retrieval.py --memory --check
+
   frontend:
     name: frontend
     runs-on: ubuntu-latest

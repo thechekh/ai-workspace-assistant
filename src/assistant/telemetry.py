@@ -34,6 +34,12 @@ RETRIEVAL_SECONDS = Histogram("assistant_retrieval_seconds", "RAG retrieval dura
 TOKENS_TOTAL = Counter("assistant_tokens_total", "LLM tokens (real or estimated)", ["direction"])
 ERRORS_TOTAL = Counter("assistant_errors_total", "Errors surfaced to clients", ["kind"])
 COST_USD_TOTAL = Counter("assistant_cost_usd_total", "Indicative LLM spend in USD", ["model"])
+CANCELLED_TOTAL = Counter(
+    "assistant_cancelled_turns_total", "Turns stopped by the user", ["backend"]
+)
+RATE_LIMITED_TOTAL = Counter(
+    "assistant_rate_limited_total", "Requests refused by the rate limiter", ["bucket"]
+)
 
 # Indicative $ per 1M tokens (prompt, completion) at the providers' listed
 # pay-as-you-go prices. Free tiers actually bill $0 — the number shows what

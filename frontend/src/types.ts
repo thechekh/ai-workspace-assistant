@@ -46,6 +46,8 @@ export interface TurnEvent {
   usage_estimated: boolean;
   /** Indicative spend at listed pay-per-token prices; 0 for fake/unknown models. */
   cost_usd: number;
+  /** True when the user pressed Stop: partial answer, real (partial) cost. */
+  cancelled: boolean;
 }
 
 /** One row of a turn's audit timeline (GET /api/sessions/{id}/turns). */
@@ -72,6 +74,28 @@ export type ServerEvent =
 
 export interface UserMessage {
   type: "user_message";
+  content: string;
+}
+
+/** Stops the turn in flight; ignored server-side when nothing is running. */
+export interface CancelRequest {
+  type: "cancel";
+}
+
+export type ClientMessage = UserMessage | CancelRequest;
+
+/** One row of the conversations panel (GET /api/sessions). */
+export interface SessionSummary {
+  session_id: string;
+  /** Unix seconds of the last message — the panel's sort order. */
+  updated_at: number;
+  messages: number;
+  preview: string;
+}
+
+/** A stored transcript (GET /api/sessions/{id}/messages). */
+export interface StoredMessage {
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
 }
 

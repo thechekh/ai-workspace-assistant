@@ -107,6 +107,14 @@ class Settings(BaseSettings):
     mcp_enabled: bool = True
     mcp_servers: list[MCPServerConfig] = Field(default_factory=_default_mcp_servers)
 
+    # Rate limiting — a budget guard, not access control: it stops one stuck
+    # client from draining the day's LLM quota. Limits are per session, in a
+    # sliding window shared through Redis. Set a limit to 0 to disable just
+    # that bucket; rate_limit_enabled=false disables all of them.
+    rate_limit_enabled: bool = True
+    rate_limit_turns_per_minute: int = 20  # chat turns (the expensive path)
+    rate_limit_uploads_per_hour: int = 50  # document uploads + re-index
+
     # Infra
     redis_url: str = "redis://localhost:6379/0"
     qdrant_url: str = "http://localhost:6333"

@@ -16,6 +16,7 @@ from assistant.agent.base import AgentBackend
 from assistant.agent.registry import build_agents
 from assistant.agent.tools import Tool, ToolRegistry, make_fetch_url, make_search_docs
 from assistant.agent.tools.fetch import new_http_client
+from assistant.api.rate_limit import RateLimiter
 from assistant.api.routes import router as api_router
 from assistant.api.ws import router as ws_router
 from assistant.config import Settings
@@ -56,6 +57,7 @@ class Runtime:
     llm: LLMClient
     session_store: SessionStore
     memory: ConversationMemory
+    rate_limiter: RateLimiter
     agents: dict[str, AgentBackend]
     http_client: httpx.AsyncClient
     qdrant: AsyncQdrantClient | None = None
@@ -140,6 +142,7 @@ async def build_runtime(
         redis=redis,
         llm=resolved_llm,
         session_store=session_store,
+        rate_limiter=RateLimiter(redis, enabled=settings.rate_limit_enabled),
         memory=ConversationMemory(
             session_store,
             build_summarizer(settings, resolved_llm),
@@ -180,6 +183,7 @@ def create_app(
         app.state.settings = runtime.settings
         app.state.session_store = runtime.session_store
         app.state.memory = runtime.memory
+        app.state.rate_limiter = runtime.rate_limiter
         app.state.agents = runtime.agents
         app.state.default_backend = runtime.settings.agent_backend
         # Live dependency handles for the deep health check (/api/health).

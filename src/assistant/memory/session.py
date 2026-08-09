@@ -3,19 +3,29 @@
 Each session is a Redis list of JSON-serialized ChatMessage entries with a
 TTL that refreshes on every append, plus a rolling-summary record used by
 ConversationMemory ("summary text" + how many messages it covers).
+
+Sessions are also indexed in a sorted set scored by last activity, so the UI
+can list recent conversations without `KEYS`/`SCAN` over the keyspace — the
+one pattern that gets slower exactly as a deployment gets busier.
 """
 
 import json
+import time
 import uuid
 
 from redis.asyncio import Redis
 
 from assistant.agent.base import ChatMessage
-from assistant.api.schemas import TurnRecord
+from assistant.api.schemas import SessionSummary, TurnRecord
 
 # Audit trail depth per session — enough to debug a conversation, bounded
 # so a long session cannot grow without limit.
 _MAX_AUDIT_TURNS = 50
+
+# How much of the opening question to keep as a sidebar label.
+_PREVIEW_CHARS = 80
+
+_INDEX_KEY = "sessions:index"
 
 
 class SessionStore:
@@ -37,8 +47,66 @@ class SessionStore:
 
     async def append(self, session_id: str, message: ChatMessage) -> None:
         key = self._key(session_id)
-        await self._redis.rpush(key, message.model_dump_json())
-        await self._redis.expire(key, self._ttl)
+        pipe = self._redis.pipeline(transaction=True)
+        pipe.rpush(key, message.model_dump_json())
+        pipe.expire(key, self._ttl)
+        # Same round trip: keep the recency index in step with the data. A
+        # separate call could leave a session listed but already expired.
+        pipe.zadd(_INDEX_KEY, {session_id: time.time()})
+        await pipe.execute()
+
+    async def recent(self, limit: int = 30) -> list[SessionSummary]:
+        """The most recently active sessions, newest first.
+
+        Sorted-set members outlive the keys they point at (Redis expires keys,
+        not set entries), so entries older than the TTL are dropped on read and
+        any session whose history is already gone is skipped.
+        """
+        cutoff = time.time() - self._ttl
+        await self._redis.zremrangebyscore(_INDEX_KEY, 0, cutoff)
+        # `withscores=True` returns (member, score) pairs; redis-py types the
+        # reply loosely because it depends on the arguments.
+        entries: list[tuple[str, float]] = await self._redis.zrevrange(  # pyright: ignore[reportAssignmentType]
+            _INDEX_KEY, 0, limit - 1, withscores=True
+        )
+        if not entries:
+            return []
+
+        # One round trip for every session's first message + length, rather
+        # than two calls per session.
+        pipe = self._redis.pipeline(transaction=False)
+        for session_id, _ in entries:
+            pipe.lindex(self._key(session_id), 0)
+            pipe.llen(self._key(session_id))
+        replies = await pipe.execute()
+
+        sessions: list[SessionSummary] = []
+        for index, (session_id, updated_at) in enumerate(entries):
+            first_raw, length = replies[index * 2], replies[index * 2 + 1]
+            if not length:
+                continue  # history expired; the index entry is stale
+            preview = ""
+            if first_raw:
+                preview = ChatMessage.model_validate_json(first_raw).content
+            sessions.append(
+                SessionSummary(
+                    session_id=session_id,
+                    updated_at=updated_at,
+                    messages=int(length),
+                    preview=preview[:_PREVIEW_CHARS],
+                )
+            )
+        return sessions
+
+    async def forget(self, session_id: str) -> bool:
+        """Delete a conversation and everything recorded about it."""
+        removed = await self._redis.delete(
+            self._key(session_id),
+            self._turns_key(session_id),
+            self._summary_key(session_id),
+        )
+        await self._redis.zrem(_INDEX_KEY, session_id)
+        return bool(removed)
 
     @staticmethod
     def _turns_key(session_id: str) -> str:

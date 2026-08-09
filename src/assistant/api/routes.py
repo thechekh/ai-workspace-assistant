@@ -4,6 +4,9 @@ Auth: when ASSISTANT_AUTH_TOKEN is set, mutating/read-sensitive endpoints
 require `Authorization: Bearer <token>`; /api/info and /api/health stay
 public (the UI needs them before authenticating, and neither leaks
 conversation data). Unset token = open, for zero-config dev.
+
+Writes are additionally rate limited (see `rate_limit.py`): indexing is the
+one path here that costs real work per call.
 """
 
 import logging
@@ -12,16 +15,20 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
+from assistant.api.rate_limit import RateLimiter
 from assistant.api.schemas import (
     DocumentList,
     DocumentUploadResult,
     IndexedDocument,
+    SessionList,
+    SessionMessages,
     SessionTurns,
     TurnRecord,
 )
 from assistant.config import Settings
 from assistant.rag.ingest import ingest, ingest_documents
 from assistant.rag.store import VectorStore
+from assistant.telemetry import ERRORS_TOTAL, RATE_LIMITED_TOTAL
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -38,6 +45,38 @@ def require_token(request: Request) -> None:
     expected = f"Bearer {settings.auth_token.get_secret_value()}"
     if request.headers.get("Authorization") != expected:
         raise HTTPException(status_code=401, detail="missing or invalid bearer token")
+
+
+async def limit_writes(request: Request) -> None:
+    """Throttle the *indexing* endpoints, keyed by caller.
+
+    Deliberately not applied to `DELETE /api/documents/{source}`: the budget
+    this protects is embedding work, deleting costs none of it, and throttling
+    the remedy means someone who over-uploads cannot clean up for an hour.
+    Live testing found exactly that — the limiter refused the cleanup.
+
+    Identity is the bearer token when one is configured (the deployed case:
+    every client behind a shared proxy IP would otherwise share one bucket),
+    and the peer address otherwise.
+    """
+    settings: Settings = request.app.state.settings
+    limiter: RateLimiter = request.app.state.rate_limiter
+    identity = (
+        request.headers.get("Authorization", "")[-16:]
+        if settings.auth_token is not None
+        else (request.client.host if request.client else "unknown")
+    )
+    decision = await limiter.check(
+        "writes", identity, limit=settings.rate_limit_uploads_per_hour, window_seconds=3600
+    )
+    if not decision.allowed:
+        ERRORS_TOTAL.labels(kind="rate_limited").inc()
+        RATE_LIMITED_TOTAL.labels(bucket="writes").inc()
+        raise HTTPException(
+            status_code=429,
+            detail=decision.message("indexing requests"),
+            headers={"Retry-After": str(decision.retry_after)},
+        )
 
 
 @router.get("/info")
@@ -114,6 +153,41 @@ async def health(request: Request) -> dict[str, object]:
     return {"status": "degraded" if degraded else "ok", "components": components}
 
 
+@router.get("/sessions", dependencies=[Depends(require_token)], response_model=SessionList)
+async def list_sessions(request: Request, limit: int = 30) -> SessionList:
+    """Recent conversations, newest first — the sidebar's data.
+
+    Auth-guarded like the audit endpoints: the previews are conversation
+    content, unlike /api/info and /api/health.
+    """
+    sessions = await request.app.state.session_store.recent(min(limit, 100))
+    return SessionList(sessions=sessions)
+
+
+@router.delete("/sessions/{session_id}", dependencies=[Depends(require_token)])
+async def forget_session(session_id: str, request: Request) -> dict[str, object]:
+    """Delete one conversation: history, audit trail and rolling summary."""
+    if not await request.app.state.session_store.forget(session_id):
+        raise HTTPException(status_code=404, detail=f"no session {session_id!r}")
+    return {"session_id": session_id, "deleted": True}
+
+
+@router.get(
+    "/sessions/{session_id}/messages",
+    dependencies=[Depends(require_token)],
+    response_model=SessionMessages,
+)
+async def session_messages(session_id: str, request: Request) -> SessionMessages:
+    """Reopen a conversation: the transcript the sidebar restores into the UI.
+
+    The WebSocket resumes a session for the *model* (history goes into the
+    prompt) but never replays it to the client, so without this a reopened
+    conversation would look empty while the assistant remembered it.
+    """
+    messages = await request.app.state.session_store.history(session_id)
+    return SessionMessages(session_id=session_id, messages=messages)
+
+
 @router.get(
     "/sessions/{session_id}/turns",
     dependencies=[Depends(require_token)],
@@ -167,7 +241,7 @@ async def list_documents(request: Request) -> DocumentList:
 @router.post(
     "/documents",
     response_model=DocumentUploadResult,
-    dependencies=[Depends(require_token)],
+    dependencies=[Depends(require_token), Depends(limit_writes)],
 )
 async def upload_documents(
     request: Request,
@@ -231,7 +305,7 @@ async def delete_document(source: str, request: Request) -> dict[str, object]:
     return {"source": source, "removed_chunks": removed}
 
 
-@router.post("/reindex", dependencies=[Depends(require_token)])
+@router.post("/reindex", dependencies=[Depends(require_token), Depends(limit_writes)])
 async def reindex(request: Request) -> dict[str, object]:
     """Re-ingest ASSISTANT_CORPUS_DIR: queued via taskiq, or inline in zero-infra mode.
 

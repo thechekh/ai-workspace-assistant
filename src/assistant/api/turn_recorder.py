@@ -40,6 +40,14 @@ class TurnRecorder:
         self.first_token_ms: int | None = None
         self.answer_chars = 0
         self.error_count = 0
+        # Kept so a stopped turn can persist what the user actually saw — on a
+        # normal turn the FinalEvent supersedes it.
+        self._streamed: list[str] = []
+
+    @property
+    def streamed_text(self) -> str:
+        """The answer as far as it got — what a stopped turn leaves on screen."""
+        return "".join(self._streamed)
 
     def elapsed_ms(self) -> int:
         return round((time.perf_counter() - self._started) * 1000)
@@ -52,6 +60,7 @@ class TurnRecorder:
             if self.first_token_ms is None:
                 self.first_token_ms = now
             self.answer_chars += len(event.content)
+            self._streamed.append(event.content)
 
         elif isinstance(event, ToolCallEvent):
             self.tool_calls.append(event.tool)
@@ -85,7 +94,7 @@ class TurnRecorder:
                 )
             )
 
-    def summary(self) -> TurnSummary:
+    def summary(self, *, cancelled: bool = False) -> TurnSummary:
         """The `turn` frame the UI renders as a stats line."""
         # The pydantic-ai backend runs its own model layer (not InstrumentedLLM),
         # so fall back to structural estimates when the wrapper saw nothing.
@@ -103,6 +112,7 @@ class TurnRecorder:
             cost_usd=round(
                 estimate_cost_usd(self._llm_model, self.stats.prompt_tokens, completion_tokens), 6
             ),
+            cancelled=cancelled,
         )
 
     def record(self, summary: TurnSummary) -> TurnRecord:

@@ -85,15 +85,16 @@ Measured, free offline embedder, 18 questions:
 
 | config | recall@1 | recall@5 | MRR |
 |---|---:|---:|---:|
-| dense only | 0.56 | 0.94 | 0.72 |
-| hybrid | 0.67 | 1.00 | 0.80 |
+| dense only, no rerank | 0.78 | 0.94 | 0.86 |
+| hybrid, no rerank | 0.72 | 1.00 | 0.86 |
+| dense + rerank | 0.89 | 1.00 | 0.94 |
 | hybrid + rerank (default) | **0.83** | **1.00** | **0.92** |
 
-The story behind the one famous miss: "What linter and formatter do we use?"
-failed on dense-only because the docs say "*lint* and *format*" while the
-question says "*linter/formatter*" — different tokens, a pure lexical gap.
-Hybrid + rerank fixed its ranking. That's the case a semantic embedding
-model closes completely — and `evals/compare_embeddings.py` is standing by
+The instructive question is "What linter and formatter do we use?": the
+docs say "*lint* and *format*" while the question says "*linter/formatter*"
+— different tokens, a pure lexical gap. It is the one question where the
+sparse channel visibly helps (rank 3 dense, rank 2 hybrid). That is the case
+a semantic embedding model closes completely — and `evals/compare_embeddings.py` is standing by
 to measure exactly that when API keys exist.
 
 ## Questions you might get

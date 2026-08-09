@@ -1,9 +1,9 @@
 # 09 — Testing, operations & troubleshooting
 
-## The automated suite (212 tests, fully offline)
+## The automated suite (244 tests, fully offline)
 
 ```sh
-uv run pytest -q          # ~13s. No network, no Docker, no keys.
+uv run pytest -q          # ~22s. No network, no Docker, no keys.
 ```
 
 Determinism comes from swappable fakes: `FakeLLM` (scripted heuristics),
@@ -24,16 +24,48 @@ scripted provider errors. Map of the suite:
 | test_api_routes.py / test_config.py | REST + auth + settings |
 | test_documents_api.py | documents added at runtime: upload (file + pasted), list, re-upload replaces rather than duplicates, delete, rejected types, auth, and the empty-knowledge-base message |
 | test_fake_parity.py | all three backends route the same prompt to the same tool — the regression guard for the drift that made one backend's offline fake miss a tool |
+| test_rate_limit.py | the sliding-window limiter: the limit binds, buckets and callers are isolated, a refusal does not extend your own window, reads are never throttled, and both surfaces (WS turns, indexing writes) enforce it |
+| test_sessions_api.py | the conversations panel: recency order, previews, expired sessions never listed, delete removes history + audit + index, transcript restore, auth |
+| test_eval_gate.py | the retrieval quality gate: the committed baseline is actually achieved by the pipeline, and a drop is reported while float noise is not |
 | test_docs_links.py | the documentation itself: every relative link resolves, no stray prose outside `docs/`, the index covers every folder |
+| test_docs_consistency.py | numbers quoted in many documents at once (backend line counts, golden-set size, retrieval scores, suite size) agree with the code and with each other |
 
 Quality gates (CI, every push): `ruff check` · `ruff format --check` ·
 `pyright` (0 errors) · `pytest` with a coverage floor — on Python 3.12 **and**
-3.13 — plus a frontend job (typecheck, vitest, build) and a Docker image
-build. A second workflow runs CodeQL, `pip-audit` and `npm audit` weekly.
+3.13 — plus a frontend job (typecheck, vitest, build), a Docker image build,
+and a **retrieval quality gate**. A second workflow runs CodeQL, `pip-audit`
+and `npm audit` weekly.
+
+The quality gate is the one that catches what no assertion can. A chunking
+tweak or a change to the fusion weights can leave every test green and still
+make answers worse, so CI re-runs the 18-question golden set (in-process
+Qdrant, no services) and fails if any metric falls below
+[evals/baseline.json](../../evals/baseline.json):
+
+```sh
+uv run python evals/run_retrieval.py --memory --check     # what CI runs
+uv run python evals/run_retrieval.py --memory --record    # append to history.jsonl
+uv run python evals/run_retrieval.py --trend              # the recorded trend
+```
+
+Lowering a number in `baseline.json` is a deliberate act: do it in the same
+commit as the change that caused it, and say in the message why the trade-off
+is worth it.
 
 **Manual testing** is scripted feature-by-feature in
 [the testing checklist](../reference/testing.md) (tiers: zero-infra → Docker → real
 model → observability).
+
+## Day-to-day controls in the UI
+
+| Control | What it does |
+|---|---|
+| **Stop** (or `Esc`) | interrupts the answer in flight; keeps what streamed, still records the partial cost |
+| **Chats** | recent conversations: reopen one (transcript is restored) or delete it |
+| **Documents** | add/remove what the assistant can search, at runtime |
+| **Standard / Dev** | hide or show tool cards and the per-turn stats line |
+| backend selector | switch agent runtime; the session carries over |
+| **Re-index** | re-ingest `ASSISTANT_CORPUS_DIR` (only if one is configured) |
 
 ## Operating it
 

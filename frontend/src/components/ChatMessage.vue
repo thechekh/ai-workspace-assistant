@@ -31,6 +31,8 @@ function formatStats(stats: TurnEvent): string {
     `${stats.prompt_tokens}→${stats.completion_tokens} tok${stats.usage_estimated ? " (est)" : ""}`,
   );
   if (stats.cost_usd > 0) parts.push(`~$${stats.cost_usd.toFixed(4)}`);
+  // Says why the numbers are small — a stopped turn's cost is real but partial.
+  if (stats.cancelled) parts.push("stopped");
   if (stats.tool_calls.length > 0) parts.push(stats.tool_calls.join(", "));
   return parts.join(" · ");
 }
@@ -58,6 +60,12 @@ function describeEvent(event: AuditEvent): string {
       <template v-if="item.kind === 'assistant'">
         <MarkdownContent :source="item.text" />
         <span v-if="item.streaming" class="cursor">▍</span>
+        <!-- Visible in both modes: an answer cut short must never read as a
+             complete one, whether or not the dev stats line is showing. -->
+        <div v-if="item.cancelled" class="stopped-note">
+          <span aria-hidden="true">■</span>
+          stopped by you{{ item.text ? "" : " before the answer started" }}
+        </div>
         <div
           v-if="item.stats && chat.devMode"
           class="turn-stats"
@@ -84,3 +92,14 @@ function describeEvent(event: AuditEvent): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+.stopped-note {
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--muted, #6b7280);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+</style>

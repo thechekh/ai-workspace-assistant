@@ -77,7 +77,7 @@ and blocking CPU/IO moved off the event loop.
 - [ ] **`pyright` strict mode** — currently `standard`; nearly free on an
       already-clean codebase.
 - [ ] **`pytest-xdist`** — the suite looks xdist-ready (no shared files,
-      per-test in-memory stores, `tmp_path` used correctly). 212 tests in ~13s
+      per-test in-memory stores, `tmp_path` used correctly). 244 tests in ~22s
       is fine today, so this is a later-scale item.
 - [ ] **Decide one Python version.** There are currently three: local venv
       **3.14**, CI matrix **3.12 + 3.13**, Docker image **3.13**. A
@@ -108,8 +108,9 @@ and blocking CPU/IO moved off the event loop.
       that compose file ever seeds a deployment.
 - [ ] **Known-and-documented, revisit if this leaves localhost:** the
       `fetch_url` SSRF guard is dev-grade (string match on host, no DNS
-      resolution); no API rate limiting; unauthenticated GitHub API (60 req/h,
-      falls back to HTML — consider an optional `ASSISTANT_GITHUB_TOKEN`).
+      resolution); rate limits are per session, not per user (there is no user
+      identity until OIDC); unauthenticated GitHub API (60 req/h, falls back
+      to HTML — consider an optional `ASSISTANT_GITHUB_TOKEN`).
 
 ## D. Features
 
@@ -117,27 +118,33 @@ and blocking CPU/IO moved off the event loop.
       real rows in the embedding comparison
       (`python -m evals.compare_embeddings`); GitHub PAT + one config line →
       real GitHub MCP instead of the mock.
-- [ ] **Interrupt/cancel button** — bidirectional-WS showcase; touches the
-      agent loop meaningfully. *Recommended as the guided task you build
-      yourself, with review.*
-- [ ] **Sessions sidebar** — session-listing API (Redis scan) + UI panel; the
-      one descoped Phase-8 item.
-- [ ] **Eval trend history** — append eval runs to `evals/history.jsonl` with
-      timestamp + config; print deltas so regressions become visible. Then
-      consider gating CI on retrieval quality.
+- [x] **Interrupt/cancel button** — `{"type": "cancel"}` frame, turns run as
+      their own task, Stop button + `Esc`; partial answer and partial cost are
+      both kept. *(done)*
+- [x] **Sessions panel** — `GET /api/sessions` off a sorted-set recency index
+      (no keyspace scan), transcript restore, delete; the descoped Phase-8
+      item. *(done)*
+- [x] **Eval trend history + CI gate** — `--record` to `evals/history.jsonl`,
+      `--trend` to read it, `--check` against `evals/baseline.json` as a CI
+      job. Re-running the ablation found the documented dense/hybrid baselines
+      had been stale since the relevance gate landed. *(done)*
 - [ ] **Cloud tracing backends when tokens exist** — Logfire + Langfuse share
       the pipeline (`observability.py`); add tokens, verify dashboards.
 - [ ] **LangGraph Redis checkpointer** — makes its flagship persistence
       feature real (durable, resumable runs).
 - [ ] **Long-term memory facts store** — distilled facts in Qdrant, retrieved
       like RAG across sessions.
-- [ ] **OIDC/SSO** — replace the demo bearer token at the gateway.
-- [ ] **Rate limiting / per-user quotas**.
+- [ ] **OIDC/SSO** — replace the demo bearer token at the gateway. Also the
+      prerequisite for per-*user* quotas: the limiter below already exists,
+      it just has no user to key on.
+- [x] **Rate limiting** — sliding windows in Redis, per session for turns and
+      per caller for indexing writes, refused before any LLM call. *(done)*
 
 ## E. Learning track (workshop prep)
 
-- [ ] Implement one change end-to-end yourself (interrupt button or a new
-      tool) with review — touches every layer once.
+- [ ] Implement one change end-to-end yourself (a new tool is the natural
+      candidate now that the interrupt button is built) — touches every layer
+      once.
 - [ ] Interactive code-reading sessions (pick a file, interrogate it).
 - [ ] Mermaid sequence diagrams in the theory chapters (also slide-ready).
 - [ ] Mock Q&A rehearsal against [the defense Q&A](../theory/12-defense-qa.md).
@@ -217,7 +224,7 @@ was done about it.
   other.
 - pytest: `--strict-markers`/`--strict-config`, `filterwarnings = error`,
   explicit asyncio loop scope, and a `slow` marker for the subprocess-spawning
-  MCP tests (`pytest -m "not slow"` → 142 tests in ~4s).
+  MCP tests (`pytest -m "not slow"` → 238 tests in ~11s).
 - ruff: added `S` (bandit), `PT`, `LOG`, `G`, `T20` with scoped per-file
   ignores. Findings fixed properly rather than suppressed — md5 marked
   `usedforsecurity=False`, type-narrowing `assert`s replaced with `cast` (they

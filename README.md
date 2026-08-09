@@ -56,7 +56,9 @@ Re-uploading the same source replaces it — chunk ids are deterministic.
 
 ```sh
 # retrieval quality against the golden question set (fixture: evals/corpus/)
-uv run python evals/run_retrieval.py --memory     # --memory: no Docker needed
+uv run python evals/run_retrieval.py --memory            # --memory: no Docker needed
+uv run python evals/run_retrieval.py --memory --check    # fail if quality regressed (CI runs this)
+uv run python evals/run_retrieval.py --trend             # recorded history
 
 # compare embedding models (hash always; openai/voyage when keys are set)
 uv run python -m evals.compare_embeddings         # -> evals/results-embeddings.md
@@ -68,8 +70,9 @@ with the free offline `hash-512` embedder (18 questions):
 
 | config | recall@1 | recall@5 | MRR |
 |---|---:|---:|---:|
-| dense only (Phase 2 baseline) | 0.56 | 0.94 | 0.72 |
-| hybrid | 0.67 | 1.00 | 0.80 |
+| dense only, no rerank | 0.78 | 0.94 | 0.86 |
+| hybrid, no rerank | 0.72 | 1.00 | 0.86 |
+| dense + rerank | 0.89 | 1.00 | 0.94 |
 | hybrid + rerank (default) | **0.83** | **1.00** | **0.92** |
 
 For real embeddings set `ASSISTANT_EMBEDDING_PROVIDER=openai` (+ key) or

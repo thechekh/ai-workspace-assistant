@@ -143,11 +143,33 @@ prints the comparison table the day a key exists. The pipeline is the
 deliverable; the embedder is a plug.
 
 **Q: How do you know retrieval is any good?**
-We measure it: an 18-question golden set, recall@1 / recall@5 / MRR, three
-configurations compared — dense 0.56/0.94/0.72 → hybrid 0.67/1.00/0.80 →
-hybrid+rerank **0.83/1.00/0.92**. Every stage earns its place with a number.
-It runs self-contained in seconds (`evals/run_retrieval.py --memory`), so
-it's a regression gate rather than a one-off benchmark.
+We measure it: an 18-question golden set, recall@1 / recall@5 / MRR, four
+configurations compared — dense 0.78/0.94/0.86, hybrid 0.72/1.00/0.86,
+dense+rerank 0.89/1.00/0.94, and the default hybrid+rerank
+**0.83/1.00/0.92**. It is a literal regression gate: CI runs
+`evals/run_retrieval.py --memory --check` on every push and fails the build
+if any metric drops below `evals/baseline.json`, because a chunking or fusion
+change can keep every unit test green while making answers worse.
+
+**Q: Your own table shows dense+rerank beating your default. Why is hybrid
+the default?**
+Good catch, and the honest answer is that the difference is one question out
+of eighteen, in opposite directions: hybrid wins the lexical-gap question
+("linter/formatter" against docs that say "lint/format", rank 3 → 2), dense
+wins another. Both reach recall@5 = 1.00. At this corpus size that ordering
+is noise, and the ablation cannot cleanly separate the two channels anyway —
+`hash-512` is a *lexical* hash, so the "dense" arm is already keyword-ish.
+Sparse stays on because it costs nothing at query time and is the insurance
+against wording the embedder has never seen; the reranker is the stage that
+measurably earns its place (+0.11 recall@1). With a real semantic embedder
+the two channels genuinely diverge, which is what `compare_embeddings.py`
+exists to measure.
+
+Worth saying out loud: those baseline numbers were **wrong in the docs**
+until an audit re-ran them. They had been measured before the relevance gate
+landed, and only the headline was rechecked. That is why the eval is now a
+build step and why `test_docs_consistency.py` asserts the numbers the
+documents quote.
 
 **Q: Where does the knowledge base come from?**
 It starts **empty** — no seed data ships with the app. Documents are added
@@ -181,8 +203,16 @@ datastore, and at this corpus size you would not feel the difference.
 Dense captures *meaning* — "invoice" near "billing" even with no shared
 words. Sparse is classic keyword matching, so exact tokens like a service
 name or an error code score highly. They fail in opposite directions, which
-is why fusing them beats either: our own numbers show recall@1 going
-0.56 → 0.67 from adding sparse alone.
+is why fusing them is the safer default.
+
+Be precise about what our own numbers show, because they do not show sparse
+winning outright: adding sparse takes recall@**5** from 0.94 to **1.00**
+(every question lands in the top 5) while recall@1 moves 0.78 → 0.72, and
+after reranking 0.89 → 0.83 — one question either way on an 18-question
+set. The honest reading is that at this corpus size, with a *lexical* hash
+embedder standing in for the dense channel, the ablation cannot separate the
+two signals; sparse is cheap insurance whose value shows up on unseen
+wording, and the reranker is the stage that measurably earns its place.
 
 **Q: What is RRF, in one sentence?**
 Reciprocal Rank Fusion merges two ranked lists by scoring each document on
@@ -275,16 +305,17 @@ accounts.
 Remove the nondeterminism from every layer except the one under evaluation:
 scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-**212 tests in ~13 seconds, fully offline** — no network, no containers, no
+**244 tests in ~22 seconds, fully offline** — no network, no containers, no
 keys. Model *quality* is deliberately out of unit scope; that's what the
 eval harness is for.
 
 **Q: What does CI actually enforce?**
 Ruff (lint + format), pyright, the test suite with a coverage floor, a
-frontend job (typecheck + tests + build), and a Docker image build — across
-Python 3.12 **and** 3.13, because 3.13 is what the image ships and testing
-only the floor version was a real gap. A separate security workflow runs
-CodeQL plus `pip-audit` and `npm audit` weekly.
+frontend job (typecheck + tests + build), a Docker image build, and the
+retrieval quality gate — across Python 3.12 **and** 3.13, because 3.13 is
+what the image ships and testing only the floor version was a real gap. A
+separate security workflow runs CodeQL plus `pip-audit` and `npm audit`
+weekly.
 
 **Q: Did the security scanning find anything?**
 Yes, immediately — which is the point. Eight Python vulnerabilities across
@@ -312,12 +343,36 @@ split into a package. The prose claims are kept honest by re-verifying
 numbers before citing them — everything in the table at the top of this page
 is reproducible with one command.
 
+**Q: How do you stop a runaway answer, and what does it cost?**
+A `cancel` frame. That is the bidirectional part of the WebSocket earning its
+keep — with SSE the client would have to drop the connection. It needed one
+structural change: the receive loop cannot read a frame while it is awaiting
+the answer, so each turn runs as its own `asyncio.Task`. Cancelling it lands
+inside `async for event in agent.run(...)`; leaving that loop closes the async
+generator, which runs the `finally` blocks that end the spans and release the
+provider stream — no separate cleanup path that could drift. A stopped turn
+is not an error: the partial answer stays on screen and in history (marked
+`[stopped by the user]`, so the next turn does not re-answer from scratch),
+the tokens really were spent so the cost is still recorded, and the metric
+`assistant_cancelled_turns_total` is deliberately excluded from the latency
+histogram — a stopped turn measures the user's patience, not the system's.
+
+**Q: What stops one client burning your whole quota?**
+A sliding-window rate limiter in Redis: 20 chat turns per minute per session,
+50 indexing writes per hour per caller, both configurable, both checked
+*before* any LLM call. A sliding log rather than `INCR`+`EXPIRE`, because a
+fixed window lets a burst across the boundary through at double the limit; in
+Redis rather than memory, so it survives more than one worker. Be precise
+about what it is: a budget guard against a stuck client, not access control.
+Real per-user quotas need user identity, which needs OIDC — and then it is
+the same limiter keyed on the subject instead of the session.
+
 **Q: What would you do next, with more time?**
-In order: an interrupt/cancel button (the bidirectional-WS showcase),
-session management UI, a real-model eval pass plus the embedding comparison
-rows, long-term memory as a facts store in Qdrant, OIDC, and a Redis
-checkpointer to make LangGraph runs durable — at which point its
-checkpointing becomes a genuine differentiator rather than a demo.
+In order: a real-model eval pass plus the embedding comparison rows, OIDC
+(which also upgrades the rate limits from per-session to per-user), long-term
+memory as a facts store in Qdrant, and a Redis checkpointer to make LangGraph
+runs durable — at which point its checkpointing becomes a genuine
+differentiator rather than a demo.
 
 ---
 

@@ -1,8 +1,10 @@
+import asyncio
+import contextlib
 import uuid
 
 import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from assistant.agent.base import (
     AgentBackend,
@@ -10,14 +12,17 @@ from assistant.agent.base import (
     ErrorEvent,
     FinalEvent,
 )
-from assistant.api.schemas import SessionStarted, UserMessage
+from assistant.api.rate_limit import RateLimiter
+from assistant.api.schemas import CancelRequest, ClientMessage, SessionStarted
 from assistant.api.turn_recorder import TurnRecorder
 from assistant.llm.errors import describe_llm_error
 from assistant.memory.conversation import ConversationMemory
 from assistant.memory.session import SessionStore
 from assistant.telemetry import (
+    CANCELLED_TOTAL,
     COST_USD_TOTAL,
     ERRORS_TOTAL,
+    RATE_LIMITED_TOTAL,
     TURN_SECONDS,
     TURNS_TOTAL,
     current_turn_stats,
@@ -40,6 +45,7 @@ async def chat_endpoint(websocket: WebSocket) -> None:
 
     store: SessionStore = websocket.app.state.session_store
     memory: ConversationMemory = websocket.app.state.memory
+    limiter: RateLimiter = websocket.app.state.rate_limiter
     agents: dict[str, AgentBackend] = websocket.app.state.agents
     default_backend: str = websocket.app.state.default_backend
     settings = websocket.app.state.settings
@@ -58,32 +64,98 @@ async def chat_endpoint(websocket: WebSocket) -> None:
     await websocket.send_text(SessionStarted(session_id=session_id).model_dump_json())
     logger.info("ws.connected", session_id=session_id, backend=requested_backend)
 
+    # The turn runs as a task rather than inline, so this loop stays free to
+    # read the next frame — which is the only way a `cancel` can arrive while
+    # the model is still streaming.
+    turn: asyncio.Task[None] | None = None
     try:
         while True:
             raw = await websocket.receive_text()
             try:
-                incoming = UserMessage.model_validate_json(raw)
+                incoming = TypeAdapter(ClientMessage).validate_json(raw)
             except ValidationError:
                 ERRORS_TOTAL.labels(kind="invalid_message").inc()
                 await websocket.send_text(
                     ErrorEvent(
-                        message="invalid message, expected {type: user_message, content}"
+                        message="invalid message, expected {type: user_message, content} "
+                        "or {type: cancel}"
                     ).model_dump_json()
                 )
                 continue
-            await _handle_turn(
-                websocket,
-                store,
-                memory,
-                agent,
-                requested_backend,
+
+            running = turn is not None and not turn.done()
+
+            if isinstance(incoming, CancelRequest):
+                if running and turn is not None:
+                    logger.info("turn.cancel_requested", session_id=session_id)
+                    turn.cancel()
+                continue
+
+            if running:
+                # One turn at a time: the model is mid-answer and the history
+                # it is working from would be wrong for a second question.
+                await websocket.send_text(
+                    ErrorEvent(
+                        message="still answering the previous message — "
+                        "stop it first, or wait for it to finish"
+                    ).model_dump_json()
+                )
+                continue
+
+            # Checked before the turn starts, so a runaway client is refused
+            # for the price of one Redis round trip rather than an LLM call.
+            decision = await limiter.check(
+                "turns",
                 session_id,
-                incoming.content,
-                llm_model,
+                limit=settings.rate_limit_turns_per_minute,
+                window_seconds=60,
             )
+            if not decision.allowed:
+                ERRORS_TOTAL.labels(kind="rate_limited").inc()
+                RATE_LIMITED_TOTAL.labels(bucket="turns").inc()
+                logger.warning(
+                    "turn.rate_limited", session_id=session_id, retry_after=decision.retry_after
+                )
+                await websocket.send_text(
+                    ErrorEvent(message=decision.message("messages")).model_dump_json()
+                )
+                continue
+
+            turn = asyncio.create_task(
+                _handle_turn(
+                    websocket,
+                    store,
+                    memory,
+                    agent,
+                    requested_backend,
+                    session_id,
+                    incoming.content,
+                    llm_model,
+                )
+            )
+            # Nobody awaits a finished turn, so without this an escaping
+            # exception would surface only as asyncio's "Task exception was
+            # never retrieved" at GC time, detached from the session.
+            turn.add_done_callback(_log_turn_task_result)
     except WebSocketDisconnect:
         logger.info("ws.disconnected", session_id=session_id)
         return
+    finally:
+        # Never leave a turn running against a socket nobody is reading.
+        if turn is not None and not turn.done():
+            turn.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await turn
+
+
+def _log_turn_task_result(task: asyncio.Task[None]) -> None:
+    if task.cancelled():
+        return
+    exc = task.exception()
+    # WebSocketDisconnect is the client leaving mid-turn: routine, and the
+    # receive loop reports it already.
+    if exc is not None and not isinstance(exc, WebSocketDisconnect):
+        logger.error("turn.task_failed", exc_info=exc)
 
 
 async def _handle_turn(
@@ -107,6 +179,7 @@ async def _handle_turn(
         session_id=session_id, turn_id=recorder.turn_id, backend=backend
     ):
         logger.info("turn.start", user_chars=len(user_message))
+        cancelled = False
         try:
             with tracer.start_as_current_span("agent.turn") as span:
                 span.set_attribute("session.id", session_id)
@@ -135,6 +208,21 @@ async def _handle_turn(
             # without polluting error metrics or logging a traceback.
             logger.info("turn.abandoned")
             raise
+        except asyncio.CancelledError:
+            # The user pressed Stop. Everything streamed so far is real and
+            # stays on screen; the tokens were spent and still get counted.
+            # `agent.run` is a generator, so leaving this block closes it and
+            # its own finally-blocks end the spans and release the LLM stream.
+            cancelled = True
+            CANCELLED_TOTAL.labels(backend=backend).inc()
+            logger.info("turn.cancelled", answer_chars=recorder.answer_chars)
+            # Persist the partial answer, otherwise the history holds a question
+            # nobody replied to and the next turn re-answers it from scratch.
+            if partial := recorder.streamed_text.strip():
+                await store.append(
+                    session_id,
+                    ChatMessage(role="assistant", content=f"{partial} [stopped by the user]"),
+                )
         except Exception as exc:
             kind, message = describe_llm_error(exc) or (
                 "turn_exception",
@@ -147,9 +235,12 @@ async def _handle_turn(
         finally:
             current_turn_stats.reset(stats_token)
 
-        summary = recorder.summary()
+        summary = recorder.summary(cancelled=cancelled)
         TURNS_TOTAL.labels(backend=backend).inc()
-        TURN_SECONDS.labels(backend=backend).observe(summary.duration_ms / 1000)
+        if not cancelled:
+            # A stopped turn's duration measures the user's patience, not the
+            # system's latency — it would skew the p95 it lands in.
+            TURN_SECONDS.labels(backend=backend).observe(summary.duration_ms / 1000)
         if summary.cost_usd:
             COST_USD_TOTAL.labels(model=llm_model).inc(summary.cost_usd)
 

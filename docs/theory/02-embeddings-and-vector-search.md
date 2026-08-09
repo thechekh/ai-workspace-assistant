@@ -60,7 +60,8 @@ deterministic lexical one ([`rag/rerank.py`](../../src/assistant/rag/rerank.py))
 API rerankers (voyage, Cohere) implement the same protocol.
 
 Measured effect on our golden set (chapter 03 explains the metrics):
-recall@1 went **0.56 → 0.67 (hybrid) → 0.83 (+rerank)**; recall@5 hit
+recall@1 went **0.78 (dense) → 0.83 (hybrid + rerank)**, and the rerank
+is the stage that pays: +0.11 over hybrid alone. recall@5 hit
 **1.00**. Zero cost, no API keys.
 
 ## Our `hash-512` dense embedder — an honest disclosure to make proactively

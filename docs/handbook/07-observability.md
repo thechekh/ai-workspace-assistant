@@ -61,7 +61,9 @@ Defined in [telemetry.py](../../src/assistant/telemetry.py):
 | `assistant_retrieval_seconds` | mode | RAG retrieval (histogram) |
 | `assistant_tokens_total` | direction=`prompt\|completion` | tokens, real or estimated |
 | `assistant_cost_usd_total` | model | indicative spend |
-| `assistant_errors_total` | kind (see chapter 04 table + `invalid_message`, `agent_event`, `turn_exception`) | user-visible failures |
+| `assistant_errors_total` | kind (see chapter 04 table + `invalid_message`, `agent_event`, `turn_exception`, `rate_limited`) | user-visible failures |
+| `assistant_cancelled_turns_total` | backend | turns the user stopped (excluded from `turn_seconds`) |
+| `assistant_rate_limited_total` | bucket=`turns\|writes` | requests the limiter refused |
 
 PromQL you'll actually use (paste into :9090 or a Grafana panel):
 
@@ -72,6 +74,9 @@ histogram_quantile(0.95, sum by (le, backend)
 sum by (tool, status) (increase(assistant_tool_calls_total[1h]))
 increase(assistant_cost_usd_total[1d])                        # $ today
 sum by (kind) (increase(assistant_errors_total[1h]))          # what's failing
+increase(assistant_cancelled_turns_total[1d])
+  / increase(assistant_turns_total[1d])                       # stop rate: are answers too slow?
+sum by (bucket) (increase(assistant_rate_limited_total[1h])) # who is hitting the limits
 ```
 
 **Grafana** auto-provisions the *AI Workspace Assistant* dashboard
@@ -122,6 +127,10 @@ renders it under the message:
 ```
 3.3s · first token 2995 ms · 2 LLM steps · 4313→115 tok · ~$0.0026 · fetch_url   details
 ```
+
+A stopped turn ends the same line with `· stopped`, and the answer itself
+carries a "stopped by you" marker **in both modes** — an answer cut short
+must never read as a complete one just because the stats are hidden.
 
 - tokens without `(est)` = provider-reported; `(est)` = chars/4 fallback.
 - `~$` hidden when 0 (fake provider / unknown model).

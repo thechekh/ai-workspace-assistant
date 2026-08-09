@@ -44,6 +44,26 @@ than an exception. No tool writes to the filesystem, executes shell
 commands, or mutates state. There is no `eval`, no shell interpolation of
 model output.
 
+### Rate limiting
+Two sliding windows in Redis, per session for chat turns
+(`ASSISTANT_RATE_LIMIT_TURNS_PER_MINUTE`, default 20) and per caller for the
+indexing endpoints (`ASSISTANT_RATE_LIMIT_UPLOADS_PER_HOUR`, default 50).
+Over the limit, a chat turn gets an `error` frame and a write gets `429` with
+`Retry-After` — before any LLM call, so a runaway client is refused for the
+price of one Redis round trip.
+
+This is a **budget guard, not access control**: the failure it prevents is one
+stuck client (a retry loop, a held Enter key, a misbehaving script) draining a
+day's quota in a minute. A sliding-window log rather than the usual
+`INCR`+`EXPIRE` fixed window, because a fixed window lets a burst across the
+boundary through at twice the limit; in Redis rather than process memory, so
+the limit still holds with more than one worker. Refused requests are removed
+from the log again — being throttled never pushes your own reset further away.
+Reads (`/api/info`, `/api/health`) are never throttled: they back the UI's
+status dot, and a busy instance must not look like a down one.
+→ [api/rate_limit.py](../../src/assistant/api/rate_limit.py),
+[test_rate_limit.py](../../tests/test_rate_limit.py)
+
 ### Path traversal
 `code__read_file` resolves the target and refuses anything outside the
 repository root (`error: path escapes the repository root`) — with a
@@ -101,7 +121,7 @@ would be required before exposing this to untrusted users.
 | Gap | Why it is fine here | What production needs |
 |---|---|---|
 | Single shared bearer token | One team, one instance | OIDC/SSO at the gateway |
-| No rate limiting or quotas | Local use; the LLM provider's own limits apply | Per-user quotas, request throttling |
+| Rate limits are per session, not per user | There is no user identity yet — auth is a single shared token | Per-user quotas keyed on the OIDC subject |
 | No content sanitisation on ingest | Documents come from the operator | Strip instruction-like content, or tier tool permissions by document trust |
 | No per-user isolation | Single-tenant | Per-user collections and session scoping |
 | SSRF guard is string-based | Local network | DNS resolution + egress allowlist |
@@ -111,8 +131,9 @@ would be required before exposing this to untrusted users.
 
 ## If you take this further
 
-Roughly in order of value: OIDC at the gateway → per-user rate limits and
-quotas → per-user document scoping → egress allowlist for `fetch_url` →
-tool-permission tiers driven by document trust. The `ToolRegistry` is the
+Roughly in order of value: OIDC at the gateway → re-key the existing rate
+limits on the authenticated user rather than the session → per-user document
+scoping → egress allowlist for `fetch_url` → tool-permission tiers driven by
+document trust. The `ToolRegistry` is the
 natural enforcement point for the last one, which is why it exists as a
 single seam.

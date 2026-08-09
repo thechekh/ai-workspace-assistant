@@ -5,8 +5,11 @@ import { computed, ref, watch } from "vue";
 import type {
   AuditEvent,
   AuditTurn,
+  CancelRequest,
   IndexedDocument,
   ServerEvent,
+  SessionSummary,
+  StoredMessage,
   TurnEvent,
   UserMessage,
 } from "../types";
@@ -62,6 +65,8 @@ export interface AssistantItem {
   kind: "assistant";
   text: string;
   streaming: boolean;
+  /** Answer cut short by Stop — rendered with a "stopped" marker. */
+  cancelled?: boolean;
   /** Attached when the post-final `turn` frame arrives. */
   stats?: TurnEvent;
 }
@@ -84,6 +89,11 @@ export const useChatStore = defineStore("chat", () => {
   const info = ref<PlatformInfo | null>(null);
   const toasts = ref<Toast[]>([]);
   const token = resolveToken();
+
+  // True from "message sent" until the closing `turn` frame (or an error).
+  // Drives the Stop button and blocks a second question mid-answer, which the
+  // server would reject anyway.
+  const busy = ref(false);
 
   const devMode = ref(resolveDevMode());
   function toggleDevMode(): void {
@@ -192,15 +202,25 @@ export const useChatStore = defineStore("chat", () => {
       }
       case "error":
         if (last && last.kind === "assistant" && last.streaming) last.streaming = false;
+        busy.value = false;
         items.value.push({ kind: "error", text: event.message });
         toast("error", event.message);
         break;
       case "turn": {
-        // Arrives right after `final` — attach to the answer it describes.
+        // Always the last frame of a turn, on the stopped path too.
+        busy.value = false;
         const answer = [...items.value]
           .reverse()
           .find((item): item is AssistantItem => item.kind === "assistant");
-        if (answer) answer.stats = event;
+        if (answer) {
+          answer.stats = event;
+          answer.streaming = false;
+          if (event.cancelled) answer.cancelled = true;
+        }
+        // A turn stopped before the first token has no answer bubble to mark.
+        if (event.cancelled && !answer?.cancelled) {
+          items.value.push({ kind: "assistant", text: "", streaming: false, cancelled: true });
+        }
         break;
       }
     }
@@ -222,13 +242,32 @@ export const useChatStore = defineStore("chat", () => {
     open();
   });
 
+  // A dropped socket takes its in-flight turn with it: no summary frame is
+  // ever coming, so release the composer instead of wedging it on `busy`.
+  watch(connected, (isConnected) => {
+    if (!isConnected && busy.value) {
+      busy.value = false;
+      const last = items.value[items.value.length - 1];
+      if (last && last.kind === "assistant" && last.streaming) last.streaming = false;
+    }
+  });
+
   function sendMessage(text: string): boolean {
     const trimmed = text.trim();
-    if (!trimmed || !connected.value) return false;
+    if (!trimmed || !connected.value || busy.value) return false;
     items.value.push({ kind: "user", text: trimmed });
     const payload: UserMessage = { type: "user_message", content: trimmed };
     send(JSON.stringify(payload));
+    busy.value = true;
     return true;
+  }
+
+  /** Stop the turn in flight. The server still sends its `turn` summary, so
+   *  `busy` is cleared there rather than optimistically here. */
+  function cancelTurn(): void {
+    if (!busy.value || !connected.value) return;
+    const payload: CancelRequest = { type: "cancel" };
+    send(JSON.stringify(payload));
   }
 
   /** Audit timeline for one turn of the current session ("explain this turn"). */
@@ -314,10 +353,80 @@ export const useChatStore = defineStore("chat", () => {
   }
   void loadDocuments();
 
+  // --- conversations -------------------------------------------------------
+  const sessions = ref<SessionSummary[]>([]);
+  const sessionsLoading = ref(false);
+
+  async function loadSessions(): Promise<void> {
+    sessionsLoading.value = true;
+    try {
+      const response = await fetch("/api/sessions", { headers: authHeaders() });
+      if (response.ok) {
+        sessions.value = ((await response.json()) as { sessions: SessionSummary[] }).sessions;
+      }
+    } catch {
+      /* offline: the panel simply shows nothing */
+    } finally {
+      sessionsLoading.value = false;
+    }
+  }
+
+  /** Reopen a stored conversation: restore the transcript, then reconnect to it.
+   *
+   *  The WebSocket resumes history for the *model*, but never replays it, so
+   *  the transcript is fetched over HTTP — otherwise reopening a conversation
+   *  would show an empty window the assistant nonetheless remembered.
+   */
+  async function switchSession(id: string): Promise<void> {
+    if (id === sessionId.value) return;
+    sessionId.value = id;
+    sessionStorage.setItem("session_id", id);
+    items.value = [];
+    busy.value = false;
+
+    try {
+      const response = await fetch(`/api/sessions/${id}/messages`, { headers: authHeaders() });
+      if (response.ok) {
+        const stored = ((await response.json()) as { messages: StoredMessage[] }).messages;
+        items.value = stored
+          .filter((message) => message.role === "user" || message.role === "assistant")
+          .map((message) =>
+            message.role === "user"
+              ? ({ kind: "user", text: message.content } as ChatItem)
+              : ({ kind: "assistant", text: message.content, streaming: false } as ChatItem),
+          );
+      }
+    } catch {
+      toast("error", "could not load that conversation's history");
+    }
+
+    close();
+    open(); // reconnects with ?session_id=<id>
+  }
+
+  async function deleteSession(id: string): Promise<void> {
+    try {
+      const response = await fetch(`/api/sessions/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!response.ok) {
+        toast("error", `could not delete that conversation (${response.status})`);
+        return;
+      }
+      sessions.value = sessions.value.filter((item) => item.session_id !== id);
+      // Deleting the conversation you are in leaves you somewhere real.
+      if (id === sessionId.value) newSession();
+    } catch (error) {
+      toast("error", `could not delete that conversation: ${String(error)}`);
+    }
+  }
+
   function newSession(): void {
     sessionStorage.removeItem("session_id");
     sessionId.value = null;
     items.value = [];
+    busy.value = false;
     close();
     open(); // wsUrl no longer carries session_id → server issues a fresh one
   }
@@ -327,13 +436,20 @@ export const useChatStore = defineStore("chat", () => {
     sessionId,
     backend,
     connected,
+    busy,
     info,
     health,
     devMode,
     toggleDevMode,
     toasts,
     sendMessage,
+    cancelTurn,
     newSession,
+    sessions,
+    sessionsLoading,
+    loadSessions,
+    switchSession,
+    deleteSession,
     reindex,
     fetchTurnEvents,
     documents,

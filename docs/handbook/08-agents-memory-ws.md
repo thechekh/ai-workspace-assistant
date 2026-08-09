@@ -32,7 +32,16 @@ has; every backend gets the identical tool registry and system prompt.
 Typed frames, defined in [api/schemas.py](../../src/assistant/api/schemas.py)
 and mirrored in [frontend/src/types.ts](../../frontend/src/types.ts).
 
-**Client → server:** `{"type": "user_message", "content": "..."}`
+**Client → server:**
+
+| frame | meaning |
+|---|---|
+| `{"type": "user_message", "content": "..."}` | ask a question (max 8000 chars) |
+| `{"type": "cancel"}` | stop the turn in flight; ignored when nothing is running |
+
+A second `user_message` while one is still answering is refused with an
+`error` frame rather than queued — the model is mid-answer and the history a
+queued question would be answered from is already stale.
 
 **Server → client, in order per turn:**
 
@@ -43,12 +52,36 @@ and mirrored in [frontend/src/types.ts](../../frontend/src/types.ts).
 | `tool_call` | `tool`, `arguments` | agent invokes a tool (UI shows a card) |
 | `tool_result` | `tool`, `result` | tool finished (fills the card) |
 | `final` | `content` | the complete answer (authoritative text) |
-| `turn` | `turn_id, backend, duration_ms, first_token_ms, llm_steps, tool_calls[], prompt_tokens, completion_tokens, usage_estimated, cost_usd` | **after** `final` — the stats line |
+| `turn` | `turn_id, backend, duration_ms, first_token_ms, llm_steps, tool_calls[], prompt_tokens, completion_tokens, usage_estimated, cost_usd, cancelled` | **always last** — the stats line, on the stopped path too |
 | `error` | `message` | anything failed; the socket stays open, mapped to friendly text (chapter 04) |
 
 Connection query params: `?session_id=` (resume), `?backend=` (runtime),
 `?token=` (auth — browsers can't set WS headers). Invalid JSON in → an
 `error` frame, socket survives.
+
+### Stopping a turn
+
+The receive loop cannot read a `cancel` frame while it is awaiting the
+answer, so each turn runs as its own `asyncio.Task` and the loop stays free
+to read. `cancel` cancels that task; the exception lands inside `async for
+event in agent.run(...)`, and leaving the loop closes the async generator —
+which runs its `finally` blocks, ending spans and releasing the provider's
+HTTP stream. Nothing is left dangling and no separate cleanup path exists to
+drift.
+
+A stopped turn is **not** an error:
+
+- everything already streamed stays on screen, and is stored as history with
+  a `[stopped by the user]` marker — otherwise the next turn would answer the
+  same question from scratch,
+- the tokens really were spent, so the summary and the audit record are
+  written as usual, with `cancelled: true`,
+- `assistant_cancelled_turns_total{backend}` counts it, and it is left out of
+  the turn-duration histogram: a stopped turn measures the user's patience,
+  not the system's latency.
+
+Closing the tab does the same thing — the connection's `finally` cancels a
+turn still in flight, so nobody pays for an answer no one is reading.
 
 ## Conversation memory (why prompts don't grow forever)
 
@@ -73,12 +106,34 @@ Per `session_id` (TTL 24 h):
 
 | Redis key | Contents |
 |---|---|
-| `session:{id}` | the transcript (list of ChatMessage JSON) |
+| `session:{id}:messages` | the transcript (list of ChatMessage JSON) |
 | `session:{id}:summary` | the rolling summary |
 | `session:{id}:turns` | audit records (last 50; chapter 07) |
+| `sessions:index` | sorted set of session ids, scored by last activity |
 
 `fakeredis://` gives the identical API in-process — sessions just die with
 the server.
+
+`sessions:index` is what makes the **Chats** panel possible without a
+`KEYS`/`SCAN` sweep of the keyspace — the one access pattern that gets slower
+exactly as a deployment gets busier. It is updated in the same round trip as
+the message it records, so the index cannot outlive its data by a failed
+second call. Redis expires keys but not sorted-set members, so `recent()`
+also drops entries past the TTL and skips any session whose history is
+already gone.
+
+| endpoint | purpose |
+|---|---|
+| `GET /api/sessions` | recent conversations: id, last activity, message count, opening-question preview |
+| `GET /api/sessions/{id}/messages` | the stored transcript — how the UI repaints a conversation you reopen |
+| `DELETE /api/sessions/{id}` | forget one conversation: history, summary and audit trail |
+
+All three are auth-guarded when `ASSISTANT_AUTH_TOKEN` is set: unlike
+`/api/info` and `/api/health`, they return conversation content. Reopening a
+conversation restores the transcript over HTTP and reconnects the socket with
+`?session_id=` — the WebSocket resumes history for the *model* but never
+replays it, so without that fetch a reopened chat would look empty while the
+assistant plainly remembered it.
 
 ## Where the turn logic lives
 

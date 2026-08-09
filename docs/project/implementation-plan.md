@@ -79,6 +79,8 @@ Goal: the assistant can answer from *our* docs.
 
 **Acceptance (verified):** 30 chunks ingested into the Qdrant container end-to-end; retriever tested against in-memory Qdrant (`:memory:`) + hash embedder — 20/20 tests green. Golden-set baseline with the free offline `hash-512` embedder: **recall@1 0.56, recall@5 0.94, MRR 0.72**. The single miss ("What linter and formatter do we use?" — lexical gap: *linter* vs *lint*) is exactly the case semantic embeddings fix → motivates the Phase 7 comparison.
 
+> Superseded: the relevance gate added in Phase 8 (drop chunks with zero query overlap) lifted this same configuration to **0.78/0.94/0.86**. Kept as the dated record of what Phase 2 measured; the current table lives in [../handbook/05-rag-qdrant.md](../handbook/05-rag-qdrant.md).
+
 ---
 
 ## Phase 3 — Custom agent tool loop ✅
@@ -147,7 +149,7 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 - [x] `evals/compare_embeddings.py`: auto-detects available providers (hash always; openai/voyage when keys exist), per-model `:memory:` collections, writes `evals/results-embeddings.md`
 - [x] `run_retrieval.py --memory`: fully self-contained eval (in-process Qdrant + on-the-fly ingest — no Docker)
 
-**Acceptance (verified):** 65/65 tests green (summarizer units, incremental folding, bounded-context WS test ×3 backends — prompt size provably stops growing; sparse/hybrid/reranker/voyage tests). Golden-set numbers (hash-512, 18 questions): dense baseline 0.56/0.94/0.72 → hybrid 0.67/1.00/0.80 → **hybrid+rerank 0.83/1.00/0.92** (recall@1/recall@5/MRR) — every question now lands in the top 5, at zero cost. Comparison table in `evals/results-embeddings.md`; openai/voyage rows appear automatically once keys exist.
+**Acceptance (verified):** 65/65 tests green (summarizer units, incremental folding, bounded-context WS test ×3 backends — prompt size provably stops growing; sparse/hybrid/reranker/voyage tests). Golden-set numbers (hash-512, 18 questions): dense baseline 0.56/0.94/0.72 → hybrid 0.67/1.00/0.80 → **hybrid+rerank 0.83/1.00/0.92** (recall@1/recall@5/MRR) — every question now lands in the top 5, at zero cost. (The two baselines were re-measured after Phase 8's relevance gate: 0.78/0.94/0.86 and 0.72/1.00/0.86. The headline is unchanged.) Comparison table in `evals/results-embeddings.md`; openai/voyage rows appear automatically once keys exist.
 
 ---
 

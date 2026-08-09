@@ -17,6 +17,13 @@ questions three ways:
 Everything streams in real time over a typed WebSocket protocol into a Vue 3
 chat UI, and every step of every answer is observable (chapter 07).
 
+The UI header carries the controls that make it usable as a product rather
+than a demo: a **Standard/Dev mode** toggle (chapter 07), a **Chats** panel
+for reopening past conversations (chapter 08), a **Documents** panel for
+filling the knowledge base at runtime (chapter 05), and a backend selector
+for comparing the three agent runtimes side by side. An answer in flight can
+be stopped with the **Stop** button or `Esc`.
+
 ## Architecture
 
 ```mermaid
