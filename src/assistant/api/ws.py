@@ -15,6 +15,7 @@ from assistant.agent.base import (
 from assistant.api.rate_limit import RateLimiter
 from assistant.api.schemas import CancelRequest, ClientMessage, SessionStarted
 from assistant.api.turn_recorder import TurnRecorder
+from assistant.config import Settings
 from assistant.llm.errors import describe_llm_error
 from assistant.memory.conversation import ConversationMemory
 from assistant.memory.session import SessionStore
@@ -48,7 +49,7 @@ async def chat_endpoint(websocket: WebSocket) -> None:
     limiter: RateLimiter = websocket.app.state.rate_limiter
     agents: dict[str, AgentBackend] = websocket.app.state.agents
     default_backend: str = websocket.app.state.default_backend
-    settings = websocket.app.state.settings
+    settings: Settings = websocket.app.state.settings
     # Cost is priced per model; the fake provider is free by definition.
     llm_model: str = "" if settings.llm_provider == "fake" else settings.llm_model
 
@@ -102,23 +103,7 @@ async def chat_endpoint(websocket: WebSocket) -> None:
                 )
                 continue
 
-            # Checked before the turn starts, so a runaway client is refused
-            # for the price of one Redis round trip rather than an LLM call.
-            decision = await limiter.check(
-                "turns",
-                session_id,
-                limit=settings.rate_limit_turns_per_minute,
-                window_seconds=60,
-            )
-            if not decision.allowed:
-                ERRORS_TOTAL.labels(kind="rate_limited").inc()
-                RATE_LIMITED_TOTAL.labels(bucket="turns").inc()
-                logger.warning(
-                    "turn.rate_limited", session_id=session_id, retry_after=decision.retry_after
-                )
-                await websocket.send_text(
-                    ErrorEvent(message=decision.message("messages")).model_dump_json()
-                )
+            if not await _within_rate_limit(websocket, limiter, settings, session_id):
                 continue
 
             turn = asyncio.create_task(
@@ -146,6 +131,27 @@ async def chat_endpoint(websocket: WebSocket) -> None:
             turn.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await turn
+
+
+async def _within_rate_limit(
+    websocket: WebSocket, limiter: RateLimiter, settings: Settings, session_id: str
+) -> bool:
+    """Check the turn budget, reporting a refusal to the client.
+
+    Deliberately before the turn starts: a runaway client then costs one Redis
+    round trip instead of an LLM call.
+    """
+    decision = await limiter.check(
+        "turns", session_id, limit=settings.rate_limit_turns_per_minute, window_seconds=60
+    )
+    if decision.allowed:
+        return True
+
+    ERRORS_TOTAL.labels(kind="rate_limited").inc()
+    RATE_LIMITED_TOTAL.labels(bucket="turns").inc()
+    logger.warning("turn.rate_limited", session_id=session_id, retry_after=decision.retry_after)
+    await websocket.send_text(ErrorEvent(message=decision.message("messages")).model_dump_json())
+    return False
 
 
 def _log_turn_task_result(task: asyncio.Task[None]) -> None:
@@ -214,6 +220,12 @@ async def _handle_turn(
             # `agent.run` is a generator, so leaving this block closes it and
             # its own finally-blocks end the spans and release the LLM stream.
             cancelled = True
+            # Swallowing a CancelledError leaves the task's `cancelling` count
+            # raised, which would make an enclosing TaskGroup or timeout treat
+            # this task as still-cancelling. We consumed the request, so we
+            # balance the count.
+            if (task := asyncio.current_task()) is not None:
+                task.uncancel()
             CANCELLED_TOTAL.labels(backend=backend).inc()
             logger.info("turn.cancelled", answer_chars=recorder.answer_chars)
             # Persist the partial answer, otherwise the history holds a question
