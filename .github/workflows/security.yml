@@ -36,7 +36,7 @@ jobs:
       matrix:
         language: [python, javascript-typescript]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: github/codeql-action/init@v3
         with:
           language: ${{ matrix.language }}
@@ -50,8 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9
         with:
           python-version: "3.12"
           enable-cache: true
@@ -60,7 +60,7 @@ jobs:
         run: |
           uv export --frozen --no-dev --no-emit-project --format requirements-txt > requirements.txt
           uvx pip-audit --requirement requirements.txt --strict
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
