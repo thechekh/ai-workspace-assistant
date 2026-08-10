@@ -93,7 +93,10 @@ class ToolRegistry:
     async def execute(self, name: str, arguments: dict[str, object]) -> str:
         tool = self._tools.get(name)
         if tool is None:
-            TOOL_CALLS_TOTAL.labels(tool=name, status="unknown").inc()
+            # Fixed label, NOT the requested name: that name comes from the
+            # model, and a hallucinated one would add a Prometheus time series
+            # that never goes away. The real name is in the log line instead.
+            TOOL_CALLS_TOTAL.labels(tool="<unregistered>", status="unknown").inc()
             logger.warning("tool.unknown", tool=name)
             return f"error: unknown tool {name!r}"
         return await tool.run(arguments)

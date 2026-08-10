@@ -48,6 +48,8 @@ export interface TurnEvent {
   cost_usd: number;
   /** True when the user pressed Stop: partial answer, real (partial) cost. */
   cancelled: boolean;
+  /** True when the turn ended in an error; the `error` frame has the message. */
+  failed: boolean;
 }
 
 /** One row of a turn's audit timeline (GET /api/sessions/{id}/turns). */

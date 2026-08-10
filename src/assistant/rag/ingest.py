@@ -43,13 +43,30 @@ async def ingest_chunks(
     recreate: bool = False,
 ) -> int:
     """Embed and upsert already-chunked documents. The shared tail of both the
-    CLI corpus path and the runtime upload endpoint."""
+    CLI corpus path and the runtime upload endpoint.
+
+    Ingesting a source **replaces** it: every chunk it already had is deleted
+    first. Relying on the deterministic ids to overwrite is not enough — an id
+    is uuid5 of (source, heading, index), so shortening a document or renaming
+    a heading leaves the old chunks under ids nothing new collides with. They
+    survive, stay searchable, and get cited: deleting a paragraph would not
+    delete it from the answers.
+
+    Sources are replaced individually rather than by wiping the collection,
+    because one Qdrant collection holds both the corpus folder and whatever was
+    uploaded at runtime — a nightly re-index must not erase someone's upload.
+    A file *removed* from the corpus folder is the remaining gap; `--recreate`
+    is the deliberate full rebuild for that.
+    """
     if not chunks:
         return 0
     embedder = build_embedder(settings)
     dense_vectors = await embedder.embed([chunk.text for chunk in chunks])
     sparse_vectors = [encode_sparse(chunk.text) for chunk in chunks]
     await store.ensure_collection(embedder.dimension, recreate=recreate)
+    if not recreate:  # recreate already dropped everything
+        for source in sorted({chunk.source for chunk in chunks}):
+            await store.delete_source(source)
     await store.upsert(chunks, dense_vectors, sparse_vectors)
     return len(chunks)
 
@@ -63,8 +80,7 @@ async def ingest_documents(
     """Ingest documents supplied at runtime as (source_name, markdown_text).
 
     Chunking is CPU-bound, so it runs off the event loop — an upload must not
-    stall live chats. Re-uploading the same source overwrites it in place,
-    because chunk ids are deterministic from (source, index).
+    stall live chats. Re-uploading a source replaces it (see `ingest_chunks`).
     """
     chunks = await asyncio.to_thread(
         lambda: [

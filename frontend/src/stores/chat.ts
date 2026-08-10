@@ -161,6 +161,22 @@ export const useChatStore = defineStore("chat", () => {
     return `${proto}://${location.host}/chat?${params.toString()}`;
   });
 
+  /** The assistant bubble belonging to the turn now finishing, if it made one.
+   *
+   *  Scanning back for "the last assistant message" is wrong: a turn stopped
+   *  before its first token produced no bubble, and would silently adopt the
+   *  previous turn's answer — overwriting its stats and marking a finished
+   *  reply as stopped. The user message that opened this turn is the boundary.
+   */
+  function answerOfCurrentTurn(): AssistantItem | undefined {
+    for (let i = items.value.length - 1; i >= 0; i--) {
+      const item = items.value[i];
+      if (item.kind === "user") return undefined;
+      if (item.kind === "assistant") return item;
+    }
+    return undefined;
+  }
+
   function handleEvent(event: ServerEvent): void {
     const last = items.value[items.value.length - 1];
     switch (event.type) {
@@ -209,18 +225,18 @@ export const useChatStore = defineStore("chat", () => {
       case "turn": {
         // Always the last frame of a turn, on the stopped path too.
         busy.value = false;
-        const answer = [...items.value]
-          .reverse()
-          .find((item): item is AssistantItem => item.kind === "assistant");
+        const answer = answerOfCurrentTurn();
         if (answer) {
           answer.stats = event;
           answer.streaming = false;
           if (event.cancelled) answer.cancelled = true;
-        }
-        // A turn stopped before the first token has no answer bubble to mark.
-        if (event.cancelled && !answer?.cancelled) {
+        } else if (event.cancelled) {
+          // Stopped before the first token: this turn has no bubble of its own,
+          // and the previous turn's answer must not be borrowed to mark it.
           items.value.push({ kind: "assistant", text: "", streaming: false, cancelled: true });
         }
+        // A failed turn already pushed an `error` item; the summary only adds
+        // what it cost, which dev mode shows on the answer when there is one.
         break;
       }
     }

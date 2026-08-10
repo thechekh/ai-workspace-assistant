@@ -9,10 +9,21 @@ the shared registry instead so the three backends stay interchangeable.)
 
 The `fake` LLM provider maps to a pydantic-ai FunctionModel that mirrors
 FakeLLM's demo heuristics — the whole backend runs offline at zero cost.
+
+One asymmetry is worth knowing about: this backend drives the provider through
+pydantic-ai's own model layer, so it does *not* inherit the hardening in
+`llm/client.py` (429 backoff, `failed_generation` salvage, leaked-`<function>`
+parsing). The retry below closes the gap that actually bit — Groq aborting a
+stream with `tool_use_failed` — because without it this backend answered a
+knowledge-base question with an error while the other two retried and
+recovered, which is precisely the parity the project claims.
 """
 
+import asyncio
+import logging
 from collections.abc import AsyncIterator
 
+from openai import RateLimitError
 from pydantic_ai import Agent as PydanticAgent
 from pydantic_ai.messages import (
     FunctionToolCallEvent,
@@ -46,8 +57,16 @@ from assistant.agent.base import (
 from assistant.agent.tools import Tool as RegistryTool
 from assistant.agent.tools import ToolRegistry
 from assistant.config import Settings
-from assistant.llm.client import resolve_provider
+from assistant.llm.client import (
+    RATE_LIMIT_RETRIES,
+    TOOL_USE_RETRIES,
+    is_tool_use_failure,
+    rate_limit_delay,
+    resolve_provider,
+)
 from assistant.llm.fake import decide_fake_tool_call, echo_reply, stream_words, tool_result_reply
+
+logger = logging.getLogger(__name__)
 
 
 def _adapt_tool(tool: RegistryTool) -> PydanticTool:
@@ -104,6 +123,59 @@ class PydanticAIAgent:
         )
 
     async def run(self, history: list[ChatMessage], user_message: str) -> AsyncIterator[AgentEvent]:
+        """One turn, retrying a provider-side malformed tool call.
+
+        This backend drives the provider through pydantic-ai's model layer, so
+        it never passes through `OpenAICompatibleLLM` and inherits none of its
+        retries. Two provider behaviours make that visible in normal use: a 429
+        on a free tier, and llama emitting tool-call JSON the provider rejects
+        (Groq aborts the stream with `tool_use_failed`). Both were observed
+        turning a perfectly good question into an error here while the other
+        two backends recovered — the exact parity this project claims.
+
+        Retrying is only safe until the first event reaches the caller: after
+        that a second attempt would duplicate what is already on screen. That
+        is the same `emitted` guard `OpenAICompatibleLLM.stream_step` uses, and
+        the backoff comes from the same function, so there is one opinion about
+        how long to wait rather than two.
+        """
+        budget = max(TOOL_USE_RETRIES, RATE_LIMIT_RETRIES)
+        tool_use_retries = 0
+        rate_limit_retries = 0
+        while True:
+            emitted = False
+            try:
+                async for event in self._run_once(history, user_message):
+                    emitted = True
+                    yield event
+                return
+            except RateLimitError as exc:
+                if emitted or rate_limit_retries >= RATE_LIMIT_RETRIES:
+                    raise
+                rate_limit_retries += 1
+                delay = rate_limit_delay(exc, rate_limit_retries)
+                logger.warning(
+                    "LLM rate limited (429) — retry %d/%d in %.1fs",
+                    rate_limit_retries,
+                    RATE_LIMIT_RETRIES,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            except Exception as exc:
+                if emitted or tool_use_retries >= TOOL_USE_RETRIES or not is_tool_use_failure(exc):
+                    raise
+                tool_use_retries += 1
+                logger.warning(
+                    "model produced an invalid tool call — retrying turn (%d/%d)",
+                    tool_use_retries,
+                    TOOL_USE_RETRIES,
+                )
+            if tool_use_retries + rate_limit_retries > 2 * budget:  # belt and braces
+                raise RuntimeError("retry budget exhausted")
+
+    async def _run_once(
+        self, history: list[ChatMessage], user_message: str
+    ) -> AsyncIterator[AgentEvent]:
         message_history = _to_model_messages(self._system_prompt, history) if history else None
         async with self._agent.iter(user_message, message_history=message_history) as agent_run:
             async for node in agent_run:

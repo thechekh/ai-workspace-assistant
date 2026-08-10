@@ -65,6 +65,7 @@ function turnFrame(overrides: Partial<TurnEvent> = {}): TurnEvent {
     usage_estimated: false,
     cost_usd: 0.0012,
     cancelled: false,
+    failed: false,
     ...overrides,
   };
 }
@@ -257,6 +258,33 @@ describe("chat store — stopping a turn", () => {
     expect(chat.items[1]).toMatchObject({ kind: "assistant", text: "", cancelled: true });
   });
 
+  it("never borrows the previous turn's answer to mark a stop", () => {
+    // Regression: the turn frame used to attach to "the last assistant message
+    // anywhere", so stopping turn 2 before its first token relabelled turn 1's
+    // finished reply as stopped and overwrote its stats.
+    const chat = useChatStore();
+    chat.sendMessage("first question");
+    send({ type: "token", content: "the complete first answer" });
+    send({ type: "final", content: "the complete first answer" });
+    send(turnFrame({ turn_id: "turn-one" }));
+
+    chat.sendMessage("second question");
+    send(turnFrame({ turn_id: "turn-two", cancelled: true, first_token_ms: null }));
+
+    const first = chat.items.find(
+      (item) => item.kind === "assistant" && item.text === "the complete first answer",
+    );
+    expect(first).toBeTruthy();
+    expect(first && "cancelled" in first ? first.cancelled : undefined).toBeFalsy();
+    expect(first).toMatchObject({ stats: { turn_id: "turn-one" } });
+    // The stopped turn gets its own (empty) bubble instead.
+    expect(chat.items[chat.items.length - 1]).toMatchObject({
+      kind: "assistant",
+      text: "",
+      cancelled: true,
+    });
+  });
+
   it("releases the composer when the socket drops mid-turn", async () => {
     const chat = useChatStore();
     chat.sendMessage("hello");
@@ -274,6 +302,21 @@ describe("chat store — stopping a turn", () => {
     chat.sendMessage("hello");
     send({ type: "error", message: "LLM rate limit hit (429)" });
     expect(chat.busy).toBe(false);
+  });
+
+  it("keeps the cost of a failed turn on the partial answer", () => {
+    // A turn that dies after the provider's retries has still spent tokens.
+    // The summary arrives after the error frame and must not be dropped.
+    const chat = useChatStore();
+    chat.sendMessage("hello");
+    send({ type: "token", content: "half an ans" });
+    send({ type: "error", message: "the model produced an invalid tool call" });
+    send(turnFrame({ failed: true, prompt_tokens: 3899, cost_usd: 0.0023 }));
+
+    expect(chat.busy).toBe(false);
+    const answer = chat.items.find((item) => item.kind === "assistant");
+    expect(answer).toMatchObject({ stats: { failed: true, cost_usd: 0.0023 } });
+    expect(chat.items.some((item) => item.kind === "error")).toBe(true);
   });
 });
 

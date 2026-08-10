@@ -41,14 +41,14 @@ PROVIDER_BASE_URLS: dict[str, str | None] = {
 
 # Retries on 429: free tiers (Groq: ~30 req/min) use per-minute windows that
 # need longer backoff than the SDK's built-in quick retries (which we disable).
-_RATE_LIMIT_RETRIES = 2
+RATE_LIMIT_RETRIES = 2
 _MAX_RETRY_DELAY_S = 15.0
 # Per-request ceiling. Generous enough for a slow first token on a large
 # prompt, short enough that a stalled provider cannot hold a turn open.
 _REQUEST_TIMEOUT_S = 60.0
 # Groq aborts a 200 stream with code "tool_use_failed" when the model emits
 # malformed tool-call JSON (a known llama flake) — a fresh attempt usually works.
-_TOOL_USE_RETRIES = 2
+TOOL_USE_RETRIES = 2
 
 
 def _retry_after_seconds(exc: RateLimitError) -> float | None:
@@ -57,6 +57,20 @@ def _retry_after_seconds(exc: RateLimitError) -> float | None:
         return float(header) if header else None
     except ValueError:  # HTTP-date form — rare; fall back to our own backoff
         return None
+
+
+def rate_limit_delay(exc: RateLimitError, attempt: int) -> float:
+    """How long to wait before retry `attempt` (1-based) of a 429.
+
+    Shared with the pydantic-ai backend, which drives the provider through its
+    own model layer and so cannot reuse the retry loop below — but must not
+    grow a second opinion about backoff.
+    """
+    retry_after = _retry_after_seconds(exc)
+    # `retry-after: 0` means "retry now" — a valid value, so test against None
+    # rather than truthiness.
+    backoff = retry_after if retry_after is not None else 2.0 * attempt
+    return min(backoff, _MAX_RETRY_DELAY_S)
 
 
 def is_tool_use_failure(exc: BaseException) -> bool:
@@ -68,9 +82,13 @@ def is_tool_use_failure(exc: BaseException) -> bool:
 
 # llama's native tool syntax, which sometimes leaks into plain text output
 # (or arrives via Groq's `failed_generation`). Observed variants:
-# <function.name>{...}</function>, <function=name>{...}, <function(name){...}.
+# <function.name>{...}</function>, <function=name>{...}, <function(name){...},
+# and — seen live on llama-3.1-8b — an opening paren instead of the angle
+# bracket: (function=name>{...}. Missing that last one put raw markup in front
+# of a user, which is the whole failure this exists to prevent, so the opener
+# is matched loosely and the closer stays optional.
 # The JSON is brace-matched with raw_decode, so nested arguments parse fine.
-_LEAKED_CALL_PREFIX = re.compile(r"<function[.=(]\s*([\w./-]+)\s*[)>]?", re.IGNORECASE)
+_LEAKED_CALL_PREFIX = re.compile(r"[<(]function[.=(]\s*([\w./-]+)\s*[)>]?", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -214,11 +232,32 @@ class _LeakedTextBuffer:
     call, or emitted as text if it turns out to be ordinary prose.
     """
 
-    _PREFIX = "<function"
+    # Both openers seen in the wild; the leading character is all that differs.
+    _PREFIXES = ("<function", "(function")
 
     def __init__(self) -> None:
         self._held: list[str] = []
         self._holding = True
+
+    @classmethod
+    def _could_be_markup(cls, joined: str) -> bool:
+        """Is the text so far still a possible start of a leaked tool call?
+
+        "Does it match the first N characters" alone is not enough: that stays
+        true forever once N characters have arrived, so an answer merely
+        opening with those letters ("(functional programming…") would be
+        withheld until the end of the stream. Real markup always continues with
+        a separator, so that is the second thing to require.
+        """
+        for prefix in cls._PREFIXES:
+            if len(joined) < len(prefix):
+                if prefix.startswith(joined):
+                    return True
+            elif joined.startswith(prefix):
+                rest = joined[len(prefix) :]
+                if not rest or rest[0] in ".=(":
+                    return True
+        return False
 
     def push(self, text: str) -> str | None:
         """Returns text to stream now, or None while still withholding."""
@@ -226,7 +265,7 @@ class _LeakedTextBuffer:
             return text
         self._held.append(text)
         joined = "".join(self._held).lstrip()
-        if joined and not self._PREFIX.startswith(joined[: len(self._PREFIX)]):
+        if joined and not self._could_be_markup(joined):
             self._holding = False  # ordinary prose — flush everything held
             flushed = "".join(self._held)
             self._held = []
@@ -333,12 +372,12 @@ class OpenAICompatibleLLM:
             except APIError as exc:
                 if emitted or not is_tool_use_failure(exc):
                     raise
-                if tool_use_retries < _TOOL_USE_RETRIES:
+                if tool_use_retries < TOOL_USE_RETRIES:
                     tool_use_retries += 1
                     logger.warning(
                         "model produced an invalid tool call — retrying step (%d/%d)",
                         tool_use_retries,
-                        _TOOL_USE_RETRIES,
+                        TOOL_USE_RETRIES,
                     )
                     continue
                 # Retries exhausted — Groq reports the model's attempt in
@@ -376,18 +415,14 @@ class OpenAICompatibleLLM:
                 # Some OpenAI-compatible providers reject stream_options — retry without.
                 create_kwargs.pop("stream_options", None)
             except RateLimitError as exc:
-                if rate_limit_retries >= _RATE_LIMIT_RETRIES:
+                if rate_limit_retries >= RATE_LIMIT_RETRIES:
                     raise
                 rate_limit_retries += 1
-                # `retry-after: 0` means "retry now" — it is a valid value, so
-                # test it against None rather than truthiness (0.0 is falsy).
-                retry_after = _retry_after_seconds(exc)
-                backoff = retry_after if retry_after is not None else 2.0 * rate_limit_retries
-                delay = min(backoff, _MAX_RETRY_DELAY_S)
+                delay = rate_limit_delay(exc, rate_limit_retries)
                 logger.warning(
                     "LLM rate limited (429) — retry %d/%d in %.1fs",
                     rate_limit_retries,
-                    _RATE_LIMIT_RETRIES,
+                    RATE_LIMIT_RETRIES,
                     delay,
                 )
                 await asyncio.sleep(delay)

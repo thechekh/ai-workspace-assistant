@@ -62,6 +62,11 @@ class SessionStore:
         not set entries), so entries older than the TTL are dropped on read and
         any session whose history is already gone is skipped.
         """
+        # ZREVRANGE takes an inclusive *end index*, where negatives count from
+        # the end — so limit=0 would ask for 0..-1, i.e. everything, and turn a
+        # cap into its opposite. Clamp before the arithmetic, not after.
+        if limit <= 0:
+            return []
         cutoff = time.time() - self._ttl
         await self._redis.zremrangebyscore(_INDEX_KEY, 0, cutoff)
         # `withscores=True` returns (member, score) pairs; redis-py types the

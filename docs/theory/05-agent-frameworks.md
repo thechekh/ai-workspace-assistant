@@ -21,7 +21,7 @@ agent/base.py        AgentBackend protocol + AgentEvent stream (the contract)
 agent/tools/         ToolRegistry — ONE tool source for all backends
 agent/backends/
   custom.py      98 lines   the loop, no dependencies
-  pydantic_ai.py 194 lines  Pydantic AI runtime
+  pydantic_ai.py 266 lines  Pydantic AI runtime
   langgraph.py   278 lines  LangGraph runtime
 ```
 

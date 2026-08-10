@@ -39,7 +39,7 @@ for the hard questions.
 4. **Three runtimes, one contract** — `AgentBackend` protocol; custom vs
    Pydantic AI vs LangGraph, switchable per session. *Slide source:*
    [backend-comparison.md](../reference/backend-comparison.md) (measured LoC
-   98/194/278 + verdict table). The same test suite passes on all three.
+   98/266/278 + verdict table). The same test suite passes on all three.
 5. **MCP** — why a protocol beats N bespoke integrations; stdio vs
    streamable HTTP; tool namespacing; graceful degradation. Our servers:
    `code_search` (real) + `fake_github` (mock with the official server's

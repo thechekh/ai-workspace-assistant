@@ -9,7 +9,9 @@ Writes are additionally rate limited (see `rate_limit.py`): indexing is the
 one path here that costs real work per call.
 """
 
+import hashlib
 import logging
+import secrets
 import time
 from pathlib import Path
 
@@ -43,7 +45,10 @@ def require_token(request: Request) -> None:
     if settings.auth_token is None:
         return
     expected = f"Bearer {settings.auth_token.get_secret_value()}"
-    if request.headers.get("Authorization") != expected:
+    # compare_digest, not ==: a plain comparison returns as soon as two bytes
+    # differ, which leaks the shared secret one character at a time to anyone
+    # who can time the endpoint.
+    if not secrets.compare_digest(request.headers.get("Authorization", ""), expected):
         raise HTTPException(status_code=401, detail="missing or invalid bearer token")
 
 
@@ -61,11 +66,14 @@ async def limit_writes(request: Request) -> None:
     """
     settings: Settings = request.app.state.settings
     limiter: RateLimiter = request.app.state.rate_limiter
-    identity = (
-        request.headers.get("Authorization", "")[-16:]
-        if settings.auth_token is not None
-        else (request.client.host if request.client else "unknown")
-    )
+    if settings.auth_token is not None:
+        # Hashed, because this ends up in a Redis key name: a slice of the raw
+        # bearer token would put part of the secret somewhere it can be dumped
+        # with KEYS, logged by a slowlog, or read from an RDB snapshot.
+        credential = request.headers.get("Authorization", "")
+        identity = hashlib.sha256(credential.encode()).hexdigest()[:16]
+    else:
+        identity = request.client.host if request.client else "unknown"
     decision = await limiter.check(
         "writes", identity, limit=settings.rate_limit_uploads_per_hour, window_seconds=3600
     )
@@ -160,7 +168,7 @@ async def list_sessions(request: Request, limit: int = 30) -> SessionList:
     Auth-guarded like the audit endpoints: the previews are conversation
     content, unlike /api/info and /api/health.
     """
-    sessions = await request.app.state.session_store.recent(min(limit, 100))
+    sessions = await request.app.state.session_store.recent(max(1, min(limit, 100)))
     return SessionList(sessions=sessions)
 
 

@@ -31,8 +31,9 @@ function formatStats(stats: TurnEvent): string {
     `${stats.prompt_tokens}→${stats.completion_tokens} tok${stats.usage_estimated ? " (est)" : ""}`,
   );
   if (stats.cost_usd > 0) parts.push(`~$${stats.cost_usd.toFixed(4)}`);
-  // Says why the numbers are small — a stopped turn's cost is real but partial.
+  // Says why the numbers are what they are: both paths spend real tokens.
   if (stats.cancelled) parts.push("stopped");
+  if (stats.failed) parts.push("failed");
   if (stats.tool_calls.length > 0) parts.push(stats.tool_calls.join(", "));
   return parts.join(" · ");
 }

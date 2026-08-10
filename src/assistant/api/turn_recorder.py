@@ -94,7 +94,7 @@ class TurnRecorder:
                 )
             )
 
-    def summary(self, *, cancelled: bool = False) -> TurnSummary:
+    def summary(self, *, cancelled: bool = False, failed: bool = False) -> TurnSummary:
         """The `turn` frame the UI renders as a stats line."""
         # The pydantic-ai backend runs its own model layer (not InstrumentedLLM),
         # so fall back to structural estimates when the wrapper saw nothing.
@@ -113,6 +113,7 @@ class TurnRecorder:
                 estimate_cost_usd(self._llm_model, self.stats.prompt_tokens, completion_tokens), 6
             ),
             cancelled=cancelled,
+            failed=failed,
         )
 
     def record(self, summary: TurnSummary) -> TurnRecord:

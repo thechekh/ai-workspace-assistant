@@ -14,7 +14,7 @@ cite one, be ready to run the command.
 | Tests | 212 backend + 16 frontend | `uv run pytest -q`, `npm run test:run` |
 | Coverage | 83.7%, floor enforced in CI | `uv run pytest --cov` |
 | Retrieval quality | recall@1 **0.83**, recall@5 **1.00**, MRR **0.92** | `uv run python evals/run_retrieval.py --memory` |
-| Agent backends | 98 / 194 / 278 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
+| Agent backends | 98 / 266 / 278 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
 | Real-model cost | ~$0.012 for a full 8-case acceptance run | the stats line under every answer |
 | Suite runtime | ~13 s, fully offline | no network, no Docker |
 
@@ -25,7 +25,7 @@ cite one, be ready to run the command.
 **Q: Why implement the agent three times? Isn't once enough?**
 Because "which framework?" was a real open question and we wanted an
 evidence-based answer, not a blog-post opinion. The marginal cost was low —
-98/194/278 lines; everything else (tools, memory, telemetry, protocol) is
+98/266/278 lines; everything else (tools, memory, telemetry, protocol) is
 shared — and the payoff is [backend-comparison.md](../reference/backend-comparison.md)
 with measured numbers, plus the choice stays reversible via one config value.
 The comparison *is* a deliverable, not a detour.
@@ -305,7 +305,7 @@ accounts.
 Remove the nondeterminism from every layer except the one under evaluation:
 scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-**244 tests in ~22 seconds, fully offline** — no network, no containers, no
+**264 tests in ~22 seconds, fully offline** — no network, no containers, no
 keys. Model *quality* is deliberately out of unit scope; that's what the
 eval harness is for.
 
@@ -334,6 +334,22 @@ offline fake for the pydantic-ai backend was a hand-copied twin that never
 learned about a new tool, so one backend silently behaved differently from
 the other two — invisible precisely because the duplication looked harmless.
 Both now have regression tests; the second produced a whole parity test file.
+
+**Q: Has anything ever broken the "three backends, one contract" claim?**
+Yes, and it is the most useful thing a review found. `test_fake_parity.py`
+proves the three route the same prompt to the same tool — offline. Against
+real Groq, the pydantic-ai backend failed the same question the other two
+answered, every time. Cause: it drives the provider through pydantic-ai's own
+model layer, so it never passes through `llm/client.py` and inherited none of
+its hardening — no 429 backoff, no retry when llama emits a malformed tool
+call. One bad tool call and the turn was an error instead of an answer.
+
+The lesson generalises past this project: the parity test compared the
+*happy path*, and the fake provider never rate-limits or emits broken JSON, so
+the very failures the hardening exists for were the ones the test could not
+see. The backend now re-implements the retries, importing the shared policy
+(`rate_limit_delay`, `is_tool_use_failure`) so there is one opinion about when
+and how long to retry even though there are two loops.
 
 **Q: How do you know the documentation is true?**
 Partly automated: `tests/test_docs_links.py` fails the build on any broken

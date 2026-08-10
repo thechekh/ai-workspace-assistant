@@ -52,7 +52,7 @@ queued question would be answered from is already stale.
 | `tool_call` | `tool`, `arguments` | agent invokes a tool (UI shows a card) |
 | `tool_result` | `tool`, `result` | tool finished (fills the card) |
 | `final` | `content` | the complete answer (authoritative text) |
-| `turn` | `turn_id, backend, duration_ms, first_token_ms, llm_steps, tool_calls[], prompt_tokens, completion_tokens, usage_estimated, cost_usd, cancelled` | **always last** — the stats line, on the stopped path too |
+| `turn` | `turn_id, backend, duration_ms, first_token_ms, llm_steps, tool_calls[], prompt_tokens, completion_tokens, usage_estimated, cost_usd, cancelled, failed` | **always last** — exactly one per turn, however it ended |
 | `error` | `message` | anything failed; the socket stays open, mapped to friendly text (chapter 04) |
 
 Connection query params: `?session_id=` (resume), `?backend=` (runtime),
@@ -82,6 +82,21 @@ A stopped turn is **not** an error:
 
 Closing the tab does the same thing — the connection's `finally` cancels a
 turn still in flight, so nobody pays for an answer no one is reading.
+
+### One `turn` frame per turn, always
+
+A turn ends one of three ways, and all three finish with a `turn` frame:
+completed, `cancelled: true`, or `failed: true` (preceded by the `error` frame
+carrying the message). That makes the frame a usable end-of-turn marker — a
+client can wait for exactly one of them without a timeout.
+
+It is also an accounting rule. A turn that dies after the provider's retries
+has already spent three prompts' worth of tokens; returning early on the error
+path used to drop that from the summary, the audit trail and
+`assistant_cost_usd_total` — hiding spend at exactly the moment spend is
+worth watching. Failed and stopped turns are excluded from
+`assistant_turn_seconds` (a provider timeout is not this system's latency) but
+never from cost.
 
 ## Conversation memory (why prompts don't grow forever)
 

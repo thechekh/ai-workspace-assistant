@@ -17,8 +17,35 @@ _GITHUB_USER_RE = re.compile(r"^https?://github\.com/([\w-]+)/?(?:[?#].*)?$", re
 # Dev-grade SSRF guard: refuse obvious loopback/private/link-local hosts.
 # (Production would resolve DNS and enforce an allowlist at the egress proxy.)
 _BLOCKED_HOST_RE = re.compile(
-    r"^(localhost$|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)", re.IGNORECASE
+    r"^(localhost\.?$|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)",
+    re.IGNORECASE,
 )
+
+
+def is_blocked_host(host: str) -> bool:
+    return bool(_BLOCKED_HOST_RE.match(host.strip("[]")))
+
+
+class BlockedRedirect(httpx.HTTPError):
+    """A redirect pointed somewhere the initial-URL check would have refused."""
+
+
+async def _refuse_internal_redirects(response: httpx.Response) -> None:
+    """Re-check the target of every redirect, not just the URL we were given.
+
+    Validating only the first URL is the classic way an SSRF guard gets walked
+    past: a perfectly public address answers `302 Location: http://127.0.0.1/…`
+    and, with redirects followed, the internal body comes back anyway. This
+    runs as a response hook so it covers each hop.
+    """
+    if not response.has_redirect_location:
+        return
+    target = response.headers.get("location", "")
+    host = httpx.URL(response.url.join(target)).host or ""
+    if is_blocked_host(host):
+        raise BlockedRedirect(f"redirect to a private or loopback address ({host}) refused")
+
+
 _GITHUB_JSON = {"Accept": "application/vnd.github+json"}
 
 
@@ -82,6 +109,9 @@ def new_http_client() -> httpx.AsyncClient:
         timeout=15,
         follow_redirects=True,
         headers={"User-Agent": "ai-workspace-assistant/0.1"},
+        # Redirects are followed, so every hop is re-checked against the same
+        # host rules as the original URL.
+        event_hooks={"response": [_refuse_internal_redirects]},
     )
 
 
@@ -95,8 +125,7 @@ def make_fetch_url(
         url = str(arguments.get("url", "")).strip()
         if not url.startswith(("http://", "https://")):
             return "error: only http(s) URLs are supported"
-        host = httpx.URL(url).host or ""
-        if _BLOCKED_HOST_RE.match(host):
+        if is_blocked_host(httpx.URL(url).host or ""):
             return "error: refusing to fetch private or loopback addresses"
 
         owned = client is None

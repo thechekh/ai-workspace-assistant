@@ -54,6 +54,33 @@ this file records what changed after the initial nine phases.
   package, provider-error classification moved to `llm/errors.py`.
 
 ### Fixed
+- **Re-uploading a document did not replace it.** Chunk ids are
+  `uuid5(source, heading, index)`, so shortening a document or renaming a
+  heading left the old chunks under ids nothing new collided with: deleted
+  text stayed indexed, retrievable and citable. Ingest now deletes a source
+  before re-adding it, which also fixes the nightly corpus re-index.
+- **The pydantic-ai backend inherited none of the provider hardening.** It
+  drives the model through pydantic-ai's own layer, bypassing `llm/client.py`,
+  so it had no 429 backoff and no `tool_use_failed` retry — and failed live
+  questions the other two backends answered. Retries re-implemented in the
+  backend, sharing the policy helpers so the timing is defined once.
+- **A failed turn never sent its `turn` frame.** The error path returned
+  early, so clients waiting for the end-of-turn marker hung, no audit row was
+  written, and the tokens already spent (three prompts, after retries) were
+  missing from `assistant_cost_usd_total`. Every turn now ends with exactly
+  one `turn` frame carrying `cancelled` / `failed`.
+- **`GET /api/sessions?limit=0` returned every session.** `ZREVRANGE`'s end
+  index is inclusive and negatives count from the end, so the cap inverted.
+- **Leaked `(function=…` tool markup reached the user.** The salvage matched
+  only `<function…`; llama-3.1-8b emits the paren form. Both are recovered,
+  and prose that merely starts with those letters is no longer withheld.
+- **A hallucinated tool name became a permanent Prometheus label.** Unknown
+  tools now count under a fixed `<unregistered>` label; the name stays in logs.
+- **`fetch_url`'s SSRF guard only checked the first URL.** With redirects
+  followed, a public address could 302 to `169.254.169.254` and return the
+  body. Every hop is now re-checked.
+- Bearer tokens are compared with `secrets.compare_digest` (HTTP and WS), and
+  the rate-limit key derives from a hash instead of a slice of the token.
 - **Stale retrieval ablation numbers in the docs.** The `0.56 / 0.67`
   dense/hybrid baselines were measured before the Phase 8 relevance gate and
   had drifted; re-measured, they are `0.78 / 0.72` (recall@1). The headline

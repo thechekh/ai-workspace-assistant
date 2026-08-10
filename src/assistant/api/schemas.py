@@ -60,6 +60,10 @@ class TurnSummary(BaseModel):
     # True when the user stopped the turn: whatever streamed before the stop
     # is kept, and the partial cost is still accounted for.
     cancelled: bool = False
+    # True when the turn ended in an error (the `error` frame carries the
+    # message). The tokens spent getting there are still counted — a provider
+    # that fails after two retries is exactly when spend must stay visible.
+    failed: bool = False
 
 
 class IndexedDocument(BaseModel):
@@ -116,6 +120,7 @@ class TurnRecord(BaseModel):
     usage_estimated: bool = True
     cost_usd: float = 0.0
     cancelled: bool = False
+    failed: bool = False
     tool_calls: list[str] = Field(default_factory=list)
     events: list[TurnAuditEvent] = Field(default_factory=list)
 

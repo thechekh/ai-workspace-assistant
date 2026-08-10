@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import secrets
 import uuid
 
 import structlog
@@ -38,9 +39,13 @@ logger = structlog.get_logger("assistant.ws")
 async def chat_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
 
-    # Optional bearer auth (browsers can't set WS headers -> ?token= query param)
+    # Optional bearer auth (browsers can't set WS headers -> ?token= query param).
+    # compare_digest for the same reason as the HTTP guard: `!=` returns early
+    # on the first differing byte and leaks the secret to a timing attack.
     expected = websocket.app.state.settings.auth_token
-    if expected is not None and websocket.query_params.get("token") != expected.get_secret_value():
+    if expected is not None and not secrets.compare_digest(
+        websocket.query_params.get("token", ""), expected.get_secret_value()
+    ):
         await websocket.close(code=1008, reason="missing or invalid token")
         return
 
@@ -186,6 +191,7 @@ async def _handle_turn(
     ):
         logger.info("turn.start", user_chars=len(user_message))
         cancelled = False
+        failed = False
         try:
             with tracer.start_as_current_span("agent.turn") as span:
                 span.set_attribute("session.id", session_id)
@@ -242,16 +248,30 @@ async def _handle_turn(
             )
             ERRORS_TOTAL.labels(kind=kind).inc()
             logger.exception("turn.failed", kind=kind)
+            # Same reasoning as the stopped path: text the user already saw is
+            # part of the conversation. Dropping it desynchronises the screen
+            # from the history the next prompt is built from.
+            if partial := recorder.streamed_text.strip():
+                await store.append(
+                    session_id,
+                    ChatMessage(role="assistant", content=f"{partial} [answer interrupted]"),
+                )
             await websocket.send_text(ErrorEvent(message=message).model_dump_json())
-            return
+            # Falls through to the summary rather than returning: `turn` is the
+            # frame that ends a turn, so a client can wait for exactly one of
+            # them however the turn goes. It also keeps the spend visible — a
+            # turn that died after two provider retries burned three prompts,
+            # and dropping it here hid that cost precisely when it mattered.
+            failed = True
         finally:
             current_turn_stats.reset(stats_token)
 
-        summary = recorder.summary(cancelled=cancelled)
+        summary = recorder.summary(cancelled=cancelled, failed=failed)
         TURNS_TOTAL.labels(backend=backend).inc()
-        if not cancelled:
-            # A stopped turn's duration measures the user's patience, not the
-            # system's latency — it would skew the p95 it lands in.
+        if not (cancelled or failed):
+            # A stopped turn measures the user's patience and a failed one the
+            # provider's timeout — neither is this system's latency, and both
+            # would skew the p95 they land in.
             TURN_SECONDS.labels(backend=backend).observe(summary.duration_ms / 1000)
         if summary.cost_usd:
             COST_USD_TOTAL.labels(model=llm_model).inc(summary.cost_usd)

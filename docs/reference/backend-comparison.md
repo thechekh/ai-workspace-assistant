@@ -13,7 +13,8 @@ Measured on this repository (line counts via `wc -l`, docstrings included).
 
 | | custom loop | Pydantic AI | LangGraph |
 |---|---:|---:|---:|
-| Backend file LoC | **98** | **194** | **278** |
+| Backend file LoC | **98** | **266** | **278** |
+| Inherits the shared provider hardening | yes | **no — re-implemented** | yes |
 | …of which framework-adapter code | 0 | ~45 (FunctionModel fake) + ~25 (model builder) | ~95 (`BaseChatModel` adapter) + ~35 (message conversion) |
 | Extra runtime deps | none (shares `llm/client.py`) | `pydantic-ai` (+ its provider SDKs) | `langgraph` + `langchain-core` |
 | Offline fake for tests/demo | free — FakeLLM speaks our protocol | needs a `FunctionModel` twin; both now share `llm/fake.py` after the hand-copied version silently drifted | free — the adapter lets FakeLLM/ScriptedLLM run unchanged |
@@ -61,6 +62,20 @@ effort** per backend. The interesting difference is what each framework
 - pydantic-ai replaces the model layer entirely with its own abstraction —
   clean, but it means provider config exists twice (ours + theirs), and the
   offline fake had to be **re-implemented** against `FunctionModel`.
+
+  This is the dimension that cost the most, and it did not show up until a
+  live run. Replacing the model layer also replaces everything wrapped around
+  it: the 429 backoff, the `tool_use_failed` retry, the `failed_generation`
+  salvage and the leaked-`<function>` parsing all live in
+  `llm/client.py`, which this backend never reaches. Offline the three
+  backends were provably identical (`test_fake_parity.py`); against real Groq,
+  the same knowledge-base question that custom and langgraph answered was a
+  hard error here, reproducibly, because llama had emitted one malformed tool
+  call and nothing retried it. The retries are now re-implemented in the
+  backend — sharing the *policy* (`rate_limit_delay`, `is_tool_use_failure`)
+  even though it cannot share the loop. That is the real price of swapping a
+  framework's model layer for your own: not the adapter, the invariants that
+  quietly stop applying.
 - langgraph is coupled to LangChain's `BaseChatModel`/message types, so we
   wrote a 95-line adapter over our protocol. Upside discovered: once the
   adapter existed, **every** fake and scripted LLM we already had worked on
