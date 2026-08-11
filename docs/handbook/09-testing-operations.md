@@ -1,6 +1,6 @@
 # 09 — Testing, operations & troubleshooting
 
-## The automated suite (264 tests, fully offline)
+## The automated suite (292 tests, fully offline)
 
 ```sh
 uv run pytest -q          # ~22s. No network, no Docker, no keys.
@@ -29,6 +29,8 @@ scripted provider errors. Map of the suite:
 | test_eval_gate.py | the retrieval quality gate: the committed baseline is actually achieved by the pipeline, and a drop is reported while float noise is not |
 | test_docs_links.py | the documentation itself: every relative link resolves, no stray prose outside `docs/`, the index covers every folder |
 | test_docs_consistency.py | numbers quoted in many documents at once (backend line counts, golden-set size, retrieval scores, suite size) agree with the code and with each other |
+| test_docs_coverage.py | every setting, endpoint, metric, wire frame, tool, source file, dependency and run command is mentioned somewhere — so shipping a feature without documenting it fails the build |
+| test_review_regressions.py | the defects a full review found, each reproduced before it was fixed: re-upload leaving orphan chunks, `?limit=0` inverting the cap, a hallucinated tool name becoming a metric label, an SSRF guard walked past by a redirect, a failed turn never reporting its cost |
 
 Quality gates (CI, every push): `ruff check` · `ruff format --check` ·
 `pyright` (0 errors) · `pytest` with a coverage floor — on Python 3.12 **and**

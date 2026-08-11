@@ -305,7 +305,7 @@ accounts.
 Remove the nondeterminism from every layer except the one under evaluation:
 scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-**264 tests in ~22 seconds, fully offline** — no network, no containers, no
+**292 tests in ~22 seconds, fully offline** — no network, no containers, no
 keys. Model *quality* is deliberately out of unit scope; that's what the
 eval harness is for.
 

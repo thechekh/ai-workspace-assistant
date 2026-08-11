@@ -77,7 +77,7 @@ and blocking CPU/IO moved off the event loop.
 - [ ] **`pyright` strict mode** — currently `standard`; nearly free on an
       already-clean codebase.
 - [ ] **`pytest-xdist`** — the suite looks xdist-ready (no shared files,
-      per-test in-memory stores, `tmp_path` used correctly). 264 tests in ~22s
+      per-test in-memory stores, `tmp_path` used correctly). 292 tests in ~22s
       is fine today, so this is a later-scale item.
 - [ ] **Decide one Python version.** There are currently three: local venv
       **3.14**, CI matrix **3.12 + 3.13**, Docker image **3.13**. A

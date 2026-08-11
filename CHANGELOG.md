@@ -41,7 +41,15 @@ this file records what changed after the initial nine phases.
 - Security scanning workflow (CodeQL, `pip-audit`, `npm audit`) and
   [docs/reference/security.md](docs/reference/security.md).
 - ESLint + Prettier for the frontend, enforced in CI and pre-commit.
-- Documentation tests: link integrity and cross-document fact consistency.
+- Documentation tests: link integrity, cross-document fact consistency, and
+  **coverage** — every setting, endpoint, metric, wire frame, tool, source
+  file, dependency and run command must be mentioned somewhere, so shipping a
+  feature without documenting it fails the build. It found four real gaps on
+  the first run: the three `ASSISTANT_RATE_LIMIT_*` settings had reached
+  `.env.example` but no handbook table, and `python-multipart` was an
+  undocumented direct dependency.
+- A field-by-field table for the per-turn stats line, including when
+  `usage_estimated` is true and why a failed turn's cost reads low.
 
 ### Changed
 - All dependencies upgraded to latest, absorbing four upstream breaking

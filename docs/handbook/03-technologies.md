@@ -18,6 +18,9 @@ The web framework and ASGI server: one process serves the WebSocket chat
 (`/chat`), the REST API (`/api/*`), Prometheus metrics (`/metrics`), and the
 built Vue UI (static files at `/`). Chosen for first-class async +
 WebSockets + pydantic integration + auto OpenAPI (`/docs`).
+`python-multipart` rides along as a direct dependency because Starlette needs
+it to parse the file uploads `POST /api/documents` accepts — without it that
+endpoint fails at import time rather than at request time.
 *Where:* [main.py](../../src/assistant/main.py) (app factory + lifespan wiring),
 [api/ws.py](../../src/assistant/api/ws.py), [api/routes.py](../../src/assistant/api/routes.py).
 
@@ -78,7 +81,14 @@ and `structlog.contextvars` injects `session_id`/`turn_id`/`backend` into
 **every** line automatically.
 *Where:* [logs.py](../../src/assistant/logs.py); chapter 07.
 
-### OpenTelemetry (API + SDK + OTLP exporter)
+### OpenTelemetry — `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`
+Three packages with distinct jobs, which is why all three are direct
+dependencies rather than transitive ones: `opentelemetry-api` is what
+`telemetry.py` imports to create spans (it is a no-op on its own, so
+instrumented code needs no guards), `opentelemetry-sdk` is the implementation
+`observability.py` installs only when a destination exists, and
+`…-exporter-otlp-proto-http` ships the spans over HTTP.
+
 Manual spans on the four seams that explain the agent: `agent.turn`,
 `llm.step`, `tool.execute`, `rag.retrieve`. Inert (no-op tracer) until a
 destination is configured: local Jaeger via `ASSISTANT_OTLP_ENDPOINT`, and/or

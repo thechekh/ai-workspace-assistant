@@ -128,9 +128,37 @@ renders it under the message:
 3.3s · first token 2995 ms · 2 LLM steps · 4313→115 tok · ~$0.0026 · fetch_url   details
 ```
 
-A stopped turn ends the same line with `· stopped`, and the answer itself
-carries a "stopped by you" marker **in both modes** — an answer cut short
-must never read as a complete one just because the stats are hidden.
+Field by field — this is the whole `turn` frame, and the audit record stores
+the same values plus the timeline:
+
+| Field | Meaning |
+|---|---|
+| `turn_id` | 12-hex id; the key for `GET /api/sessions/{id}/turns/{turn_id}` |
+| `backend` | which runtime answered (`custom` / `pydantic_ai` / `langgraph`) |
+| `duration_ms` | wall clock for the whole turn, question to final answer |
+| `first_token_ms` | time to the first streamed character — the number a user actually feels; `null` if the turn produced no text |
+| `llm_steps` | model round trips; 1 = answered directly, 2 = one tool call and a follow-up, and so on |
+| `tool_calls` | the tools used, in order, including repeats |
+| `prompt_tokens` / `completion_tokens` | tokens in and out, summed across every step of the turn |
+| `usage_estimated` | `false` = the provider reported those counts; `true` = chars/4 fallback (see below) |
+| `cost_usd` | indicative spend at listed prices; `0.0` for the fake provider and unpriced models |
+| `cancelled` | the user pressed Stop |
+| `failed` | the turn ended in an error (an `error` frame carries the message) |
+
+A stopped turn ends the same line with `· stopped` and a failed one with
+`· failed`. The answer itself carries a "stopped by you" marker **in both
+modes** — an answer cut short must never read as a complete one just because
+the stats are hidden.
+
+**When `usage_estimated` is true.** Three cases, all honest rather than
+broken: the pydantic-ai backend runs its own model layer and never passes
+through `InstrumentedLLM`; a stopped turn's stream is cut before the
+provider's final usage chunk arrives; and a step the provider *aborted* — a
+Groq `tool_use_failed`, say — reports no usage at all for that attempt. The
+last one has a consequence worth knowing when reading a cost dashboard: the
+retried attempts really were billed, but the provider never reported them, so
+`cost_usd` reads low on exactly those turns. `(est)` in the UI is the flag
+that says "treat this number as approximate".
 
 - tokens without `(est)` = provider-reported; `(est)` = chars/4 fallback.
 - `~$` hidden when 0 (fake provider / unknown model).

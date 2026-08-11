@@ -124,6 +124,9 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 | `HISTORY_CHAR_BUDGET` | `8000` | When un-summarized history exceeds this, old turns fold into the rolling summary |
 | `HISTORY_KEEP_RECENT` | `6` | Messages always kept verbatim |
 | `SESSION_TTL_SECONDS` | `86400` | How long transcript, summary and audit trail live in Redis |
+| `RATE_LIMIT_ENABLED` | `true` | Master switch for both limiters below |
+| `RATE_LIMIT_TURNS_PER_MINUTE` | `20` | Chat turns per session; `0` disables just this bucket |
+| `RATE_LIMIT_UPLOADS_PER_HOUR` | `50` | Indexing requests per caller (`POST /api/documents`, `/api/reindex`) |
 | `SYSTEM_PROMPT` | *(see config.py)* | Steers tool choice and the honesty rules — override to change persona/behaviour |
 | `DEBUG` | `true` | Also serves the minimal WS console at `/dev` |
 | `CORPUS_DIR` | *(unset)* | Optional folder to (re)ingest from; unset means the knowledge base is filled via `POST /api/documents` |
