@@ -50,6 +50,14 @@ this file records what changed after the initial nine phases.
   undocumented direct dependency.
 - A field-by-field table for the per-turn stats line, including when
   `usage_estimated` is true and why a failed turn's cost reads low.
+- **The glossary now covers every AI/ML concept the project uses** — 115
+  entries across ten sections, up from 53. A sweep of the docs and the code
+  for AI/ML terminology found 109 distinct concepts in use and only half of
+  them on the one page you would revise from: *ablation, baseline, regression
+  gate, relevance gate, top-k, corpus vs knowledge base, agentic loop, cost
+  accounting, time to first token, correlation id, backpressure, untrusted
+  model output* and thirty more were explained in a chapter somewhere but
+  missing from the lookup.
 
 ### Changed
 - All dependencies upgraded to latest, absorbing four upstream breaking
