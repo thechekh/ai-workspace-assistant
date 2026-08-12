@@ -151,3 +151,15 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Path traversal** — escaping an allowed directory with `../`; refused by resolving and checking the root (sec).
 - **Content sanitisation** — stripping instruction-like content from ingested documents; a known gap here (sec).
 - **Data residency** — which jurisdiction your prompts are processed in; a reason the provider is a config value (sec).
+
+## Deliberately not used
+
+Terms you will be asked about that this project does **not** use. Knowing why
+is worth as much as knowing the term — "we don't, because…" is a better answer
+than a blank look, and each of these is a real decision rather than an
+oversight.
+
+- **Temperature / top-p (sampling parameters)** — knobs controlling how randomly the model picks each token. Never set here: provider defaults are taken as-is, because the eval harness measures *retrieval*, and pinning generation randomness would imply a determinism the API does not actually offer. Reproducibility comes from `FakeLLM` instead (01, 09).
+- **Dot product / inner product** — the other common vector similarity metric. The collection is configured `Distance.COSINE`, but `hash-512` L2-normalizes every vector, and for unit-length vectors cosine and dot product produce *identical rankings*. Cosine is declared because it stays correct if an un-normalized embedder is swapped in (02).
+- **Vector quantization** — compressing stored vectors (scalar/product/binary) to trade a little accuracy for much less memory. Qdrant supports it; not enabled, because it earns its keep at millions of vectors and this knowledge base holds tens (02, 10).
+- **Precision / accuracy** — the classification metrics people expect to hear. Not measured, deliberately: retrieval here feeds *one* answer, so what matters is whether the right chunk is near the top, which is what `recall@k` and `MRR` capture. Precision would score a system that returns everything (03, 09).
