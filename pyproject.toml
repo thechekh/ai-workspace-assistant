@@ -51,10 +51,15 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
+    # `-n 4` runs the suite in ~16s vs ~26s serial. Deliberately not in
+    # addopts: interleaved output makes a failing test harder to read, and
+    # `-n auto` is *slower* on a many-core machine (12 workers each pay
+    # interpreter + fixture startup for a suite that only lasts 26s).
     "respx>=0.21",
     "pre-commit>=4.0",
     "pyyaml>=6.0",
     "types-pyyaml>=6.0",
+    "pytest-xdist>=3.8.0",
 ]
 
 [build-system]
@@ -125,7 +130,10 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 # Ratchet: measured at 82.7% — raise as coverage improves, never lower it.
-fail_under = 82
+# Raised as coverage grew (82 -> 84 at a measured 84.7). Kept a point
+# below the real number so an unrelated refactor does not fail the build,
+# but close enough that deleting tests does.
+fail_under = 84
 exclude_also = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",

@@ -35,7 +35,38 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pyright
-      - run: uv run pytest -q --cov --cov-report=term-missing
+      # -n auto: the runner has 4 cores, which measured fastest. Locally `auto`
+      # can be slower than `-n 4` on a many-core machine — see pyproject.
+      - run: uv run pytest -q --cov --cov-report=term-missing -n auto
+
+  pre-commit:
+    name: pre-commit hooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # Both toolchains, because the hooks are `language: system` and shell out
+      # to `uv run ruff` and `npx eslint` — running them any other way would
+      # test a different thing than a contributor's commit does.
+      - run: uv sync --frozen
+      - run: npm ci
+        working-directory: frontend
+      # The ruff/eslint hooks duplicate the jobs above; the point of running
+      # them here is the hook *wiring* — a path-mangling bug in the eslint
+      # hook's argument handling once made it lint the wrong files, and only
+      # running pre-commit itself would have caught it. The rest (yaml/toml/
+      # json validity, private keys, merge markers, large files) is checked
+      # nowhere else in CI.
+      - run: uv run pre-commit run --all-files --show-diff-on-failure
 
   retrieval-quality:
     name: retrieval quality gate

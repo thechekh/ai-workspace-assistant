@@ -1,10 +1,18 @@
 # 09 — Testing, operations & troubleshooting
 
-## The automated suite (292 tests, fully offline)
+## The automated suite (301 tests, fully offline)
 
 ```sh
-uv run pytest -q          # ~22s. No network, no Docker, no keys.
+uv run pytest -q          # ~26s. No network, no Docker, no keys.
+uv run pytest -q -n 4     # ~16s, in parallel (pytest-xdist)
 ```
+
+`-n 4` rather than `-n auto`: measured on this suite, `auto` spawned twelve
+workers and came out **slower than serial** (30s vs 26s), because each worker
+pays interpreter and fixture startup for a suite that only lasts half a minute.
+Four was the sweet spot locally; CI uses `auto` because its runners have four
+cores. It is deliberately not the default — interleaved output makes a failing
+test harder to read.
 
 Determinism comes from swappable fakes: `FakeLLM` (scripted heuristics),
 `fakeredis`, in-memory Qdrant, `HermeticSettings` (ignores your `.env`), and

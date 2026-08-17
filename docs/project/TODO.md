@@ -68,17 +68,29 @@ and blocking CPU/IO moved off the event loop.
       GHAS, so the job is gated on `github.event.repository.private == false`
       and currently skips. It self-enables when the repo goes public or GHAS
       is turned on. `pip-audit`/`npm audit` run unconditionally.
-- [ ] **Raise the coverage floor** — currently pinned at 82% (measured 83.8%).
-      Ratchet upward as gaps close; never lower it.
-- [ ] **Prettier/ESLint for TS/Vue** — nothing formats or lints the frontend;
-      pre-commit and CI only cover Python.
-- [ ] **CI should run `pre-commit run --all-files`** so contributors who skip
-      `pre-commit install` are still caught.
-- [ ] **`pyright` strict mode** — currently `standard`; nearly free on an
-      already-clean codebase.
-- [ ] **`pytest-xdist`** — the suite looks xdist-ready (no shared files,
-      per-test in-memory stores, `tmp_path` used correctly). 292 tests in ~22s
-      is fine today, so this is a later-scale item.
+- [x] **Raise the coverage floor** — 82 → **84** (measured 84.7). Kept a point
+      below the real number so an unrelated refactor does not fail the build,
+      but close enough that deleting tests does. Ratchet up; never down. *(done)*
+- [x] **Prettier/ESLint for TS/Vue** — flat-config ESLint + Prettier, wired into
+      both pre-commit and the CI frontend job. *(done)*
+- [x] **CI runs `pre-commit run --all-files`** in its own job with both
+      toolchains, so a contributor who skips `pre-commit install` is still
+      caught — and so is a bug in the hook wiring itself, which is the part no
+      other job can see. *(done)*
+- [ ] **`pyright` strict mode** — measured, and *not* nearly free: **552
+      errors**, overwhelmingly `reportUnknown*` in tests, where `.json()`
+      returns `dict[Unknown, Unknown]` and helpers are untyped. Restricting
+      strict to `src/` via `executionEnvironments` made it worse (791), so the
+      real cost is a typing pass over the test suite, not a config flag.
+      Deferred deliberately — the codebase is already at 0 errors on
+      `standard`, and 552 suppressions would buy nothing.
+- [x] **`pytest-xdist`** — added to the dev group and used in CI (`-n auto`,
+      4 runner cores). Measured on 301 tests: serial **26.3s**, `-n 2` 19.0s,
+      `-n 4` **16.1s**, `-n 8` 22.4s, `-n auto` (12 workers here) **30.1s** —
+      slower than serial, because each worker pays interpreter and fixture
+      startup for a suite that only lasts 26s. Deliberately *not* in
+      `addopts`: interleaved output makes a failing test harder to read.
+      Coverage aggregates correctly across workers (84.72% either way). *(done)*
 - [ ] **Decide one Python version.** There are currently three: local venv
       **3.14**, CI matrix **3.12 + 3.13**, Docker image **3.13**. A
       `.python-version` file was tried and reverted — it forces uv to rebuild

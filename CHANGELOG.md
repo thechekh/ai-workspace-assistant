@@ -70,6 +70,17 @@ this file records what changed after the initial nine phases.
   missing from the lookup.
 
 ### Changed
+- **Coverage floor raised 82 → 84** (measured 84.7), and a **`pre-commit` CI
+  job** with both toolchains — the ruff/eslint hooks duplicate other jobs on
+  purpose, because what only this job can catch is a bug in the *hook wiring*
+  (one previously made the eslint hook lint the wrong files), plus the
+  yaml/toml/json, private-key, merge-marker and large-file checks that run
+  nowhere else in CI.
+- **`pytest-xdist`**, used in CI (`-n auto`) but deliberately not in `addopts`.
+  Measured on 301 tests: serial 26.3s, `-n 2` 19.0s, `-n 4` **16.1s**, `-n 8`
+  22.4s, `-n auto` (12 workers) 30.1s — *slower than serial*, because each
+  worker pays interpreter and fixture startup for a half-minute suite. CI uses
+  `auto` because its runners have four cores.
 - All dependencies upgraded to latest, absorbing four upstream breaking
   changes (pydantic-ai 2.x, `MCPServer` → `FastMCP`, MCP camelCase types,
   a third value from `streamable_http_client`).
