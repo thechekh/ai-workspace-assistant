@@ -13,9 +13,9 @@ dependencies = [
     "openai>=1.55",
     "qdrant-client>=1.12",
     "mcp>=1.29",  # 1.29 renamed MCPServer -> FastMCP and reverted to camelCase
-    "pydantic-ai>=2.27",  # 2.x moved FunctionToolResultEvent.result -> .part
-    "langgraph>=0.6",
-    "langchain-core>=0.3",  # imported directly by the LangGraph backend adapter
+    "pydantic-ai>=2.30.0",  # 2.x moved FunctionToolResultEvent.result -> .part
+    "langgraph>=1.2.11",
+    "langchain-core>=1.5.4",  # imported directly by the LangGraph backend adapter
     "logfire[fastapi,httpx]>=3.0",
     "opentelemetry-api>=1.27",  # telemetry.py imports the tracer API directly
     "opentelemetry-sdk>=1.27",  # observability.py builds the provider directly
@@ -42,11 +42,11 @@ evals = [
     # `langchain_community.chat_models.vertexai` at module load, and
     # langchain-community 0.4 (now sunset upstream) deleted it — a fresh
     # install of ragas alone raises ModuleNotFoundError on `import ragas`.
-    "langchain-community<0.4",
+    "langchain-community<0.5",
 ]
 
 dev = [
-    "ruff>=0.8",
+    "ruff>=0.16.3",
     "pyright>=1.1.390",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
@@ -56,7 +56,7 @@ dev = [
     # `-n auto` is *slower* on a many-core machine (12 workers each pay
     # interpreter + fixture startup for a suite that only lasts 26s).
     "respx>=0.21",
-    "pre-commit>=4.0",
+    "pre-commit>=4.6.2",
     "pyyaml>=6.0",
     "types-pyyaml>=6.0",
     "pytest-xdist>=3.8.0",
