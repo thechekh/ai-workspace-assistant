@@ -167,6 +167,28 @@ So it is a **trend, recorded on demand** — not a gate. That split is the
 point: *retrieval quality is gated in CI because it is deterministic and free;
 generation quality is measured on demand because it is neither.*
 
+### The measured number
+
+First run, `gpt-4.1-nano` judging four golden-set questions answered by the
+same model:
+
+```
+judge: gpt-4.1-nano   questions: 4
+faithfulness: 0.92
+```
+
+The metric was sanity-checked before being trusted, by scoring a deliberately
+hallucinated answer against a known context:
+
+| answer | faithfulness |
+|---|---:|
+| "billing-service generates PDF invoices on a nightly schedule" *(supported)* | **1.00** |
+| "billing-service generates invoices every 5 minutes and is written in Rust" *(invented)* | **0.33** |
+
+One claim of three survived in the second case, which is the arithmetic
+working exactly as described. A metric that cannot tell those two apart is
+worth nothing, so this check matters more than the headline score.
+
 ### Running it
 
 ```sh

@@ -128,6 +128,27 @@ Reproduce: `uv run python evals/run_retrieval.py --memory` (no Docker
 needed). Compare embedders: `uv run python -m evals.compare_embeddings` →
 writes [evals/results-embeddings.md](../../evals/results-embeddings.md).
 
+### What a real embedder buys — measured
+
+The offline `hash-512` embedder is a *lexical* hash, so it cannot match
+wording it has never seen. Swapping in a semantic model, same corpus, same
+18 questions, same hybrid+rerank pipeline:
+
+| embedder | recall@1 | recall@5 | MRR | cost |
+|---|---:|---:|---:|---|
+| `hash-512` (offline default) | 0.83 | 1.00 | 0.92 | $0 |
+| `text-embedding-3-small` | **0.94** | 1.00 | **0.97** | fractions of a cent |
+
+Three of the questions the hash embedder ranked second or third move to
+first place. That is the vocabulary-mismatch gap closing: the semantic model
+matches *meaning*, so a question phrased with different words than the
+document still lands. It also reframes the hybrid-vs-dense ablation — with a
+lexical stand-in for the dense channel, dense and sparse were measuring
+nearly the same thing, which is exactly why that comparison was so close.
+
+Set `ASSISTANT_EMBEDDING_API_KEY` and re-run `compare_embeddings` to
+reproduce; the table regenerates itself.
+
 ## Watching Qdrant itself
 
 - **Web UI**: http://localhost:6333/dashboard → collection `docs` → browse

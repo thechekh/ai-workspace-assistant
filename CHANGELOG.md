@@ -70,6 +70,19 @@ this file records what changed after the initial nine phases.
   missing from the lookup.
 
 ### Changed
+- **The embedder comparison is no longer hypothetical.** `text-embedding-3-small`
+  measured against the offline `hash-512` on the same corpus and questions:
+  recall@1 **0.83 → 0.94**, MRR **0.92 → 0.97**. Three questions the lexical
+  hash ranked second or third move to first — the vocabulary-mismatch gap
+  closing. It also reframes the hybrid-vs-dense ablation: with a *lexical*
+  stand-in for the dense channel, dense and sparse were measuring nearly the
+  same thing, which is why that comparison was so close.
+- **Groundedness has a real number**: faithfulness **0.92** over four
+  golden-set questions, judged by `gpt-4.1-nano`. Sanity-checked before being
+  trusted — a supported answer scored 1.00 and a deliberately invented one
+  ("every 5 minutes and written in Rust") scored 0.33, one claim of three.
+- `gpt-4.1-nano` added to the price table; without it, cost accounting silently
+  reported $0.00 per turn for the cheapest OpenAI model that still calls tools.
 - **Coverage floor raised 82 → 84** (measured 84.7), and a **`pre-commit` CI
   job** with both toolchains — the ruff/eslint hooks duplicate other jobs on
   purpose, because what only this job can catch is a bug in the *hook wiring*

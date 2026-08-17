@@ -84,8 +84,9 @@ def test_retrieval_scores_do_not_contradict_each_other() -> None:
     unchanged, which is exactly why nobody noticed. The dated acceptance
     records in docs/project/ keep the old numbers on purpose and are skipped.
     """
-    # default hybrid+rerank, dense+rerank, dense-only, hybrid-only
-    measured = {"0.83", "0.89", "0.78", "0.72"}
+    # default hybrid+rerank, dense+rerank, dense-only, hybrid-only, and
+    # text-embedding-3-small (the measured semantic embedder)
+    measured = {"0.83", "0.89", "0.78", "0.72", "0.94"}
     historical = {"0.56", "0.67"}  # Phase 2/7, superseded and labelled as such
     contradictions = [
         f"{_rel(path)}: recall@1 {match.group(1)}"
