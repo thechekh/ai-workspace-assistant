@@ -104,14 +104,16 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 
 - **Eval** — a measured quality check (vs a pass/fail unit test) (09).
 - **Golden set** — annotated question→answer-location pairs used to score retrieval (03, 09).
-- **recall@k** — fraction of questions whose correct chunk appears in the top k results (03).
-- **MRR** — mean reciprocal rank; 1.0 means the correct chunk is always ranked first (03).
+- **recall@k** — fraction of questions whose correct chunk appears in the top k results; blind to rank within the window ([metrics](../reference/metrics.md)) (03).
+- **MRR** — mean reciprocal rank; averages 1/rank, so rank 1 counts double rank 2 ([metrics](../reference/metrics.md)) (03).
 - **Baseline** — the recorded numbers a change is compared against; ours live in `evals/baseline.json` (09).
 - **Ablation** — turning one stage off to measure what it contributes (dense vs hybrid vs reranked) (03, 09).
 - **Regression gate** — CI failing the build when a measured number drops below the baseline (09).
 - **Benchmark** — a measurement run; here always reproducible from the repository, never quoted from memory (09).
 - **Determinism** — same input, same output; what fakes and fixed seeds buy the test suite (09).
-- **LLM-as-judge** — scoring answers with another model; noted as future work, not used here (09).
+- **LLM-as-judge** — scoring answers with another model; used on demand via Ragas, never in CI ([metrics](../reference/metrics.md)) (09).
+- **Groundedness / faithfulness** — the share of an answer's claims supported by the retrieved context; hallucination, measured ([metrics](../reference/metrics.md)) (03, 09).
+- **Ragas** — the LLM-judged RAG evaluation library behind that metric; an optional dependency group (09).
 
 ## Observability and LLMOps
 

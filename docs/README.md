@@ -33,6 +33,10 @@ a tiered checklist (zero-infra → Docker → real model → observability).
 **I need exact tool behaviour** → [reference/tools.md](reference/tools.md) —
 every tool's purpose, parameters, return shape, errors, and implementation.
 
+**I need to explain a quality number** → [reference/metrics.md](reference/metrics.md)
+— recall@k, MRR and groundedness: what each measures, what it hides, and why
+one is a CI gate and the other never can be.
+
 **I'm asked "is this secure?"** → [reference/security.md](reference/security.md)
 — the threat model, every control with a pointer to its code, and an
 honest list of what is not built.
@@ -59,6 +63,7 @@ questions*. Read across.
 | **Real-time / WebSocket** | [theory/08](theory/08-realtime-websockets.md) | [handbook/08](handbook/08-agents-memory-ws.md) — the frame protocol | — |
 | **Observability & cost** | [theory/09](theory/09-observability-and-evals.md) | [handbook/07](handbook/07-observability.md) — every surface + PromQL | [theory/12 §Observability](theory/12-defense-qa.md) |
 | **Testing & evals** | [theory/09](theory/09-observability-and-evals.md) | [handbook/09](handbook/09-testing-operations.md) | [reference/testing.md](reference/testing.md) — manual checklist |
+| **Quality metrics** | [reference/metrics.md](reference/metrics.md) — recall@k, MRR, groundedness in full | [handbook/05](handbook/05-rag-qdrant.md) — the measured table | [theory/09](theory/09-observability-and-evals.md) |
 | **Security** | — | [reference/security.md](reference/security.md) — threat model + controls | [theory/12 §LLM & AI](theory/12-defense-qa.md) |
 | **Any unfamiliar term** | [theory/11 — glossary](theory/11-glossary.md) | — | — |
 

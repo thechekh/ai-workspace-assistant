@@ -30,6 +30,21 @@ dependencies = [
 ]
 
 [dependency-groups]
+# Opt-in: `uv sync --group evals`. Deliberately NOT a runtime dependency and
+# not in `dev` — ragas pulls ~35 packages (datasets, pandas, pyarrow, scipy,
+# huggingface-hub) that would roughly double the Docker image, and every one
+# of its metrics is an LLM call, so nothing here can run in the offline suite.
+# See docs/reference/metrics.md for why it sits outside CI.
+evals = [
+    # <1.0 because `ragas.metrics.Faithfulness` is deprecated for removal there.
+    "ragas>=0.4,<1.0",
+    # Verified the hard way: ragas 0.4.3 imports
+    # `langchain_community.chat_models.vertexai` at module load, and
+    # langchain-community 0.4 (now sunset upstream) deleted it — a fresh
+    # install of ragas alone raises ModuleNotFoundError on `import ragas`.
+    "langchain-community<0.4",
+]
+
 dev = [
     "ruff>=0.8",
     "pyright>=1.1.390",

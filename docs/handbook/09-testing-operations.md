@@ -30,6 +30,7 @@ scripted provider errors. Map of the suite:
 | test_docs_links.py | the documentation itself: every relative link resolves, no stray prose outside `docs/`, the index covers every folder |
 | test_docs_consistency.py | numbers quoted in many documents at once (backend line counts, golden-set size, retrieval scores, suite size) agree with the code and with each other |
 | test_docs_coverage.py | every setting, endpoint, metric, wire frame, tool, source file, dependency and run command is mentioned somewhere — so shipping a feature without documenting it fails the build |
+| test_ragas_harness.py | the LLM-judged eval's plumbing, tested without an LLM: the dataset matches Ragas' field contract, and unanswerable questions are dropped before a judge could score an honest "I don't know" as a hallucination |
 | test_review_regressions.py | the defects a full review found, each reproduced before it was fixed: re-upload leaving orphan chunks, `?limit=0` inverting the cap, a hallucinated tool name becoming a metric label, an SSRF guard walked past by a redirect, a failed turn never reporting its cost |
 
 Quality gates (CI, every push): `ruff check` · `ruff format --check` ·
@@ -49,6 +50,18 @@ uv run python evals/run_retrieval.py --memory --check     # what CI runs
 uv run python evals/run_retrieval.py --memory --record    # append to history.jsonl
 uv run python evals/run_retrieval.py --trend              # the recorded trend
 ```
+
+That gate covers **retrieval**. Generation quality — whether the model
+actually grounded its answer in what was retrieved — is measured separately
+and deliberately outside CI, because every one of its metrics is an LLM call:
+
+```sh
+uv sync --group evals                          # opt-in, ~35 extra packages
+uv run python -m evals.run_ragas --limit 3     # groundedness, judged by an LLM
+```
+
+Both metrics families, and why only one of them can be a build gate, are
+explained in [reference/metrics.md](../reference/metrics.md).
 
 Lowering a number in `baseline.json` is a deliberate act: do it in the same
 commit as the change that caused it, and say in the message why the trade-off

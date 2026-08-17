@@ -80,6 +80,8 @@ Vibes don't survive a Q&A session; numbers do.
   first correct result (1.0 = always ranked first).
 - Runner: `uv run python evals/run_retrieval.py --memory` (self-contained:
   in-process Qdrant, no Docker).
+- Every metric in full — what each hides, and how groundedness differs from
+  both — is in [reference/metrics.md](../reference/metrics.md).
 
 Measured, free offline embedder, 18 questions:
 

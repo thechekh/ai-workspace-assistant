@@ -8,6 +8,16 @@ this file records what changed after the initial nine phases.
 ## Unreleased
 
 ### Added
+- **Groundedness measured with Ragas** (`evals/run_ragas.py`) — the LLM-judged
+  faithfulness of an answer against the context it was given, which is
+  hallucination expressed as a number. It closes the one gap the retrieval
+  eval could never see: recall@k proves the right chunk was *found*, not that
+  the model *used* it. Opt-in (`uv sync --group evals`), never in CI, and
+  never a gate — every metric is an LLM call, the scores are
+  non-deterministic, and ~35 extra packages would double the image.
+- [docs/reference/metrics.md](docs/reference/metrics.md) — recall@k, MRR and
+  groundedness in full: how each is computed, a worked example, what each one
+  *hides*, and why retrieval is gated in CI while generation cannot be.
 - **Stop button** (and `Esc`) to interrupt an answer mid-stream. Turns run as
   their own task so the socket stays free to read a `{"type": "cancel"}`
   frame; the partial answer is kept, stored as history with a
