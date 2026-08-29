@@ -42,7 +42,7 @@ evals = [
     # `langchain_community.chat_models.vertexai` at module load, and
     # langchain-community 0.4 (now sunset upstream) deleted it — a fresh
     # install of ragas alone raises ModuleNotFoundError on `import ragas`.
-    "langchain-community<0.4",
+    "langchain-community<0.5",
 ]
 
 dev = [
