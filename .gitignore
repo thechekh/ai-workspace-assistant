@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Node / frontend
+node_modules/
+frontend/dist/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Browser-test session artifacts
+
+# Transient browser-automation output (docs/images/ is curated and tracked)
+.playwright-mcp/

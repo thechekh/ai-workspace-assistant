@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to the same branch supersedes the previous run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is the declared floor; 3.13 is what the Docker image ships.
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      # --frozen: fail if pyproject.toml drifted from uv.lock, rather than
+      # silently re-resolving and testing versions the lock doesn't pin.
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pyright
+      # -n auto: the runner has 4 cores, which measured fastest. Locally `auto`
+      # can be slower than `-n 4` on a many-core machine — see pyproject.
+      - run: uv run pytest -q --cov --cov-report=term-missing -n auto
+
+  pre-commit:
+    name: pre-commit hooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # Both toolchains, because the hooks are `language: system` and shell out
+      # to `uv run ruff` and `npx eslint` — running them any other way would
+      # test a different thing than a contributor's commit does.
+      - run: uv sync --frozen
+      - run: npm ci
+        working-directory: frontend
+      # The ruff/eslint hooks duplicate the jobs above; the point of running
+      # them here is the hook *wiring* — a path-mangling bug in the eslint
+      # hook's argument handling once made it lint the wrong files, and only
+      # running pre-commit itself would have caught it. The rest (yaml/toml/
+      # json validity, private keys, merge markers, large files) is checked
+      # nowhere else in CI.
+      - run: uv run pre-commit run --all-files --show-diff-on-failure
+
+  retrieval-quality:
+    name: retrieval quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --frozen
+      # No unit test can catch a chunking or fusion change that keeps every
+      # assertion green while making answers worse. This runs the 18-question
+      # golden set (in-process Qdrant, no services) and fails if any metric
+      # drops below evals/baseline.json.
+      - run: uv run python evals/run_retrieval.py --memory --check
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:run
+      - run: npm run build
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      # Build only — proves the image (and the frontend stage inside it) is
+      # buildable on every PR. Nothing is pushed.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

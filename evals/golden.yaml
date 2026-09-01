@@ -1,0 +1,58 @@
+# Golden retrieval set v1 — real engineer questions mapped to where the
+# answer lives in evals/corpus/. Used by evals/run_retrieval.py for
+# recall@k + MRR, and reused in Phase 7 for the embedding comparison.
+#
+# expect_source: corpus-relative file that must appear in the top-k
+# expect_text:   (optional) substring that must appear in that chunk
+
+- question: Which service is responsible for invoice generation?
+  expect_source: architecture/services.md
+  expect_text: billing-service
+- question: How does the payment adapter work?
+  expect_source: architecture/services.md
+  expect_text: payment-adapter
+- question: Which services consume SQS queues?
+  expect_source: architecture/services.md
+  expect_text: SQS
+- question: How do we prevent double-charging a customer on retries?
+  expect_source: architecture/services.md
+  expect_text: idempotency
+- question: Which service handles user authentication?
+  expect_source: architecture/services.md
+  expect_text: auth-service
+- question: What is our deployment architecture?
+  expect_source: architecture/deployment.md
+- question: How do we deploy to production?
+  expect_source: architecture/deployment.md
+  expect_text: ArgoCD
+- question: What Kubernetes platform do we run on?
+  expect_source: architecture/deployment.md
+  expect_text: EKS
+- question: How are secrets managed?
+  expect_source: architecture/deployment.md
+  expect_text: Secrets Manager
+- question: How do we roll back a bad production deploy?
+  expect_source: architecture/deployment.md
+  expect_text: revert
+- question: What linter and formatter do we use for Python?
+  expect_source: guidelines/coding-standards.md
+  expect_text: ruff
+- question: What commit message convention do we follow?
+  expect_source: guidelines/coding-standards.md
+  expect_text: Conventional Commits
+- question: What frontend framework and state management do we use?
+  expect_source: guidelines/coding-standards.md
+  expect_text: Pinia
+- question: What happens during a SEV1 incident?
+  expect_source: guidelines/incident-response.md
+- question: How soon must a postmortem be written after an incident?
+  expect_source: guidelines/incident-response.md
+  expect_text: postmortem
+- question: What accounts do I need in my first week?
+  expect_source: onboarding/getting-started.md
+- question: Where do I ask for help as a new engineer?
+  expect_source: onboarding/getting-started.md
+  expect_text: "#eng-help"
+- question: How do I set up my local development environment?
+  expect_source: onboarding/getting-started.md
+  expect_text: docker compose

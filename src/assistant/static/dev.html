@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AI Workspace Assistant — dev console</title>
+<style>
+  body { font-family: ui-monospace, Consolas, monospace; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+  #log { white-space: pre-wrap; border: 1px solid #8884; border-radius: 6px; padding: 1rem; min-height: 320px; }
+  form { display: flex; gap: .5rem; margin-top: 1rem; }
+  input { flex: 1; padding: .5rem; font: inherit; }
+  button { padding: .5rem 1rem; }
+  .u { color: #0a7; } .a { color: #07a; } .e { color: #c33; } .m { color: #888; }
+</style>
+</head>
+<body>
+<h3>AI Workspace Assistant — dev console</h3>
+<p class="m">Minimal dependency-free WS console: raw frames, no build step. Useful for debugging the protocol when the SPA is not the thing under test.</p>
+<div id="log"></div>
+<form id="f"><input id="i" placeholder="Ask something…" autocomplete="off"><button>Send</button></form>
+<script>
+  const log = document.getElementById("log");
+  const line = (cls, text) => {
+    const el = document.createElement("div");
+    el.className = cls;
+    el.textContent = text;
+    log.appendChild(el);
+    el.scrollIntoView();
+    return el;
+  };
+
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const saved = sessionStorage.getItem("session_id");
+  const ws = new WebSocket(`${proto}://${location.host}/chat${saved ? `?session_id=${saved}` : ""}`);
+  let current = null;
+
+  ws.onmessage = (msg) => {
+    const ev = JSON.parse(msg.data);
+    if (ev.type === "session") {
+      sessionStorage.setItem("session_id", ev.session_id);
+      line("m", `session ${ev.session_id}`);
+    } else if (ev.type === "token") {
+      if (!current) current = line("a", "");
+      current.textContent += ev.content;
+    } else if (ev.type === "final") {
+      if (current) current.textContent = ev.content;
+      current = null;
+    } else if (ev.type === "tool_call") {
+      line("m", `🔧 tool call: ${ev.tool} ${JSON.stringify(ev.arguments)}`);
+    } else if (ev.type === "tool_result") {
+      line("m", `✅ tool result: ${ev.tool}`);
+    } else if (ev.type === "error") {
+      line("e", `error: ${ev.message}`);
+      current = null;
+    }
+  };
+  ws.onclose = () => line("e", "disconnected — reload the page");
+
+  document.getElementById("f").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("i");
+    if (!input.value) return;
+    line("u", `> ${input.value}`);
+    ws.send(JSON.stringify({ type: "user_message", content: input.value }));
+    input.value = "";
+  });
+</script>
+</body>
+</html>

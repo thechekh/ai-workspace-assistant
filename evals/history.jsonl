@@ -1,0 +1,1 @@
+{"at": "2026-08-08T23:50:53+00:00", "sha": "0fad9d8034c2", "embedder": "hash-512", "mode": "hybrid", "rerank": true, "k": 5, "questions": 18, "metrics": {"recall@1": 0.8333, "recall@5": 1.0, "mrr": 0.9167}}

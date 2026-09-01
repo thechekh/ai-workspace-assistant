@@ -1,0 +1,141 @@
+[project]
+name = "ai-workspace-assistant"
+version = "0.1.0"
+description = "Internal AI workspace assistant — agentic FastAPI backend with MCP tools and Qdrant RAG"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "redis>=5.2",
+    "openai>=1.55",
+    "qdrant-client>=1.12",
+    "mcp>=1.29",  # 1.29 renamed MCPServer -> FastMCP and reverted to camelCase
+    "pydantic-ai>=2.27",  # 2.x moved FunctionToolResultEvent.result -> .part
+    "langgraph>=0.6",
+    "langchain-core>=0.3",  # imported directly by the LangGraph backend adapter
+    "logfire[fastapi,httpx]>=3.0",
+    "opentelemetry-api>=1.27",  # telemetry.py imports the tracer API directly
+    "opentelemetry-sdk>=1.27",  # observability.py builds the provider directly
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
+    "taskiq>=0.11",
+    "taskiq-redis>=1.0",
+    "structlog>=24.4",
+    "prometheus-client>=0.20",
+    "fakeredis>=2.26",  # ASSISTANT_REDIS_URL=fakeredis:// is a documented runtime mode
+    "httpx>=0.27",  # fetch_url tool + Voyage embedder (was only a transitive dep)
+    "python-multipart>=0.0.9",  # multipart uploads for POST /api/documents
+]
+
+[dependency-groups]
+# Opt-in: `uv sync --group evals`. Deliberately NOT a runtime dependency and
+# not in `dev` — ragas pulls ~35 packages (datasets, pandas, pyarrow, scipy,
+# huggingface-hub) that would roughly double the Docker image, and every one
+# of its metrics is an LLM call, so nothing here can run in the offline suite.
+# See docs/reference/metrics.md for why it sits outside CI.
+evals = [
+    # <1.0 because `ragas.metrics.Faithfulness` is deprecated for removal there.
+    "ragas>=0.4,<1.0",
+    # Verified the hard way: ragas 0.4.3 imports
+    # `langchain_community.chat_models.vertexai` at module load, and
+    # langchain-community 0.4 (now sunset upstream) deleted it — a fresh
+    # install of ragas alone raises ModuleNotFoundError on `import ragas`.
+    "langchain-community<0.4",
+]
+
+dev = [
+    "ruff>=0.8",
+    "pyright>=1.1.390",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    # `-n 4` runs the suite in ~16s vs ~26s serial. Deliberately not in
+    # addopts: interleaved output makes a failing test harder to read, and
+    # `-n auto` is *slower* on a many-core machine (12 workers each pay
+    # interpreter + fixture startup for a suite that only lasts 26s).
+    "respx>=0.21",
+    "pre-commit>=4.0",
+    "pyyaml>=6.0",
+    "types-pyyaml>=6.0",
+    "pytest-xdist>=3.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/assistant"]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# S = bandit (this app fetches URLs and spawns subprocesses), PT = pytest
+# style, LOG/G = logging correctness (we use structlog), T20 = stray prints.
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC", "S", "PT", "LOG", "G", "T20"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency markers are *meant* to be called in argument defaults;
+# they are immutable, so B008 does not apply to them.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Query",
+    "fastapi.Body",
+    "fastapi.Header",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests: asserts are the point, and hardcoded dummy credentials are fine.
+"tests/**" = ["S101", "S105", "S106", "S311"]
+# CLIs report results to the console by design.
+"evals/**" = ["T201", "S101"]
+"src/assistant/rag/ingest.py" = ["T201"]
+
+[tool.pyright]
+include = ["src", "tests", "evals"]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+# --strict-markers/-config: a typo'd marker or ini key fails instead of being
+# ignored. Warnings are errors so upstream deprecations surface at once.
+addopts = "--strict-markers --strict-config"
+filterwarnings = [
+    "error",
+    # langgraph/pydantic-ai still emit these from their own internals.
+    "default::DeprecationWarning",
+    "default::PendingDeprecationWarning",
+]
+markers = ["slow: spawns real subprocesses (MCP stdio servers)"]
+
+[tool.coverage.run]
+source = ["src/assistant"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+# Ratchet: measured at 82.7% — raise as coverage improves, never lower it.
+# Raised as coverage grew (82 -> 84 at a measured 84.7). Kept a point
+# below the real number so an unrelated refactor does not fail the build,
+# but close enough that deleting tests does.
+fail_under = 84
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.$",
+]

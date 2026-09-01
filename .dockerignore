@@ -1,0 +1,44 @@
+# Keep the build context small and platform-clean.
+# Without this the context is ~427 MB and `COPY frontend/ ./` overwrites the
+# container's Linux node_modules with the host's (Windows/macOS) binaries.
+
+# Virtualenvs and dependency trees — reinstalled inside the image
+.venv/
+**/node_modules/
+**/__pycache__/
+*.pyc
+
+# Build outputs — the image builds the frontend itself
+frontend/dist/
+dist/
+build/
+*.egg-info/
+
+# Secrets and local config — must never enter a build context
+.env
+.env.*
+!.env.example
+
+# VCS, CI, and editor metadata
+.git/
+.github/
+.gitignore
+.pre-commit-config.yaml
+.vscode/
+.idea/
+
+# Test, lint and tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Session artifacts and docs that don't belong in the runtime image.
+# The image ships no seed corpus; documents are added at runtime.
+.playwright-mcp/
+*.png
+docs/
+*.md
+!README.md

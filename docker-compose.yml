@@ -1,0 +1,127 @@
+# Dev default:      docker compose up -d              -> redis + qdrant only
+# Full platform:    docker compose --profile app up   -> + api, worker, scheduler
+# Observability:    docker compose --profile observability up
+#                   -> + Jaeger :16686, Prometheus :9090, Grafana :3000
+#                   (set ASSISTANT_OTLP_ENDPOINT=http://localhost:4318 for traces)
+
+# Containerised services read the same .env as local dev (env_file), with the
+# infra URLs overridden to the compose network names. Without env_file the app
+# would silently run the *fake* provider no matter what .env says.
+x-app-env: &app-env
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    ASSISTANT_REDIS_URL: redis://redis:6379/0
+    ASSISTANT_QDRANT_URL: http://qdrant:6333
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.0
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      # The image ships bash but no curl/wget, so probe /readyz over /dev/tcp.
+      test:
+        - CMD
+        - bash
+        - -c
+        - "exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    profiles: ["app"]
+    build: .
+    <<: *app-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  worker:
+    profiles: ["app"]
+    build: .
+    <<: *app-env
+    command: ["uv", "run", "--no-sync", "taskiq", "worker", "assistant.worker:broker"]
+    # Shares the api image but serves no HTTP, so the image's HTTP probe
+    # would never pass.
+    healthcheck:
+      disable: true
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  scheduler:
+    profiles: ["app"]
+    build: .
+    <<: *app-env
+    command: ["uv", "run", "--no-sync", "taskiq", "scheduler", "assistant.worker:scheduler"]
+    healthcheck:
+      disable: true # no HTTP server in this role
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # --- Observability profile: zero-account local tracing + metrics ---------
+  jaeger:
+    profiles: ["observability"]
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318" # OTLP http — ASSISTANT_OTLP_ENDPOINT points here
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v3.1.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # reach a host-run API on Linux too
+    ports:
+      - "9090:9090"
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:11.5.1
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  redis-data:
+  qdrant-data:
