@@ -54,7 +54,7 @@ Two deliberate details:
 
 **If asked — "why a factory instead of a module-level `app`?"**
 Because a module-level app runs its side effects at import time, and the test
-suite imports the module. Lazy construction is what lets 344 tests run with no
+suite imports the module. Lazy construction is what lets 340 tests run with no
 `.env`, no network and no containers.
 
 ---

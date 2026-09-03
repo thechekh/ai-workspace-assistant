@@ -116,7 +116,7 @@ frontend/              Vue 3 + Pinia + Vite chat UI
 evals/corpus/          retrieval test fixture (golden-set answers live here)
 observability/         Prometheus config + Grafana provisioning + dashboard
 evals/                 golden set + retrieval quality + embedding comparison
-tests/                 344 deterministic tests (no network, no Docker needed)
+tests/                 340 deterministic tests (no network, no Docker needed)
 docs/                  ALL documentation (handbook, theory, reference, project)
 ```
 
@@ -130,7 +130,7 @@ spans → Jaeger, /metrics + Grafana, deep health, audit trail, per-turn UI
 stats), followed by provider hardening (rate-limit backoff, llama tool-call
 salvage, cost accounting, `fetch_url`, retrieval relevance gate, duplicate
 guard) — all verified live against OpenAI. Full details:
-[implementation-plan.md](../project/implementation-plan.md) and [TODO.md](../project/TODO.md).
+[implementation-plan.md](../project/implementation-plan.md) and [future-tools.md](../project/future-tools.md).
 
 ## Design principles (why it looks like this)
 

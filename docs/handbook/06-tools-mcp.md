@@ -9,9 +9,9 @@ guards.
 
 | Tool | Origin | One line |
 |---|---|---|
-| `search_docs` | native | RAG over internal docs (chapter 05) — architecture, services, deployment, guidelines, onboarding. Cites `[source — heading]` |
+| `search_docs` | native | Hybrid RAG over the knowledge base (chapter 05): uploaded docs **and every ingested repo — documentation and code**. Cites `[source — heading]`; on a code hit it hands the model the exact `repo_read_file` call |
 | `repo_read_file` | native | One exact file from any GitHub repo — tokenless for public repos; the "show me the real code" tool |
-| `ingest_repo` | native | **The one write tool**: "ingest the docs from owner/name" pulls a repo's `.md`/`.txt`/`.rst` into the KB as `owner/repo/path` sources. Additive only — pinned by test |
+| `ingest_repo` | native | **The one write tool**: "ingest owner/name" pulls a repo's docs (and with `include_code`, its source files) into the KB as `owner/repo/path` sources. Additive only, explicit-ask only — both pinned by tests |
 | `fetch_url` | native | Public web pages (HTML→text) and GitHub: repo URL → description+README via API, account URL → public repo list. The "never guess a page's content" tool |
 | `code__search_code` | MCP `code` server | Case-insensitive regex over **this** repository (pure Python walker; respects text extensions, skips build dirs) |
 | `code__read_file` | MCP `code` server | Read a file from this repository (path-escape guarded, windowed by lines) |
@@ -69,7 +69,7 @@ an `httpx` client handed to the transport in
 
 ## How a tool call executes (the seam)
 
-Five guards live on this one seam, so every tool — native or MCP, any
+Four guards live on this one seam, so every tool — native or MCP, any
 backend — gets them for free: crash isolation (a tool exception becomes an
 `error:` *result*), the duplicate-call guard, telemetry (span + metrics +
 log), and a **20k-char cap on the result** before it re-enters the prompt —
@@ -126,7 +126,9 @@ Transport can also be `http` (streamable-HTTP URL) for remote servers.
   documentation only … use fetch_url for external URLs"*), steered by the
   system prompt ([config.py](../../src/assistant/config.py)): search_docs first
   for internal questions, fetch_url for URLs, never invent page content,
-  never repeat a fruitless search.
+  retry a fruitless search with *different* terms then report what was
+  searched — never claim something does not exist, and never claim a search
+  that was not made this turn.
 - **FakeLLM** (offline) uses keyword heuristics — PR words → github tool,
   `search code for X` → code tool, any URL → fetch_url, trailing `?` →
   search_docs — so every tool is demoable with zero keys.

@@ -330,7 +330,7 @@ def test_the_learning_roadmap_covers_every_source_file() -> None:
 
 
 def test_the_reading_roadmap_places_every_document() -> None:
-    """docs/README.md sequences all 42 documents — hold it to that.
+    """docs/README.md sequences every document — hold it to that.
 
     The roadmap's promise is "read top to bottom and you have read every
     document". A new page that never gets slotted in breaks that silently: the

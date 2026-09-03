@@ -264,7 +264,7 @@ uv run pytest tests/test_memory.py -v
 | [`telemetry.py`](../../src/assistant/telemetry.py) | 162 — revisit with fresh eyes |
 | [`observability.py`](../../src/assistant/observability.py) | 92 |
 | [`logs.py`](../../src/assistant/logs.py) | 56 |
-| [`api/routes.py`](../../src/assistant/api/routes.py) | 344 |
+| [`api/routes.py`](../../src/assistant/api/routes.py) | 340 |
 | [`api/rate_limit.py`](../../src/assistant/api/rate_limit.py) | 87 |
 
 **Read:** [theory 09 — observability & evals](../theory/09-observability-and-evals.md) ·

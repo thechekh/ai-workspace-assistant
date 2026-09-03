@@ -168,3 +168,76 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 - [x] `docs/project/workshop.md`: Part 1 slide outline (with our measured numbers), Part 2 click-by-click demo script (offline-capable), Part 3 implementation walkthrough map
 
 **Acceptance (verified):** 72/72 tests green at the time (info shape, inline reindex, 503 path, bearer auth on HTTP + WS ×token cases); browser E2E on the zero-infra path — favicon loads clean, badge renders from /api/info, Re-index button fires and the error toast appears and auto-dismisses (Qdrant intentionally down). *Caveat (resolved 2026-08-08):* the compose `app` profile was unbuilt at the time. It has since been built and run end-to-end — all services healthy, deep health `ok` through the container. Building it also surfaced a real break: `pyproject` declares `readme = "README.md"` but the Dockerfile never copied it, so `uv sync` failed at the project-install step.
+
+---
+
+## After the phases — hardening, measured (2026-08 → 2026-09)
+
+The changelog that used to live at the repository root, condensed: what
+changed after the nine build phases, with the numbers that justified it.
+
+### Removed
+- **The background-job layer** (taskiq broker, worker + scheduler services,
+  `POST /api/reindex`, `ASSISTANT_CORPUS_DIR`, the UI Re-index button). Its
+  only job was re-indexing a folder of Markdown, but documents are embedded
+  once at upload — the job was a no-op in every real configuration.
+- **Groq**, and with it a third run mode: the project runs either fully
+  mocked (`fake` provider, `fakeredis://`) or real on OpenAI `gpt-4.1-nano`.
+  The llama-era provider hardening (429 backoff, `tool_use_failed` retry,
+  leaked-markup salvage) stays, reframed as "any OpenAI-compatible endpoint".
+- `CONTRIBUTING.md`, `SECURITY.md`, `TODO.md`, `CHANGELOG.md` — folded into
+  the docs tree (this section, [future-tools.md](future-tools.md),
+  [security.md](../reference/security.md)) by owner decision.
+
+### Added
+- **Agent tools**: `ingest_repo` (the one additive write; `owner/repo/path`
+  sources; `include_code` indexes source files) and `repo_read_file`
+  (tokenless for public repos). `search_docs` gained a zero-result inventory
+  + retry contract and chained-call code hints.
+- **Production profile**: real embeddings, GitHub's hosted MCP server via
+  auth `headers` on `MCPServerConfig` (toolset-scoped: 9 tools instead of 44,
+  measured 12× cheaper per identical answer), demo repo + PR, runbook.
+- **Guards**: the 20k-char tool-result cap at `Tool.run` (after a 149k-token,
+  $0.0154 listing — 57× a normal turn); the output guard against
+  claimed-but-unperformed actions; rate limiting (sliding windows in Redis);
+  Stop/cancel mid-stream; the Conversations panel; the CI retrieval gate.
+- **Evals**: Ragas groundedness (faithfulness **0.92**, opt-in, never in CI);
+  the embedder comparison made real (`text-embedding-3-small` recall@1
+  0.83 → 0.94 on the golden set).
+- **Docs-as-tests**: link integrity, cross-document fact consistency (test
+  counts, backend line counts, golden-set size, retrieval scores), coverage
+  (every setting/endpoint/metric/frame/tool/module/dependency/command must be
+  documented), line-anchor drift, and a reading roadmap that must place every
+  document.
+
+### Fixed — each reproduced with a failing test first
+- Re-uploading a document did not replace it (chunk ids collided with
+  nothing; deleted text stayed citable) → ingest deletes a source before
+  re-adding it.
+- The pydantic-ai backend inherited none of the provider hardening → retries
+  re-implemented there, sharing the policy helpers.
+- A failed turn never sent its `turn` frame (clients hung, spend invisible)
+  → every turn ends with exactly one `turn` frame carrying `cancelled`/`failed`.
+- `GET /api/sessions?limit=0` returned every session (`ZREVRANGE` end index
+  is inclusive) → clamped.
+- Leaked `(function=…` tool markup reached the user → both opener forms
+  salvaged; ordinary prose no longer withheld.
+- A hallucinated tool name became a permanent Prometheus label → fixed
+  `<unregistered>` label.
+- `fetch_url`'s SSRF guard checked only the first URL → every redirect hop
+  re-checked.
+- Bearer tokens compared with `secrets.compare_digest`; rate-limit keys
+  derived from a hash, not a token slice.
+- Stale ablation numbers (0.56/0.67 → re-measured 0.78/0.72; one claim was
+  backwards) → every configuration reproducible from the repository.
+- `retry-after: 0` discarded as falsy; `WebSocketDisconnect` counted as an
+  error; the pydantic-ai fake had never learned `fetch_url`; the Docker build
+  never copied `README.md`.
+- **A fabricated code answer** ("Meter.tsx", an invented formula) traced to
+  four cooperating causes and fixed at each layer: identifier-aware
+  tokenization (`completedPercentage` was unsearchable by "percentage"), a
+  prompt line that sanctioned one-try surrender, a zero-result tool text
+  that forbade rephrasing, and a scope-blind `code__search_code` message.
+  Golden-set metrics unchanged at 0.83/1.00/0.92.
+- A flat source namespace let one project's `README.md` silently overwrite
+  another's → repository sources are `owner/repo/path`.

@@ -6,7 +6,7 @@ Internal AI assistant for engineers: agentic FastAPI backend, MCP tools, Qdrant 
 [handbook](docs/handbook/README.md) (run & operate it) ·
 [theory](docs/theory/README.md) (concepts from zero) ·
 [reference](docs/reference/tools.md) (tools, testing, backend comparison) ·
-[project](docs/project/TODO.md) (roadmap, decisions, workshop)
+[project](docs/project/implementation-plan.md) (history, decisions, workshop)
 
 ## Quickstart
 

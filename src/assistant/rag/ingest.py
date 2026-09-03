@@ -4,7 +4,7 @@ Usage:
     uv run python -m assistant.rag.ingest <folder> [--collection docs]
 
 Re-running is idempotent for unchanged docs (deterministic chunk ids
-overwrite in place). Runs as a taskiq background job from Phase 8.
+overwrite in place). A one-off CLI: nothing schedules it.
 """
 
 import argparse

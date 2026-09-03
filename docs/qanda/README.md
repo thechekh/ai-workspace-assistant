@@ -186,7 +186,7 @@ then buy.
 
 **Answer.** No schedule, by design: a document is embedded **once, at
 upload** — there is no drift and no batch to run (the nightly re-index job
-existed and was **removed** as a no-op; [CHANGELOG](../../CHANGELOG.md)).
+existed and was **removed** as a no-op; [implementation-plan.md](../project/implementation-plan.md)).
 Idempotency: chunk ids are `uuid5(source :: breadcrumb :: index)`, and
 re-ingesting a source **deletes that source's chunks then upserts** —
 pure-overwrite left deleted paragraphs retrievable (a found bug, now a
@@ -527,7 +527,7 @@ session, 24h TTL. Long-term (persistent facts across sessions):
 question names is the reason: a wrongly extracted "fact" ("team X owns
 billing") silently poisons *every future* conversation, so it needs
 provenance, TTLs, and a correction path before it deserves to exist. In
-[TODO](../project/TODO.md) with that design sketch attached.
+[future-tools.md](../project/future-tools.md) with that design sketch attached.
 
 **40. How do you keep long conversations under the context limit** — trim, summarize, or both?
 
@@ -547,7 +547,7 @@ user's words.
 **Answer.** Three rails: the **CI eval gate** — recall@5 / MRR floors on the
 golden set fail the build on retrieval regressions
 ([test_eval_gate.py](../../tests/test_eval_gate.py), with
-[history.jsonl](../../evals/history.jsonl) as the trend record); the **342
+[history.jsonl](../../evals/history.jsonl) as the trend record); the **340
 offline tests**, which include behavioral pins (the fake-parity suite keeps
 three backends identical, regression tests pin found bugs); and for
 prompt/description changes, **trajectory comparison** over the per-turn audit

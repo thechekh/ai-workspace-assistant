@@ -221,7 +221,7 @@ Why taskiq over arq (both were candidates):
 | Scheduler | Built-in (`TaskiqScheduler`) — e.g. nightly re-index | Built-in cron |
 | Feel | Modern, typed, async-first | Simpler but smaller |
 
-Used for: document ingestion/re-indexing (parse → chunk → embed → upsert), scheduled corpus refresh, and the embedding-comparison batch runs. (For day one, ingestion also works as a plain `uv run python -m assistant.rag.ingest` CLI — taskiq arrives when we want the "platform" shape.)
+It was used for: the nightly corpus re-index and a queued Re-index button — both removed with it. Ingestion remains a plain `uv run python -m assistant.rag.ingest` CLI plus the runtime upload/ingest paths; the embedding comparison is a one-off script.
 
 *Alternatives rejected:* Celery (heavy, sync-first, poor asyncio story), Dramatiq/RQ (solid but sync-first — wrong paradigm for this codebase).
 
@@ -318,10 +318,10 @@ MCP servers (GitHub, custom code-search via FastMCP) run either as sidecar conta
 | 5 | **Pydantic AI backend** (B); Logfire instrumentation; Langfuse OTel forwarding |
 | 6 | **LangGraph backend** (C); backend comparison writeup; conversation summarization |
 | 7 | Embedding comparison (openai vs voyage-3) with published metrics; hybrid search + reranker |
-| 8 | Polish: taskiq scheduled re-index, Vue UI polish, workshop slides & live-demo script |
+| 8 | Polish: taskiq scheduled re-index *(since removed — see §Background jobs)*, Vue UI polish, workshop slides & live-demo script |
 
 ---
 
 ## Final stack, one line each
 
-Python 3.12 · uv · ruff · pyright · FastAPI · uvicorn · Pydantic v2 · pydantic-settings · WebSockets · custom-loop / Pydantic AI / LangGraph (comparative) · OpenAI free tier → OpenAI mini ($25) · text-embedding-3-small → voyage-3 (comparative) · Qdrant (+hybrid+rerank) · Redis (+summarization) · taskiq · MCP (FastMCP + official servers) · Logfire + Langfuse over OpenTelemetry · pytest/respx + golden evals · Vue 3 + Vite + TS · Docker Compose.
+Python 3.12 · uv · ruff · pyright · FastAPI · uvicorn · Pydantic v2 · pydantic-settings · WebSockets · custom-loop / Pydantic AI / LangGraph (comparative) · fake provider (dev/CI) → OpenAI gpt-4.1-nano ($25 budget) · hash-512 (dev) → text-embedding-3-small, voyage-3 (comparative) · Qdrant (+hybrid+rerank) · Redis (+summarization) · MCP (FastMCP + official servers) · Logfire + Langfuse over OpenTelemetry · pytest/respx + golden evals · Vue 3 + Vite + TS · Docker Compose.

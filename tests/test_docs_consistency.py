@@ -21,9 +21,9 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOC_FILES = [*(REPO_ROOT / "docs").rglob("*.md"), REPO_ROOT / "README.md"]
-# Suite-size claims also live in the two root files a contributor reads first,
-# which sat two hundred tests out of date because nothing scanned them.
-COUNT_CLAIM_FILES = [*DOC_FILES, REPO_ROOT / "CLAUDE.md", REPO_ROOT / "CONTRIBUTING.md"]
+# Suite-size claims also live in the root CLAUDE.md, which sat two hundred
+# tests out of date because nothing scanned it.
+COUNT_CLAIM_FILES = [*DOC_FILES, REPO_ROOT / "CLAUDE.md"]
 
 # Word-boundary matching matters: a substring test for "line" also matches
 # "timeline", which made an HTTP status list (429/401/404) look like a
@@ -146,17 +146,21 @@ def test_test_count_claims_agree_and_are_not_badly_stale() -> None:
     # An adjective between the number and "tests" used to hide the claim
     # entirely: "129 deterministic tests" and "212 Python tests" both drifted
     # for months because the pattern demanded the two words be adjacent.
-    claim_re = re.compile(r"\b(\d{2,4}) ((?:\w+ ){0,2}?)tests\b")
+    # `\s+` rather than a literal space: prose wraps, and "**342\noffline
+    # tests**" hid a stale claim from a line-by-line scan.
+    claim_re = re.compile(r"\b(\d{2,4})\s+((?:\w+\s+){0,2}?)tests\b")
     # The frontend suite is a different number by design, not a contradiction.
     other_suite = re.compile(r"\b(frontend|vitest|npm|ui)\b", re.IGNORECASE)
-    claims = [
-        (_rel(path), int(claim.group(1)))
-        for path in COUNT_CLAIM_FILES
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if not skip_line.search(line)
-        for claim in claim_re.finditer(line)
-        if not other_suite.search(claim.group(2))
-    ]
+    claims: list[tuple[str, int]] = []
+    for path in COUNT_CLAIM_FILES:
+        text = path.read_text(encoding="utf-8")
+        for claim in claim_re.finditer(text):
+            line_start = text.rfind("\n", 0, claim.start()) + 1
+            line_end = text.find("\n", claim.start())
+            line = text[line_start : line_end if line_end != -1 else None]
+            if skip_line.search(line) or other_suite.search(claim.group(2)):
+                continue
+            claims.append((_rel(path), int(claim.group(1))))
     assert claims, "no document states the suite size — that claim should exist"
 
     distinct = {n for _, n in claims}

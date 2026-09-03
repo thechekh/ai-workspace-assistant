@@ -68,9 +68,6 @@ def test_all_prose_docs_live_under_docs():
     # cannot move into docs/ — each is a short pointer into the docs tree.
     allowed = {
         "README.md",  # landing page + packaging readme
-        "CONTRIBUTING.md",
-        "SECURITY.md",
-        "CHANGELOG.md",
         "CLAUDE.md",  # instructions for AI coding agents
         "evals/results-embeddings.md",  # generated next to its generator
     }

@@ -12,7 +12,7 @@ handbook explains how to run it, the theory course explains the concepts.
 ## Commands
 
 ```sh
-uv run pytest -q                    # 344 tests, offline, no keys, ~20s
+uv run pytest -q                    # 340 tests, offline, no keys, ~20s
 uv run pytest -m "not slow"         # skips real MCP subprocess spawns
 uv run ruff check . && uv run ruff format .
 uv run pyright

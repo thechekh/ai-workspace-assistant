@@ -204,7 +204,6 @@ def create_app(
         app.state.mcp_registry = runtime.mcp_registry
         app.state.mcp_tool_names = runtime.mcp_tool_names
         app.state.vector_store = runtime.vector_store
-        app.state.http_client = runtime.http_client
         try:
             yield
         finally:

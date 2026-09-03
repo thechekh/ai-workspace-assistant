@@ -14,7 +14,7 @@ OpenAI-compatible chat API through one client
 | `gemini` | Google's OpenAI-compat endpoint | gemini models | free tier exists |
 
 **The two modes you will actually use.** `fake` for everything you can test
-without spending — the full tool loop, RAG, streaming, cancellation, all 308
+without spending — the full tool loop, RAG, streaming, cancellation, all 340
 tests — and `openai` when you want real answers. Switching is two lines in
 `.env`; no code changes, because the provider is a config value.
 

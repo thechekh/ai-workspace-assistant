@@ -11,7 +11,7 @@ cite one, be ready to run the command.
 
 | Claim | Value | How to prove it |
 |---|---|---|
-| Tests | 344 backend tests + 35 frontend tests | `uv run pytest -q`, `npm run test:run` |
+| Tests | 340 backend tests + 35 frontend tests | `uv run pytest -q`, `npm run test:run` |
 | Coverage | 83.7%, floor enforced in CI | `uv run pytest --cov` |
 | Retrieval quality | recall@1 **0.83**, recall@5 **1.00**, MRR **0.92** | `uv run python evals/run_retrieval.py --memory` |
 | Agent backends | 98 / 266 / 278 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
@@ -93,8 +93,10 @@ honesty instructions exist because of it.
 **Q: What about prompt injection — a document that says "ignore your instructions"?**
 A real concern, and note the threat model *changed*: documents are now
 uploaded at runtime, so the corpus is no longer necessarily trusted. What
-bounds the blast radius is structural: the model can only call allowlisted,
-**read-only** tools; execution is server-side; tool arguments are
+bounds the blast radius is structural: the model can only call allowlisted
+tools that are **read-only** except for one additive, consent-gated write
+(`ingest_repo`, which adds documents and can delete or edit nothing);
+execution is server-side; tool arguments are
 schema-validated; `read_file` is jailed to the repo root (path-traversal
 test in the suite); and `fetch_url` refuses loopback and private ranges.
 What we have *not* built: content sanitisation on ingest and
@@ -306,7 +308,7 @@ accounts.
 Remove the nondeterminism from every layer except the one under evaluation:
 scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-**344 tests in ~23 seconds, fully offline** — no network, no containers, no
+**340 tests in ~23 seconds, fully offline** — no network, no containers, no
 keys. Model *quality* is deliberately out of unit scope; that's what the
 eval harness is for.
 

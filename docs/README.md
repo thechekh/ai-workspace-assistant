@@ -8,7 +8,7 @@ different jobs:
 | **[handbook/](handbook/README.md)** | *How do I run and operate **this** project?* | [handbook/README.md](handbook/README.md) |
 | **[theory/](theory/README.md)** | *What **is** an LLM / embedding / agent / MCP?* (from zero) | [theory/README.md](theory/README.md) |
 | **[reference/](reference/tools.md)** | *Precise details of one subject* | [reference/tools.md](reference/tools.md) |
-| **[project/](project/TODO.md)** | *What's planned, why it's built this way, how to present it* | [project/TODO.md](project/TODO.md) |
+| **[project/](project/implementation-plan.md)** | *Why it's built this way, what's deferred, how to present it* | [project/implementation-plan.md](project/implementation-plan.md) |
 
 The repository [README](../README.md) stays at the root — it is the GitHub
 landing page and the packaging `readme` — and links here.
@@ -51,8 +51,9 @@ one is a CI gate and the other never can be.
 — the threat model, every control with a pointer to its code, and an
 honest list of what is not built.
 
-**I want to know what's next** → [project/TODO.md](project/TODO.md) — the one
-backlog (features, code quality, hardening) plus a record of what's done.
+**I want to know what's next** → [project/future-tools.md](project/future-tools.md) —
+every deferred tool and non-tool item, with its cost and revisit trigger; the
+record of what's done is [project/implementation-plan.md](project/implementation-plan.md).
 
 ## By topic — preparing to explain or defend the project
 
@@ -79,7 +80,7 @@ questions*. Read across.
 | **Security** | — | [reference/security.md](reference/security.md) — threat model + controls | [theory/12 §LLM & AI](theory/12-defense-qa.md) |
 | **Any unfamiliar term** | [theory/11 — glossary](theory/11-glossary.md) | — | — |
 
-### The reading roadmap — all 46 documents, in order
+### The reading roadmap — all 42 documents, in order
 
 Read top to bottom and you will have read **every** document in the
 repository, each one landing when you have the background for it. Tick them
@@ -165,29 +166,25 @@ The decisions and the history — this is where "why not X?" gets answered.
 |---|---|---|
 | 32 | [project/tech-stack.md](project/tech-stack.md) | Every technology decision and the alternatives rejected |
 | 33 | [project/implementation-plan.md](project/implementation-plan.md) | Phase-by-phase build history with acceptance evidence |
-| 34 | [../CHANGELOG.md](../CHANGELOG.md) | What changed, and the bugs found along the way |
-| 35 | [project/TODO.md](project/TODO.md) | The backlog: what is deliberately not built, and why |
-| 36 | [project/description-original.md](project/description-original.md) | The original brief as received — compare with what shipped |
+| 34 | [project/description-original.md](project/description-original.md) | The original brief as received — compare with what shipped |
 
 #### Stage 8 · Rehearse the defence *(~1.5 h)*
 
 | # | Document | Why last |
 |---|---|---|
-| 37 | [theory/11-glossary.md](theory/11-glossary.md) | 119 terms — cover the definitions and say them aloud |
-| 38 | [theory/12-defense-qa.md](theory/12-defense-qa.md) | The hard questions, with answers. Do this without notes |
-| 39 | [project/workshop.md](project/workshop.md) | Slide outline and the click-by-click demo script |
-| 40 | [project/demo-runbook.md](project/demo-runbook.md) | Running the demo on the real stack: keys, infra, costs |
-| 41 | [reference/localhost.md](reference/localhost.md) | Every localhost link once it runs: dashboards, logs, and browsing the vector DB |
-| 42 | [project/future-tools.md](project/future-tools.md) | Every tool considered and deferred: cost, verdict, trigger to revisit |
-| 43 | [qanda/README.md](qanda/README.md) | The 48 hard questions, each followed by its grounded answer with measured numbers |
+| 35 | [theory/11-glossary.md](theory/11-glossary.md) | 119 terms — cover the definitions and say them aloud |
+| 36 | [theory/12-defense-qa.md](theory/12-defense-qa.md) | The hard questions, with answers. Do this without notes |
+| 37 | [project/workshop.md](project/workshop.md) | Slide outline and the click-by-click demo script |
+| 38 | [project/demo-runbook.md](project/demo-runbook.md) | Running the demo on the real stack: keys, infra, costs |
+| 39 | [reference/localhost.md](reference/localhost.md) | Every localhost link once it runs: dashboards, logs, and browsing the vector DB |
+| 40 | [project/future-tools.md](project/future-tools.md) | Every tool considered and deferred: cost, verdict, trigger to revisit |
+| 41 | [qanda/README.md](qanda/README.md) | The 48 hard questions, each followed by its grounded answer with measured numbers |
 
 #### Stage 9 · Repository conventions — only if you will contribute
 
 | # | Document | Answers |
 |---|---|---|
-| 44 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | How to set up, the quality gates, commit conventions |
-| 45 | [../SECURITY.md](../SECURITY.md) | How to report a vulnerability |
-| 46 | [../CLAUDE.md](../CLAUDE.md) | Instructions for AI coding agents working in this repo |
+| 42 | [../CLAUDE.md](../CLAUDE.md) | Instructions for AI coding agents working in this repo |
 
 **The short path.** No time for all of it? **1 → 4 → 6 → 25 → 38** — what it
 is, the architecture, how to run it, the code walkthrough, and the defence
@@ -236,7 +233,6 @@ outline, a click-by-click demo script, and the file-map walkthrough.
 - [security.md](reference/security.md) — threat model, what is enforced, what is deliberately not
 
 ### project/ — planning, decisions, delivery
-- [TODO.md](project/TODO.md) — **the** backlog and the record of completed work
 - [tech-stack.md](project/tech-stack.md) — technology decisions and rationale
 - [implementation-plan.md](project/implementation-plan.md) — phase-by-phase build history with acceptance evidence
 - [description.md](project/description.md) — the project brief (English)

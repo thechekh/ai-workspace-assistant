@@ -5,7 +5,8 @@ lives. Written to be defended: every "yes" below points at code or a test,
 and every "no" is a conscious scope decision rather than an oversight.
 
 **One-line summary:** this is a **local/internal-network tool** with real
-structural controls (allowlisted read-only tools, server-side execution,
+structural controls (an allowlisted tool surface that is read-only except for
+one additive, consent-gated write, server-side execution,
 path jails, input bounds, dependency scanning) and deliberately unbuilt
 perimeter controls (SSO, rate limiting, content sanitisation) that a
 production deployment would add at the gateway.
@@ -35,14 +36,17 @@ ingress in a shared environment.
 → [routes.py](../../src/assistant/api/routes.py) `require_token`,
 [ws.py](../../src/assistant/api/ws.py); tested for both HTTP and WS.
 
-### The model can only do allowlisted, read-only things
+### The model can only do allowlisted things — read-only, plus one additive write
 Every tool call goes through one seam
 ([tools/base.py](../../src/assistant/agent/tools/base.py) `Tool.run`):
 unknown tool names are rejected, arguments are JSON-schema-shaped,
 execution is server-side, and a crash becomes an `error:` *result* rather
 than an exception. No tool writes to the filesystem, executes shell
-commands, or mutates state. There is no `eval`, no shell interpolation of
-model output.
+commands, or deletes/edits anything. The single write is `ingest_repo`,
+which only *adds* a repository's documents to the knowledge base on explicit
+request — pinned as the sole exception by an allowlist test (see "Repo
+ingestion" below). There is no `eval`, no shell interpolation of model
+output.
 
 ### Tool results are capped before they reach the model
 Whatever a tool returns is pasted into the next LLM request and billed by the

@@ -124,6 +124,27 @@ Nothing about the architecture is waiting on code.
 for public repositories (the vendor route requires a PAT for everything) and
 adds one tool schema to the prompt instead of ~10–15 on every single turn.
 
+### Claude via a Max subscription as the gateway's LLM — **not permitted**
+**Purpose:** run the same chat pipeline with Claude (e.g. Sonnet) billed to
+a consumer Claude subscription instead of the OpenAI key.
+**Why not — Anthropic's own terms:** a subscription licenses Anthropic's
+surfaces (claude.ai, Claude Desktop, Claude Code), not third-party backends.
+The Agent SDK quickstart states it directly: *"Unless previously approved,
+Anthropic does not allow third party developers to offer claude.ai login or
+rate limits for their products, including agents built on the Claude Agent
+SDK."* So every route — OpenAI-compatible bridge proxies over Claude Code
+credentials, or the Agent SDK riding the subscription login — is excluded.
+**What is permitted, and was verified:** the reverse direction — our tools
+served *into* Claude Code/Desktop over MCP, where the subscription pays for
+the model and this project only supplies tools. Prototyped on a branch
+(streamable-HTTP server exposing `search_docs`, `repo_read_file`,
+`ingest_repo`, `list_documents`; our own `MCPRegistry` consumed it; Claude
+Code registered it), then **deleted as not needed** for the POC.
+**The buildable version:** Claude *inside* this gateway is an **API-key**
+decision — the official `anthropic` SDK as a fourth provider behind the
+`InstrumentedLLM` seam, ~half a day; at the measured ~7k-token turns,
+Sonnet ≈ $0.015 and Haiku ≈ $0.008 per turn versus $0.0008 on nano.
+
 ### `workspace-mcp` over streamable HTTP
 **Purpose:** serve this project's own tools to the whole department's
 editors (Cursor, Claude Code).
@@ -142,3 +163,23 @@ scheduler, local clones, the big model — are engineering judgment under
 constraints, not gaps. Presenting it that way is the strongest material in
 the workshop: every row above is a decision that can be defended, priced,
 and reversed on a stated trigger.
+
+## Other deferred work — not tools, same discipline
+
+The rest of the former backlog, kept here so "what's next?" has one answer.
+Each is deliberate, and each says what would trigger it.
+
+| Item | Status / why deferred | Trigger |
+|---|---|---|
+| **OIDC / SSO** at the gateway (replacing the single bearer token) | Single-tenant POC; no user identity to key on | Any second team, or per-user quotas/audit |
+| **Long-term memory facts store** (distilled facts in Qdrant across sessions) | A wrongly extracted fact poisons every later conversation; needs provenance, TTLs, a correction path | A user base that asks the same things across sessions |
+| **LangGraph Redis checkpointer** (durable, resumable runs) | The LangGraph backend is one of three equals; its flagship persistence is not needed for one-turn tools | Long multi-step runs that must survive a restart |
+| **Cloud tracing backends** (Logfire / Langfuse) | Pipeline exists and is inert; tokens were never requested | Someone who will look at the dashboards |
+| **Grafana is fully open** (anonymous admin) | Correct for localhost | The compose file seeding any shared deployment |
+| **Dev-grade SSRF guard** (string match, no DNS resolution) | Documented gap; fine on localhost | Leaving localhost — resolve DNS, allowlist egress |
+| **`pyright` strict** | Measured, *not* free: **552** errors, mostly `reportUnknown*` in tests (791 with `src/`-only strict); `standard` is at 0 | A typing pass over the test suite as its own task |
+| **CodeQL upload** | Workflow written; uploading to a private repo needs GitHub Advanced Security — job gated on the repo being public | Going public, or GHAS |
+| **One Python version** (venv 3.14, CI 3.12+3.13, Docker 3.13) | A `.python-version` file forced a venv rebuild that failed on locked files | Decide the target, then add the file deliberately |
+| **TypeScript 7** | `vue-tsc` embeds the compiler; TS 7's native rewrite has no compiler API yet | vuejs/language-tools shipping TS 7 support |
+| **`LICENSE`, `CODEOWNERS`, issue/PR templates** | Owner's choice; `CONTRIBUTING.md` / `SECURITY.md` were added and removed as clutter for a single-maintainer POC | Publishing, or a second maintainer |
+| **Workshop prep** | Mermaid sequence diagrams for the theory chapters; a mock Q&A rehearsal against [qanda](../qanda/README.md) | The week of the workshop |
