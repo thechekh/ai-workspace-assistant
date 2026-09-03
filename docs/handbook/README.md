@@ -26,7 +26,7 @@ Two companion folders:
 | 06 | [Tools & MCP](06-tools-mcp.md) | List every tool the agent has, explain how a call executes, add a new one |
 | 07 | [Observability](07-observability.md) | Open every dashboard, follow one turn through logs → metrics → traces → audit |
 | 08 | [Agents, memory & WebSocket](08-agents-memory-ws.md) | Explain the 3 backends, the WS frame protocol, and rolling summarization |
-| 09 | [Testing & operations](09-testing-operations.md) | Run the 129-test suite, the worker, auth mode; fix the common failures |
+| 09 | [Testing & operations](09-testing-operations.md) | Run the 340-test suite and auth mode; fix the common failures |
 
 ## Every localhost URL (quick reference)
 

@@ -148,7 +148,9 @@ def test_test_count_claims_agree_and_are_not_badly_stale() -> None:
     # for months because the pattern demanded the two words be adjacent.
     # `\s+` rather than a literal space: prose wraps, and "**342\noffline
     # tests**" hid a stale claim from a line-by-line scan.
-    claim_re = re.compile(r"\b(\d{2,4})\s+((?:\w+\s+){0,2}?)tests\b")
+    # The hyphenated form ("129-test suite") hid five more stale claims from
+    # every earlier version of this scan.
+    claim_re = re.compile(r"\b(\d{2,4})(?:\s+((?:\w+\s+){0,2}?)tests\b|-test\b)")
     # The frontend suite is a different number by design, not a contradiction.
     other_suite = re.compile(r"\b(frontend|vitest|npm|ui)\b", re.IGNORECASE)
     claims: list[tuple[str, int]] = []
@@ -158,7 +160,7 @@ def test_test_count_claims_agree_and_are_not_badly_stale() -> None:
             line_start = text.rfind("\n", 0, claim.start()) + 1
             line_end = text.find("\n", claim.start())
             line = text[line_start : line_end if line_end != -1 else None]
-            if skip_line.search(line) or other_suite.search(claim.group(2)):
+            if skip_line.search(line) or other_suite.search(claim.group(2) or ""):
                 continue
             claims.append((_rel(path), int(claim.group(1))))
     assert claims, "no document states the suite size — that claim should exist"

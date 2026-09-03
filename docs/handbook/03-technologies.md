@@ -46,7 +46,8 @@ swaps in an in-memory clone for zero-infra dev; tests always use it.
 
 ### Qdrant (+ qdrant-client)
 The vector database: one collection (`docs`) holding **named vectors** — a
-512-dim dense vector and a sparse lexical vector per chunk — enabling hybrid
+dense vector (512-dim with the offline hash embedder, 1536-dim with OpenAI)
+and a sparse lexical vector per chunk — enabling hybrid
 search with server-side RRF fusion. In tests the same client runs fully
 in-memory (`:memory:`). Web UI at `localhost:6333/dashboard`.
 *Where:* [rag/store.py](../../src/assistant/rag/store.py); chapter 05.

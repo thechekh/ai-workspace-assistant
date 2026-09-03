@@ -120,7 +120,7 @@ keeps them out of logs. The `log_prompts` toggle is dev-only by policy
 | Chat: *"model failed to generate a valid tool call"* (rare) | llama emitted malformed tool JSON 3× and `failed_generation` was unparseable | resend / rephrase; already auto-retried + salvage-attempted |
 | Answer contains raw `<function…>` text | should **never** happen now (salvage layer) — if seen, it's a new llama syntax variant | add it to `_LEAKED_CALL_PREFIX` in [llm/client.py](../../src/assistant/llm/client.py) + a test |
 | *"duplicate call — … use the result you already received"* in a tool card | model repeated an identical call; guard answered | cosmetic; the model continues with the earlier result |
-| *"No relevant documents found in the knowledge base …"* | relevance gate: the query shares no meaningful token with any chunk | expected for off-topic questions — the honest answer |
+| *"No relevant chunks matched this exact wording …"* | relevance gate: the query shares no meaningful token with any chunk | expected for off-topic questions — the honest answer |
 | `search_docs` returns chunks from a repo you tested with | you ingested extra sources into `docs` | `uv run python -m assistant.rag.ingest evals/corpus --recreate` |
 | Chat: *"LLM authentication failed"* / *"Model not available"* | bad key / model name typo | fix `ASSISTANT_LLM_API_KEY` / `ASSISTANT_LLM_MODEL`, restart |
 | UI loads but "disconnected" | server down, or auth on and no `?token=` | start server / open `/?token=<secret>` |

@@ -56,8 +56,8 @@ Before any detail: how the pieces are assembled.
 
 | Read | Lines |
 |---|---|
-| [`config.py`](../../src/assistant/config.py) | 139 |
-| [`main.py`](../../src/assistant/main.py) | 241 |
+| [`config.py`](../../src/assistant/config.py) | 175 |
+| [`main.py`](../../src/assistant/main.py) | 253 |
 | [`agent/base.py`](../../src/assistant/agent/base.py) | 76 |
 | [`agent/registry.py`](../../src/assistant/agent/registry.py) | 28 |
 
@@ -80,7 +80,7 @@ curl -s localhost:8000/api/info | python -m json.tool
 | Read | Lines |
 |---|---|
 | [`api/schemas.py`](../../src/assistant/api/schemas.py) | 165 |
-| [`api/ws.py`](../../src/assistant/api/ws.py) | 293 |
+| [`api/ws.py`](../../src/assistant/api/ws.py) | 306 |
 | [`api/turn_recorder.py`](../../src/assistant/api/turn_recorder.py) | 124 |
 
 **Read:** [theory 08 — WebSockets](../theory/08-realtime-websockets.md) ·
@@ -105,10 +105,10 @@ line says afterwards.
 
 | Read | Lines |
 |---|---|
-| [`llm/client.py`](../../src/assistant/llm/client.py) | 480 — the biggest file; take it in three passes |
+| [`llm/client.py`](../../src/assistant/llm/client.py) | 482 — the biggest file; take it in three passes |
 | [`llm/errors.py`](../../src/assistant/llm/errors.py) | 75 |
 | [`llm/fake.py`](../../src/assistant/llm/fake.py) | 93 |
-| [`telemetry.py`](../../src/assistant/telemetry.py) | 162 |
+| [`telemetry.py`](../../src/assistant/telemetry.py) | 160 |
 
 Three passes over `client.py`: (1) `stream_step` — the happy path; (2)
 `_create_stream` — 429 backoff and `stream_options` fallback; (3)
@@ -137,12 +137,12 @@ Read in **pipeline order** — this is how a document becomes an answer.
 |---|---|---|
 | [`rag/chunking.py`](../../src/assistant/rag/chunking.py) | 116 | split documents |
 | [`rag/embeddings.py`](../../src/assistant/rag/embeddings.py) | 110 | text → vectors |
-| [`rag/sparse.py`](../../src/assistant/rag/sparse.py) | 30 | the keyword channel |
+| [`rag/sparse.py`](../../src/assistant/rag/sparse.py) | 53 | the keyword channel |
 | [`rag/store.py`](../../src/assistant/rag/store.py) | 184 | Qdrant + RRF fusion |
-| [`rag/rerank.py`](../../src/assistant/rag/rerank.py) | 67 | reorder + the relevance gate |
+| [`rag/rerank.py`](../../src/assistant/rag/rerank.py) | 64 | reorder + the relevance gate |
 | [`rag/retriever.py`](../../src/assistant/rag/retriever.py) | 88 | the orchestrator |
 | [`rag/ingest.py`](../../src/assistant/rag/ingest.py) | 134 | the write path |
-| [`rag/repo.py`](../../src/assistant/rag/repo.py) | 140 | GitHub repo → knowledge base, sources namespaced `owner/repo/path` |
+| [`rag/repo.py`](../../src/assistant/rag/repo.py) | 240 | GitHub repo → knowledge base, sources namespaced `owner/repo/path` |
 
 **Read:** [theory 02 — embeddings](../theory/02-embeddings-and-vector-search.md) ·
 [theory 03 — RAG](../theory/03-rag.md) ·
@@ -169,12 +169,12 @@ pipeline.
 
 | Read | Lines |
 |---|---|
-| [`agent/tools/base.py`](../../src/assistant/agent/tools/base.py) | 102 — **the single most important file for safety** |
-| [`agent/tools/search_docs.py`](../../src/assistant/agent/tools/search_docs.py) | 76 |
+| [`agent/tools/base.py`](../../src/assistant/agent/tools/base.py) | 120 — **the single most important file for safety** |
+| [`agent/tools/search_docs.py`](../../src/assistant/agent/tools/search_docs.py) | 154 |
 | [`agent/tools/fetch.py`](../../src/assistant/agent/tools/fetch.py) | 173 |
-| [`agent/tools/repo_read.py`](../../src/assistant/agent/tools/repo_read.py) | 82 — one exact file from any GitHub repo, tokenless for public |
-| [`agent/tools/ingest_repo.py`](../../src/assistant/agent/tools/ingest_repo.py) | 100 — the one write tool: adds a repo's docs, nothing else |
-| [`agent/output_guard.py`](../../src/assistant/agent/output_guard.py) | 54 — why a prompt rule is not a control |
+| [`agent/tools/repo_read.py`](../../src/assistant/agent/tools/repo_read.py) | 80 — one exact file from any GitHub repo, tokenless for public |
+| [`agent/tools/ingest_repo.py`](../../src/assistant/agent/tools/ingest_repo.py) | 105 — the one write tool: adds a repo's docs, nothing else |
+| [`agent/output_guard.py`](../../src/assistant/agent/output_guard.py) | 71 — why a prompt rule is not a control |
 | [`agent/backends/custom.py`](../../src/assistant/agent/backends/custom.py) | 98 — the ReAct loop, no framework |
 
 **Read:** [theory 04 — tool calling & agents](../theory/04-tool-calling-and-agents.md) ·
@@ -218,8 +218,8 @@ uv run pytest tests/test_fake_parity.py -v     # all three route alike
 
 | Read | Lines |
 |---|---|
-| [`mcp/registry.py`](../../src/assistant/mcp/registry.py) | 102 |
-| [`mcp_servers/code_search.py`](../../src/assistant/mcp_servers/code_search.py) | 84 |
+| [`mcp/registry.py`](../../src/assistant/mcp/registry.py) | 110 |
+| [`mcp_servers/code_search.py`](../../src/assistant/mcp_servers/code_search.py) | 94 |
 | [`mcp_servers/fake_github.py`](../../src/assistant/mcp_servers/fake_github.py) | 131 |
 
 **Read:** [theory 06 — MCP](../theory/06-mcp.md) ·
@@ -261,10 +261,10 @@ uv run pytest tests/test_memory.py -v
 
 | Read | Lines |
 |---|---|
-| [`telemetry.py`](../../src/assistant/telemetry.py) | 162 — revisit with fresh eyes |
+| [`telemetry.py`](../../src/assistant/telemetry.py) | 160 — revisit with fresh eyes |
 | [`observability.py`](../../src/assistant/observability.py) | 92 |
 | [`logs.py`](../../src/assistant/logs.py) | 56 |
-| [`api/routes.py`](../../src/assistant/api/routes.py) | 340 |
+| [`api/routes.py`](../../src/assistant/api/routes.py) | 313 |
 | [`api/rate_limit.py`](../../src/assistant/api/rate_limit.py) | 87 |
 
 **Read:** [theory 09 — observability & evals](../theory/09-observability-and-evals.md) ·

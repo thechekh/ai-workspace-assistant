@@ -29,7 +29,7 @@ Every backend receives the same tools, the same history, and must emit the
 same event stream. Consequences:
 
 - The **same WebSocket test suite runs ×3** — identical assertions pass on
-  every runtime (the 203-test suite includes the WS suite parametrized ×3).
+  every runtime (the 340-test suite includes the WS suite parametrized ×3).
 - The UI **switches runtimes per session** with a dropdown — same question,
   three frameworks, live.
 - The choice of framework stays **reversible** — an architecture property,
@@ -41,7 +41,7 @@ same event stream. Consequences:
 
 1. From the team behind Pydantic; agents and tools are **typed** objects,
    validated like everything else in FastAPI-world.
-2. **Model abstraction built in** — `openai:...`, `openai:...` strings or
+2. **Model abstraction built in** — `openai:...`-style provider strings or
    model objects; it replaced our LLM client entirely for this backend.
 3. Our raw-JSON-schema tools mapped 1:1 via `Tool.from_schema` — the shared
    registry needed one small adapter function.

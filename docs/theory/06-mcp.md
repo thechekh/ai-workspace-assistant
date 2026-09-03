@@ -62,10 +62,12 @@ standalone: `python -m assistant.mcp_servers.code_search`)
   with a **path-traversal guard** (resolves the path and rejects anything
   escaping the repo root — the security question, pre-answered).
 - **`fake_github`** — a *mock* with realistic canned PRs/issues that
-  deliberately uses the official GitHub MCP server's tool names
-  (`list_pull_requests`, `get_pull_request`, `list_issues`).
+  borrows the official GitHub MCP server's tool names
+  (`list_pull_requests`, `get_pull_request`, `list_issues` — upstream has
+  since renamed the second to `pull_request_read`).
 
-The mock is a strategy, not a hack: because the tool names match, swapping
+The mock is a strategy, not a hack: because tools are *discovered* at
+startup rather than hardcoded, names need not even match, and swapping
 mock → real GitHub is **one config line** (point the `github` entry at
 `ghcr.io/github/github-mcp-server` with a PAT) — zero code changes. The
 demo runs credential-free today; production is a `.env` edit tomorrow.

@@ -157,8 +157,10 @@ Two bundled stdio servers start automatically — **no credentials needed**:
 - `github` — a **mocked** GitHub server with canned PRs/issues
   (`Show latest PRs in the repo`)
 
-The mock exposes the same tool names as the official GitHub MCP server, so
-switching to real GitHub later is just the `ASSISTANT_MCP_SERVERS` JSON in
+The mock borrows the official GitHub MCP server's tool names (two of three
+still match upstream — `get_pull_request` was renamed `pull_request_read`
+there), and because tools are discovered at startup, switching to real GitHub
+is just the `ASSISTANT_MCP_SERVERS` JSON in
 `.env` (see `.env.example`) — no code changes. Unreachable servers are
 skipped with a warning; the agent keeps running with the tools it has.
 
@@ -206,7 +208,7 @@ src/assistant/
 ├── api/               # WS /chat + turn recorder; HTTP: info, health,
 │                   #   documents, sessions/turns, metrics
 ├── agent/             # AgentBackend protocol, events, backends/ (custom | pydantic_ai | langgraph)
-├── llm/               # provider-agnostic LLM client (fake | openai | ollama | gemini | openai)
+├── llm/               # provider-agnostic LLM client (fake | openai | ollama | gemini)
 ├── memory/            # Redis-backed session history
 ├── mcp/               # MCP client registry (stdio/http, tool namespacing)
 ├── mcp_servers/       # bundled MCP servers: code_search + mocked fake_github

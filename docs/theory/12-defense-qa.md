@@ -12,11 +12,11 @@ cite one, be ready to run the command.
 | Claim | Value | How to prove it |
 |---|---|---|
 | Tests | 340 backend tests + 35 frontend tests | `uv run pytest -q`, `npm run test:run` |
-| Coverage | 83.7%, floor enforced in CI | `uv run pytest --cov` |
+| Coverage | ~86%, with an 84% floor enforced in CI | `uv run pytest --cov` |
 | Retrieval quality | recall@1 **0.83**, recall@5 **1.00**, MRR **0.92** | `uv run python evals/run_retrieval.py --memory` |
 | Agent backends | 98 / 266 / 278 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
 | Real-model cost | ~$0.012 for a full 8-case acceptance run | the stats line under every answer |
-| Suite runtime | ~13 s, fully offline | no network, no Docker |
+| Suite runtime | ~25 s, fully offline | no network, no Docker |
 
 ---
 
@@ -81,9 +81,10 @@ Three layers. **Grounding**: the agent retrieves chunks and answers from
 them, citing source and heading. **Transparency**: the tool card shows the
 user exactly what evidence was retrieved, and "details" replays the whole
 turn. **Refusal paths**: the system prompt forbids stating the content of a
-page it did not fetch, and the tools return explicit "nothing indexed" /
-"nothing relevant" messages that instruct the model not to retry and to say
-so. That last one came from a real failure — the model invented a plausible
+page it did not fetch, and the tools return an explicit "nothing indexed" message (do
+not retry — upload documents) and, for a miss on a populated index, the live
+inventory plus a retry contract: two more phrasings, then say what was
+searched, never that something does not exist. That last one came from a real failure — the model invented a plausible
 description of a GitHub repo it had never fetched; `fetch_url` plus the
 honesty instructions exist because of it.
 
@@ -184,7 +185,8 @@ set's answers live in.
 **Q: What happens when retrieval finds nothing useful?**
 It says so, and distinguishes two cases the model must handle differently:
 *nothing indexed yet* (the user's problem — upload documents) versus
-*nothing relevant* (the docs don't cover it — don't retry). This exists
+*nothing relevant* (retry with different terms, twice at most, then report
+what was searched). This exists
 because vector search **always** returns its top-k, even for a query about
 something the corpus has never heard of. The relevance gate drops chunks
 sharing no meaningful token with the query, so "empty" means the same thing
@@ -243,8 +245,10 @@ streams to the browser as typed events.
 Everything except GitHub's data: subprocess spawn, MCP handshake, tool
 discovery, namespacing, argument passing, result handling, error handling —
 all real. The code-search MCP server is *fully* real and searches this
-repository. The mock deliberately uses the official GitHub server's tool
-names, so the swap is one config line plus a PAT, with no code changes.
+repository. The mock borrows the official GitHub server's tool names (one has
+since been renamed upstream — harmless, because tools are discovered at
+startup), so the swap is one config line plus a PAT, with no code changes —
+verified live against the hosted server.
 
 **Q: Why MCP instead of writing integrations directly?**
 N+M instead of N×M. GitHub's MCP server already exists and is maintained by
@@ -279,9 +283,10 @@ timeline are in the UI.
 **Q: What can you actually see?**
 Five surfaces on the same data. **Logs** — structured, with
 `session_id`/`turn_id`/`backend` auto-bound to every line, one greppable
-`turn.summary` per turn. **Metrics** — `/metrics` exposes 9 `assistant_*`
+`turn.summary` per turn. **Metrics** — `/metrics` exposes 11 `assistant_*`
 metric families (turns, turn/LLM/tool/retrieval latency histograms, tokens,
-cost, tool calls by status, errors by kind), labelled by
+cost, tool calls by status, errors by kind, cancelled turns, rate-limit
+refusals), labelled by
 backend/provider/tool/mode.
 **Traces** — OTel spans on the seams that explain the agent:
 `agent.turn → llm.step → tool.execute → rag.retrieve`, in Jaeger. **Product**

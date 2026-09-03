@@ -43,7 +43,8 @@ for the hard questions.
 5. **MCP** — why a protocol beats N bespoke integrations; stdio vs
    streamable HTTP; tool namespacing; graceful degradation. Our servers:
    `code_search` (real) + `fake_github` (mock borrowing the official server's
-   tool names — swapping to real GitHub is a config change).
+   tool names, one since renamed upstream — tools are discovered at startup,
+   so swapping to real GitHub is a config change, verified live).
 6. **Memory** — short-term Redis history + rolling summarization (context
    stops growing; each message summarized once); long-term = the vector DB.
 7. **Observability** — five views of one turn: structured logs with

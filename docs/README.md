@@ -35,7 +35,7 @@ every tool's purpose, parameters, return shape, errors, and implementation.
 
 **I'm starting from zero and want to learn the whole thing** →
 [project/learning-roadmap.md](project/learning-roadmap.md) — twelve sessions,
-~13 hours, covering all 35 source files: what to read, what to *run*, and a
+~13 hours, covering all 38 source files: what to read, what to *run*, and a
 self-check for each. Start here if you have more than an evening.
 
 **I have to defend this project line by line** →
@@ -144,7 +144,7 @@ Same order as stage 3, so each chapter answers "…and here is how we built it".
 | # | Document | Why here |
 |---|---|---|
 | 25 | [reference/code-walkthrough.md](reference/code-walkthrough.md) | One question through every layer, file and line by line |
-| 26 | [project/learning-roadmap.md](project/learning-roadmap.md) | The twelve-session plan for reading all 35 source files |
+| 26 | [project/learning-roadmap.md](project/learning-roadmap.md) | The twelve-session plan for reading all 38 source files |
 
 #### Stage 6 · Precise references — read when you need them
 

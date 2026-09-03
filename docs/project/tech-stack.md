@@ -24,8 +24,8 @@ Modern Python stack for the bench project. For each area: the chosen technology,
 | Web framework | **FastAPI + uvicorn** | Litestar, granian | Spec'd by the task; uvicorn[standard] gives uvloop + websockets |
 | Config | **pydantic-settings** | dynaconf, environs, raw os.environ | Typed settings, `.env` support, validation at startup, same ecosystem as FastAPI |
 | Agent runtime | **Custom loop → Pydantic AI → LangGraph** (phased, all three) | pick one framework | The comparison is the learning goal; see §Agent runtime |
-| LLM (dev) | **OpenAI free tier** (+ Ollama local fallback) | Gemini free tier, OpenRouter `:free`, xAI Grok credits | Free, fast, OpenAI-compatible API, models with solid tool calling |
-| LLM (paid testing) | **OpenAI mini-tier model** (existing $25 budget) | — | Mini models cost cents per million tokens; $25 covers the whole project |
+| LLM (dev) | **`fake` provider** — deterministic, offline (+ Ollama as a local option) | Groq free tier *(used, then retired)*, Gemini free tier, OpenRouter `:free` | Zero cost, zero keys: the whole tool loop runs without a network |
+| LLM (real) | **OpenAI `gpt-4.1-nano`** (existing $25 budget) | — | $0.10 / $0.40 per 1M tokens; a demo turn is a fraction of a cent |
 | Embeddings | **text-embedding-3-small → compare voyage-3** 🧪 | BGE-M3 (local), jina | Cheap start, then measured comparison on a golden set; see §Embeddings |
 | Vector DB | **Qdrant** | Weaviate, Chroma, pgvector, LanceDB | Fast, great payload filters, native hybrid search, single container |
 | Short-term memory | **Redis** + conversation summarization | in-process dicts, Postgres | Spec'd; survives restarts, TTLs for sessions, doubles as job broker |
@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="ASSISTANT_")
 
     # LLM — provider is a config value, not a code decision
-    llm_provider: Literal["openai", "ollama", "gemini", "openai"] = "openai"
+    llm_provider: Literal["fake", "openai", "ollama", "gemini"] = "fake"
     llm_model: str = "gpt-4.1-nano"
     llm_api_key: SecretStr | None = None
     llm_base_url: str | None = None  # for OpenAI-compatible endpoints
@@ -134,16 +134,19 @@ Lines of code · streaming support · effort to attach MCP tools · memory/check
 
 **Strategy: everything speaks the OpenAI-compatible chat API (or goes through Pydantic AI's model abstraction), so the provider is pure config.** ✅
 
-Note on naming — two different things sound alike:
-
-- **OpenAI** (openai.com) — an *inference provider* running open models (Llama 3.3 70B, Llama 3.1 8B, Qwen…) on custom hardware. Generous **free tier**, very fast, OpenAI-compatible endpoint. This is the recommended free option.
-- **Grok** (x.ai) — xAI's own model family. Has offered periodic free API credits; check current terms if interested. Not needed for this project.
+> **Superseded (2026-09-01).** This section was written when **Groq**'s free
+> tier was the dev provider. Groq (an inference provider running open models
+> such as Llama 3.x on custom hardware — not xAI's *Grok*) was retired: the
+> project now runs either the `fake` provider (dev/CI, offline) or OpenAI
+> `gpt-4.1-nano` (real answers). The tables below are the historical record;
+> the provider-hardening they motivated stays, because any OpenAI-compatible
+> endpoint can misbehave the same ways.
 
 ### Dev / free tier (start here)
 
 | Provider | Cost | Notes |
 |---|---|---|
-| **OpenAI** ✅ | Free tier (rate-limited) | `gpt-4.1-nano` has solid tool calling — good enough to develop the whole agent loop |
+| **Groq** *(retired)* | Free tier (rate-limited) | llama-class models with tool calling — good enough to develop the whole agent loop; replaced by the `fake` provider for dev and OpenAI for real answers |
 | **Ollama** (local) | Free, unlimited | Runs `llama3.2` / `qwen2.5` locally; perfect for offline dev and tests. Caveat: small local models are noticeably weaker at tool calling — fine for plumbing, not for judging agent quality |
 | Google Gemini (AI Studio) | Generous free tier | `gemini-*-flash` models; good tool calling; second option if OpenAI limits bite |
 | OpenRouter | Free `:free` model variants | One API over many providers; handy for quick model comparisons |
@@ -160,7 +163,7 @@ The description names "OpenAI / Claude" — in a production version the same con
 
 ## Embeddings
 
-**Start: OpenAI `text-embedding-3-small`. Then: measured comparison against Voyage `voyage-3`.** ✅🧪
+**Shipped default: `hash-512` (offline, free — dev and CI). Real profile: OpenAI `text-embedding-3-small`. Measured comparison against Voyage `voyage-3`.** ✅🧪
 
 - `text-embedding-3-small` — ~$0.02 per million tokens; embedding the whole doc corpus costs effectively nothing out of the $25 budget.
 - **Voyage AI** (`voyage-3`, or `voyage-code-3` if the corpus is code-heavy) — consistently top-ranked on retrieval benchmarks; has a free token allowance that should cover the comparison corpus.
@@ -182,7 +185,7 @@ The description names "OpenAI / Claude" — in a production version the same con
 
 - Single container, async Python client (`qdrant-client`), great payload filtering (filter by `doc_type`, `team`, `path`), snapshots for backup.
 - **Roadmap upgrade:** hybrid search — dense vectors + sparse (BM25-style) fused with RRF via Qdrant's Query API — plus a **reranker** (Voyage `rerank-2`, Cohere, or a local cross-encoder like `bge-reranker`) over the top-20 candidates. Hybrid + rerank is the current standard for serious RAG and a visible quality jump for the demo.
-- Ingestion parsing via **docling** (PDF/HTML/DOCX → clean Markdown), heading-aware chunking (~400–800 tokens with overlap), metadata attached to every chunk.
+- Ingestion accepts Markdown, text and reStructuredText (docling for PDF/HTML/DOCX was planned and never needed); heading-aware chunking (~450 tokens, breadcrumb context instead of character overlap), metadata attached to every chunk.
 
 *Alternatives:* pgvector (fine if we wanted "just Postgres", but we have no other Postgres need); Chroma (prototyping only); Weaviate (heavier, no advantage here); LanceDB (nice embedded option, smaller ecosystem).
 
@@ -307,6 +310,8 @@ MCP servers (GitHub, custom code-search via FastMCP) run either as sidecar conta
 ---
 
 ## Phased roadmap
+
+*The original phase plan, kept as written. What actually shipped, phase by phase, is in [implementation-plan.md](implementation-plan.md) — e.g. the docling ingestion step was never needed (Markdown, text and reStructuredText covered every real source).*
 
 | Phase | Deliverable |
 |---|---|

@@ -87,10 +87,14 @@ query ──> embed (dense) ──> Qdrant hybrid search ──> RRF fusion (ser
   returns top-k *even for garbage queries*, and RRF/hash scores are not
   calibrated — so chunks sharing **no** meaningful token with the query
   (prefix-tolerant: "deploy" matches "deployment") are dropped. If nothing
-  survives, the model receives an explicit *"No relevant documents found …
-  do not retry with a rephrased query — tell the user"* message. This is the
-  fix for confident-looking irrelevant results (and it kills the
-  search-again loop that weaker models fall into).
+  survives, the model receives the live inventory of what *is* indexed, any
+  indexed filenames sharing a token with the query, and a retry contract:
+  try up to two *different* phrasings, then report what was searched — never
+  claim something does not exist. (The earlier "do not retry" text taught the
+  model to surrender after one literal miss and to assert code was absent
+  when it existed; only the *empty knowledge base* case still says "do not
+  retry — upload documents".) This is the fix for confident-looking
+  irrelevant results *and* for confident-looking absence.
 - Every retrieval emits: span `rag.retrieve` (mode, candidates, results, top
   score), log `rag.retrieved` (with `top_source`), histogram
   `assistant_retrieval_seconds{mode}`.

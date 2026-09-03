@@ -23,7 +23,7 @@ If you only have ten minutes before you present, read these six:
 
 1. [`api/ws.py` → `_handle_turn`](../../src/assistant/api/ws.py#L173) — the conductor
 2. [`agent/backends/custom.py` → `CustomAgent.run`](../../src/assistant/agent/backends/custom.py#L53) — the agent loop, 45 lines
-3. [`agent/tools/base.py` → `Tool.run`](../../src/assistant/agent/tools/base.py#L34) — the one seam every tool call passes through
+3. [`agent/tools/base.py` → `Tool.run`](../../src/assistant/agent/tools/base.py#L52) — the one seam every tool call passes through
 4. [`rag/retriever.py` → `search`](../../src/assistant/rag/retriever.py#L43) — retrieve → rerank → gate
 5. [`llm/client.py` → `stream_step`](../../src/assistant/llm/client.py#L334) — the provider hardening
 6. [`telemetry.py` → `InstrumentedLLM`](../../src/assistant/telemetry.py#L80) — how every number gets measured
@@ -32,8 +32,8 @@ If you only have ten minutes before you present, read these six:
 
 ## Step 0 — The app boots
 
-**[`main.py` → `create_app`](../../src/assistant/main.py#L162)** and
-**[`build_runtime`](../../src/assistant/main.py#L86)**
+**[`main.py` → `create_app`](../../src/assistant/main.py#L174)** and
+**[`build_runtime`](../../src/assistant/main.py#L93)**
 
 `create_app` is a factory, not a module-level app. Everything a request needs
 is assembled once in `build_runtime` into a
@@ -46,7 +46,7 @@ Two deliberate details:
 - **The keyword overrides** (`redis_client=`, `llm=`, `retriever=`) exist so
   tests substitute whole collaborators — fakeredis, `FakeLLM`, in-memory
   Qdrant — without the factory growing `if x is None` branches.
-- **[`__getattr__`](../../src/assistant/main.py#L230)** builds the app lazily.
+- **[`__getattr__`](../../src/assistant/main.py#L241)** builds the app lazily.
   uvicorn resolves `assistant.main:app` with `getattr`, so the documented run
   command is unchanged, but *importing* the module no longer reads a
   developer's `.env`, reconfigures global logging, or installs an OTLP tracer.
@@ -233,8 +233,8 @@ bypasses this client entirely — had to re-implement the retries.
 
 ## Step 8 — The tool call
 
-**[`ToolRegistry.execute`](../../src/assistant/agent/tools/base.py#L93)** →
-**[`Tool.run`](../../src/assistant/agent/tools/base.py#L34)**
+**[`ToolRegistry.execute`](../../src/assistant/agent/tools/base.py#L111)** →
+**[`Tool.run`](../../src/assistant/agent/tools/base.py#L52)**
 
 Every tool call from every backend, native or MCP, funnels through `Tool.run`.
 That single seam owns:
@@ -257,7 +257,7 @@ server-side, every tool is read-only, and nothing is `eval`'d.
 
 ## Step 9 — Retrieval
 
-**[`make_search_docs`](../../src/assistant/agent/tools/search_docs.py#L31)** →
+**[`make_search_docs`](../../src/assistant/agent/tools/search_docs.py#L100)** →
 **[`Retriever.search`](../../src/assistant/rag/retriever.py#L43)**
 
 The pipeline, in order:
@@ -353,7 +353,7 @@ Full detail in [handbook chapter 07](../handbook/07-observability.md).
 ## The other two backends
 
 Same [`AgentBackend`](../../src/assistant/agent/base.py#L68) protocol, same
-[`ToolRegistry`](../../src/assistant/agent/tools/base.py#L78):
+[`ToolRegistry`](../../src/assistant/agent/tools/base.py#L96):
 
 - [`backends/pydantic_ai.py`](../../src/assistant/agent/backends/pydantic_ai.py)
   — drives pydantic-ai's graph iteration. It replaces the *model layer*, so it
@@ -378,7 +378,7 @@ Measured comparison: [backend-comparison.md](backend-comparison.md).
 | The bugs a review found stay fixed | `tests/test_review_regressions.py` |
 
 ```sh
-uv run pytest -q                 # 300+ tests, offline, no keys
+uv run pytest -q                 # 340 tests, offline, no keys
 uv run pytest -q -n 4            # the same, in parallel
 ```
 

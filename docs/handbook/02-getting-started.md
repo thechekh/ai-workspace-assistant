@@ -121,7 +121,7 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 | Variable | Default | Meaning |
 |---|---|---|
 | `AUTH_TOKEN` | *(unset = open)* | When set: `/api/*` (mutating/sensitive) needs `Authorization: Bearer <t>`, WS needs `?token=`. Open once as `http://localhost:8000/?token=<t>` — the UI persists it |
-| `LLM_PROVIDER` | `fake` | `fake` \| `openai` \| `ollama` \| `gemini` \| `openai` — all speak the OpenAI chat API |
+| `LLM_PROVIDER` | `fake` | `fake` \| `openai` \| `ollama` \| `gemini` — all speak the OpenAI chat API |
 | `LLM_MODEL` | `gpt-4.1-nano` | Model name at the provider |
 | `LLM_API_KEY` | — | Required for hosted providers (OpenAI key starts `sk-...`) |
 | `LLM_BASE_URL` | *(provider default)* | Override the provider endpoint URL |
@@ -150,7 +150,8 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 | `LOG_PROMPTS` | `false` | Dev-only: dump full prompts/completions into logs |
 | `OTLP_ENDPOINT` | *(unset = tracing off)* | `http://localhost:4318` → local Jaeger |
 | `LOGFIRE_TOKEN` | *(unset)* | Also export spans to Logfire cloud (+ FastAPI/httpx auto-instr.) |
-| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` | *(unset)* | Also export spans to Langfuse (LLM view) |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | *(unset)* | Also export spans to Langfuse (LLM view) |
+| `LANGFUSE_HOST` | `https://cloud.langfuse.com` | Langfuse endpoint; self-hosted instances override it |
 
 ## Verify your setup (2 minutes)
 
@@ -159,7 +160,7 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
    (this is what the UI's header dot polls every 10 s).
 3. Open http://localhost:8000/ → send `ping` → tokens stream, a stats line
    appears under the answer.
-4. `uv run pytest -q` → `129 passed` (fully offline, ~13 s).
+4. `uv run pytest -q` → `340 passed` (fully offline, ~25 s).
 
 Then work through [the testing checklist](../reference/testing.md) — the feature-by-
 feature manual checklist for the mode you're in.

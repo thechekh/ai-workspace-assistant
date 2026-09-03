@@ -87,8 +87,10 @@ tool's `tool.execute` span, plus a `rag.retrieved` log line and the
 scores are not calibrated — so the tool drops chunks that share no meaningful
 token with the query (`query_overlap` in [rerank.py](../../src/assistant/rag/rerank.py),
 prefix-tolerant: "deploy" matches "deployment"). If nothing survives, the
-model gets an explicit "no relevant documents — don't retry, tell the user"
-message instead of confident-looking noise about unrelated topics.
+model gets the live inventory of indexed sources, filename matches for the
+query's tokens, and a retry contract (two more phrasings, then report what
+was searched) — instead of confident-looking noise, and instead of a
+one-try surrender.
 
 The system prompt tells the model to call this tool first for any question
 about internal systems and to cite the source files it gets back.
@@ -199,8 +201,9 @@ that server's `env` block in `ASSISTANT_MCP_SERVERS`.
 | Returns | `#135 [open] title` lines from 3 canned issues |
 
 **Why a mock?** It borrows tool names from the official GitHub MCP
-server (`ghcr.io/github/github-mcp-server`), so switching to real GitHub is
-config-only — put a PAT into the docker-based server entry shown in
+server (`ghcr.io/github/github-mcp-server`; one has since been renamed
+upstream, harmlessly — tools are discovered at startup), so switching to
+real GitHub is config-only — put a PAT into the docker-based server entry shown in
 `.env.example` (`ASSISTANT_MCP_SERVERS`) and the agent's behavior carries over
 unchanged.
 

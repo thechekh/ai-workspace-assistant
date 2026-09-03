@@ -21,7 +21,7 @@ Measured on this repository (line counts via `wc -l`, docstrings included).
 | Loop bound | hand-written `for` loop | framework internal (usage limits available) | built-in `recursion_limit` → `GraphRecursionError` |
 
 Context for fairness: the custom loop leans on our shared `llm/client.py`
-(445 lines, including the provider-hardening layer) — but it also serves LangGraph (via the adapter), the
+(482 lines, including the provider-hardening layer) — but it also serves LangGraph (via the adapter), the
 dev fake, and the test scripting, so it isn't a custom-loop-only cost.
 
 ## Dimension by dimension
