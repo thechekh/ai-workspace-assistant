@@ -28,7 +28,7 @@ from assistant.api.schemas import (
     TurnRecord,
 )
 from assistant.config import Settings
-from assistant.rag.ingest import ingest, ingest_documents
+from assistant.rag.ingest import ingest_documents
 from assistant.rag.store import VectorStore
 from assistant.telemetry import ERRORS_TOTAL, RATE_LIMITED_TOTAL
 
@@ -311,34 +311,3 @@ async def delete_document(source: str, request: Request) -> dict[str, object]:
     if not removed:
         raise HTTPException(status_code=404, detail=f"no indexed document named {source!r}")
     return {"source": source, "removed_chunks": removed}
-
-
-@router.post("/reindex", dependencies=[Depends(require_token), Depends(limit_writes)])
-async def reindex(request: Request) -> dict[str, object]:
-    """Re-ingest ASSISTANT_CORPUS_DIR: queued via taskiq, or inline in zero-infra mode.
-
-    Only meaningful when a corpus folder is configured. Documents added
-    through POST /api/documents live in Qdrant and need no re-indexing.
-    """
-    settings: Settings = request.app.state.settings
-    if settings.corpus_dir is None:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "no ASSISTANT_CORPUS_DIR configured — this instance is filled "
-                "via POST /api/documents, which needs no re-indexing"
-            ),
-        )
-    if settings.redis_url.startswith("fakeredis://"):
-        # No real Redis -> no task queue; run inline so the flow still works.
-        try:
-            count = await ingest(settings.corpus_dir, settings)
-        except Exception as exc:
-            logger.exception("inline reindex failed")
-            raise HTTPException(status_code=503, detail=f"reindex failed: {exc}") from exc
-        return {"mode": "inline", "chunks": count}
-
-    from assistant.worker import reindex_docs  # lazy: pulls taskiq only when queuing
-
-    task = await reindex_docs.kiq()
-    return {"mode": "queued", "task_id": task.task_id}

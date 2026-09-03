@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr
@@ -24,6 +23,10 @@ class MCPServerConfig(BaseModel):
     args: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
     url: str | None = None  # http only
+    # http only: sent on every request. Remote servers authenticate this way —
+    # GitHub's hosted server wants {"Authorization": "Bearer <PAT>"} — which is
+    # the difference between "http transport exists" and "http transport is usable".
+    headers: dict[str, str] = Field(default_factory=dict)
     enabled: bool = True
 
 
@@ -67,15 +70,47 @@ class Settings(BaseSettings):
     # set of subjects would make the model refuse things it can actually answer.
     system_prompt: str = (
         "You are the AI Workspace Assistant, an internal assistant for engineers. "
+        # Capability before tools. Without this the model answered "The
+        # documents ... have been permanently erased from the vector store.
+        # Confirmed." having called only search tools — nothing was deleted and
+        # the user was told otherwise. With it, six of six attempts refused
+        # correctly and the direct request stopped calling tools at all.
+        # `output_guard.py` backstops the wording; this is what makes the
+        # refusal cheap and clear.
+        "Your tools are read-only, with exactly one exception: ingest_repo ADDS a "
+        "GitHub repository's documentation to the knowledge base when the user "
+        "asks for it. Beyond that you cannot create, modify or delete anything — "
+        "no deleting documents, no editing the knowledge base, no changing code. "
+        "If you are asked to delete or change something, refuse in one sentence, "
+        "say the knowledge base is managed outside this chat, and never imply "
+        "you could do it given more detail. "
         "Tools: search_docs searches the team's own knowledge base — whatever "
         "documents have been added to this assistant — so call it first for "
         "questions about our systems, services, processes or documentation, and "
         "cite the source files it returns. fetch_url fetches public web pages and "
         "GitHub repositories/accounts — use it whenever the user asks about a "
-        "URL or an external project. You have no other web access: never state "
-        "the content of a page you did not fetch. If a tool returns nothing "
-        "relevant, do not repeat a similar call and do not guess — say plainly "
-        "that you could not find the answer. Answer concisely."
+        "URL or an external project. repo_read_file reads one exact file from a "
+        "GitHub repository (public repos need no token). When the user wants to "
+        "see code: search_docs finds the chunk (its source is owner/repo/path), "
+        "then in the SAME turn call repo_read_file with that repo and path and "
+        "quote the relevant lines — never ask permission to show code the user "
+        "already asked for. You have no other web access: never state "
+        "the content of a page you did not fetch. "
+        # The two observed lies this block exists to prevent: a turn that
+        # claimed "not found in the indexed documentation" having called no
+        # tool at all, and a turn that invented a plausible file path, variable
+        # and formula for an ingested repo — confidently, from nothing.
+        "Every claim about what the knowledge base, a repository, or any code "
+        "contains must come from a tool result in the CURRENT turn — never "
+        "from memory, never from an earlier turn. Never ask permission to "
+        "call a read-only tool; just call it. If a search returns nothing, "
+        "retry once or twice with DIFFERENT terms (synonyms, identifier "
+        "styles, file names); after that, report which terms you searched — "
+        "never assert that something does not exist. "
+        "Never claim to have performed an action you have no tool for. "
+        "Answer concisely — but concise never means withholding content the "
+        "user asked to see: when they ask for code, your answer MUST contain "
+        "the code itself in a fenced block, not a description of it."
     )
 
     # Embeddings / RAG
@@ -87,15 +122,16 @@ class Settings(BaseSettings):
     embedding_api_key: SecretStr | None = None
     voyage_api_key: SecretStr | None = None  # for the voyage embedding comparison
     qdrant_collection: str = "docs"
-    # Optional folder to (re)ingest from. Unset by default: the knowledge
-    # base starts empty and is filled at runtime via POST /api/documents.
-    # Set it to keep a folder of Markdown synced (nightly job + Re-index).
-    corpus_dir: Path | None = None
 
     # Retrieval: hybrid = dense + sparse lexical vectors fused with RRF;
     # a deterministic lexical reranker reorders the top candidates.
     retrieval_mode: RetrievalMode = "hybrid"
     rerank_enabled: bool = True
+
+    # The ingest_repo agent tool authenticates to GitHub with this token.
+    # Unset works for public repositories (60 requests/hour); a fine-grained
+    # read-only PAT unlocks private ones and 5,000/hour.
+    github_token: SecretStr | None = None
 
     # Conversation summarization: when the un-summarized history exceeds the
     # budget, older turns are folded into a rolling summary; the most recent
@@ -113,7 +149,7 @@ class Settings(BaseSettings):
     # that bucket; rate_limit_enabled=false disables all of them.
     rate_limit_enabled: bool = True
     rate_limit_turns_per_minute: int = 20  # chat turns (the expensive path)
-    rate_limit_uploads_per_hour: int = 50  # document uploads + re-index
+    rate_limit_uploads_per_hour: int = 50  # document uploads
 
     # Infra
     redis_url: str = "redis://localhost:6379/0"

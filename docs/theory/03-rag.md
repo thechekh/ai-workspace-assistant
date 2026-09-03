@@ -112,8 +112,10 @@ same prompt; the model synthesizes. For deeper multi-hop questions the agent
 can call `search_docs` multiple times with refined queries — the loop allows
 up to 6 steps.
 
-**"How do you keep the index fresh?"** — Idempotent ingest + the taskiq
-nightly re-index job + the UI's Re-index button (chapter 10). Deterministic
+**"How do you keep the index fresh?"** — Idempotent ingest: re-uploading a
+source replaces its chunks in place, because chunk ids are derived from
+(source, index). There is no scheduled re-index — a document is embedded once,
+at upload, so nothing drifts out of date on its own. Deterministic
 IDs mean changed chunks overwrite in place.
 
 **"18 questions — isn't that small?"** — It's a regression harness, not a

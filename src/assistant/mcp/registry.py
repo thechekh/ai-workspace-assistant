@@ -12,6 +12,7 @@ import logging
 import sys
 from contextlib import AsyncExitStack
 
+import httpx
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, get_default_environment, stdio_client
 from mcp.client.streamable_http import streamable_http_client
@@ -69,9 +70,16 @@ class MCPRegistry:
         else:
             if not config.url:
                 raise ValueError(f"MCP server {config.name!r}: http transport requires a url")
+            # Auth headers ride on a caller-supplied client; the exit stack closes
+            # it with the session, so a failed connect doesn't leak the connection.
+            http_client = (
+                await self._stack.enter_async_context(httpx.AsyncClient(headers=config.headers))
+                if config.headers
+                else None
+            )
             # The HTTP transport also yields a session-id callback we don't use.
             read, write, _ = await self._stack.enter_async_context(
-                streamable_http_client(config.url)
+                streamable_http_client(config.url, http_client=http_client)
             )
         session = await self._stack.enter_async_context(ClientSession(read, write))
         await session.initialize()

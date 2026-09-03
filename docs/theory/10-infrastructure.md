@@ -28,9 +28,8 @@ typed object, not scattered `os.environ` reads."
 ## Redis
 
 **What:** in-memory data store.
-**Why three jobs, one service:** session history (lists + TTL), the rolling
-summary (chapter 07), and the taskiq job broker. It's the only stateful
-service besides Qdrant — and both are externalized so API pods stay
+**Why two jobs, one service:** session history (lists + TTL) and the rolling
+summary (chapter 07). It's the only stateful service besides Qdrant — and both are externalized so API pods stay
 stateless (the scaling story, chapter 08).
 **Dev trick:** `ASSISTANT_REDIS_URL=fakeredis://` swaps in an in-process
 fake — the whole app runs with zero infrastructure.
@@ -40,23 +39,12 @@ fake — the whole app runs with zero infrastructure.
 Covered in chapter 02 — the vector database. Runs as one container with a
 volume; the ingested collection survives restarts.
 
-## taskiq (background jobs)
-
-**What:** an async-native task queue (Redis broker) — think "Celery, but
-built for asyncio and actively maintained"; that's exactly why it beat
-Celery/arq/Dramatiq in our decision table.
-**Why:** work that shouldn't block a request: re-indexing the docs corpus.
-`POST /api/reindex` (or the UI button) enqueues; a worker executes; a
-scheduler fires the same task nightly at 03:00 (cron label).
-**Where:** [`worker.py`](../../src/assistant/worker.py); graceful zero-infra
-fallback — on `fakeredis://` the reindex runs inline instead of queuing.
-
 ## Docker & compose profiles
 
 **What:** containers; compose orchestrates them locally.
 **Why profiles:** `docker compose up -d` starts only infra (redis+qdrant) —
-the dev loop keeps hot-reload on the host. `--profile app` adds api, worker,
-scheduler — the whole platform containerized from one multi-stage
+the dev loop keeps hot-reload on the host. `--profile app` adds the api —
+the whole platform containerized from one multi-stage
 [`Dockerfile`](../../Dockerfile) (Node builds the Vue SPA → uv-based Python
 runtime serves it).
 
@@ -69,7 +57,7 @@ The modern Python toolchain, each replacing an older pile:
 - **ruff** — linter *and* formatter in one (replaces flake8+isort+black).
 - **pyright** — static type checker; with Pydantic models end-to-end, whole
   bug classes die before runtime.
-- **pytest** (+asyncio, +cov) — 212 deterministic tests with a coverage
+- **pytest** (+asyncio, +cov) — 344 deterministic tests with a coverage
   floor (chapter 09).
 - **GitHub Actions** — every push runs two workflows. *CI*: ruff → format
   check → pyright → pytest+coverage on Python **3.12 and 3.13** (the image
@@ -100,7 +88,7 @@ as raw HTML — the XSS answer).
 ## Questions you might get
 
 **"Why not Kubernetes?"** — Scope discipline: compose demonstrates the full
-multi-service shape (api/worker/scheduler/infra); k8s adds operational
+multi-service shape (api + infra); k8s adds operational
 ceremony that teaches nothing extra at bench scale. The containers are
 k8s-ready when someone wants them.
 
@@ -109,6 +97,12 @@ envs+deps+Python versions, a real lockfile, and it's where the ecosystem
 has converged. Same argument shape for ruff and pyright: consolidation and
 speed.
 
-**"What's actually stateful?"** — Redis (sessions/summaries/queue) and
-Qdrant (vectors), both volume-backed containers. Everything else — API,
-worker, scheduler — is stateless and horizontally scalable.
+**"What's actually stateful?"** — Redis (sessions/summaries) and Qdrant
+(vectors), both volume-backed containers. The API is stateless and
+horizontally scalable.
+
+**"Where's the background-job layer?"** — Deliberately absent. It existed
+(taskiq + a nightly re-index cron) and was removed: documents are embedded
+once, at upload, so there was no batch left to schedule and the job was a
+no-op in every real configuration. Keeping a queue to demonstrate a queue is
+how dead weight gets defended.

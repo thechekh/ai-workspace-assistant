@@ -39,13 +39,6 @@ const healthTitle = computed(() => {
         <span class="status" :class="chat.connected ? 'on' : 'off'">
           {{ chat.connected ? "connected" : "disconnected" }}
         </span>
-        <button
-          class="ghost"
-          title="Re-ingest ASSISTANT_CORPUS_DIR (only if a corpus folder is configured)"
-          @click="chat.reindex()"
-        >
-          Re-index
-        </button>
       </div>
     </header>
     <ChatWindow />

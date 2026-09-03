@@ -30,7 +30,11 @@ async def test_search_docs_gates_unrelated_queries():
     retriever = await build_seeded_retriever_async()
     tool = make_search_docs(retriever)
     result = await tool.handler({"query": "awsomequiz streamlit certificates chinese pinyin"})
-    assert result == NO_RELEVANT_DOCS
+    # The reply now carries a live inventory + retry contract; the stable
+    # first line still marks the zero-result case.
+    assert result.startswith(NO_RELEVANT_DOCS)
+    assert "Indexed right now:" in result
+    assert "DIFFERENT terms" in result
 
 
 async def test_search_docs_still_returns_relevant_chunks():
@@ -204,3 +208,31 @@ async def test_fake_llm_calls_fetch_url_for_urls():
     assert isinstance(call, ToolCallRequest)
     assert call.name == "fetch_url"
     assert json.loads(call.arguments) == {"url": "https://github.com/thechekh/awsomequiz-streamlit"}
+
+
+async def test_zero_result_reply_names_filename_matches_and_inventory():
+    """The moment a search misses is when the model needs orientation.
+
+    Observed live: 'meter percentage' missed because the component is named
+    Progress.jsx — the reply must surface indexed filenames sharing a query
+    token and the per-repo inventory, so the next action is a better search
+    instead of a confident 'does not exist'.
+    """
+    from assistant.agent.tools.search_docs import _zero_result_help
+
+    sources = [
+        ("cassidoo/todometer/src/renderer/src/components/Progress.jsx", 3),
+        ("cassidoo/todometer/README.md", 2),
+        ("acme/handbook/docs/guide.md", 1),
+        ("uploaded-notes.md", 1),
+    ]
+    reply = _zero_result_help("where is the progress bar drawn", sources)
+    assert "cassidoo/todometer (2 files)" in reply
+    assert "acme/handbook (1 files)" in reply
+    assert "(uploaded files) (1 files)" in reply
+    assert "Progress.jsx" in reply, "filename token match must be surfaced"
+    assert "ingest_repo" in reply
+
+    # No filename overlap -> no fabricated matches section.
+    reply = _zero_result_help("kubernetes ingress", sources)
+    assert "NAME matches" not in reply

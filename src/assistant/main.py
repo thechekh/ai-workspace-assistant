@@ -14,7 +14,14 @@ from redis.asyncio import Redis
 
 from assistant.agent.base import AgentBackend
 from assistant.agent.registry import build_agents
-from assistant.agent.tools import Tool, ToolRegistry, make_fetch_url, make_search_docs
+from assistant.agent.tools import (
+    Tool,
+    ToolRegistry,
+    make_fetch_url,
+    make_ingest_repo,
+    make_repo_read_file,
+    make_search_docs,
+)
 from assistant.agent.tools.fetch import new_http_client
 from assistant.api.rate_limit import RateLimiter
 from assistant.api.routes import router as api_router
@@ -126,6 +133,11 @@ async def build_runtime(
     http_client = new_http_client()
     native_tools = [make_search_docs(resolved_retriever)] if resolved_retriever else []
     native_tools.append(make_fetch_url(client=http_client))
+    native_tools.append(make_repo_read_file(settings, client=http_client))
+    # The one write tool: adds a repo's docs to the KB, nothing else. Only
+    # exists when there is a vector store to write into.
+    if vector_store is not None:
+        native_tools.append(make_ingest_repo(settings, vector_store, client=http_client))
     tools = ToolRegistry(native_tools + mcp_tools)
 
     agents = (
@@ -192,6 +204,7 @@ def create_app(
         app.state.mcp_registry = runtime.mcp_registry
         app.state.mcp_tool_names = runtime.mcp_tool_names
         app.state.vector_store = runtime.vector_store
+        app.state.http_client = runtime.http_client
         try:
             yield
         finally:

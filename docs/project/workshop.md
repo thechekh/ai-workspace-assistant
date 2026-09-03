@@ -125,7 +125,6 @@ are extractive but the full tool loop is real.
 | RAG | `rag/` | chunking → embeddings → hybrid store → rerank |
 | Memory | `memory/` | Redis history + rolling summary |
 | Evals | `evals/` | golden set, retrieval metrics, embedding comparison, `baseline.json` as a CI gate |
-| Jobs | `worker.py` | taskiq broker + nightly cron |
 | Frontend | `frontend/src/` | Pinia store owns the WS; tool cards |
 
 Suggested flow: open the WS test (`tests/test_ws.py`) first — the protocol

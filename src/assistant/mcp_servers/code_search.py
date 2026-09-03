@@ -38,8 +38,10 @@ def _iter_files() -> Iterator[Path]:
 @mcp.tool()
 def search_code(pattern: str, max_results: int = 20) -> str:
     """Search THIS project's own source repository (the AI Workspace Assistant
-    codebase) for lines matching a regex pattern (case-insensitive). It cannot
-    see other projects or external repositories.
+    codebase) for lines matching a regex pattern (case-insensitive). NEVER use
+    it for any other repository — it physically cannot see them: an ingested
+    repo is searched with search_docs, and its files are read with
+    repo_read_file.
 
     Returns `path:line: content` matches, one per line.
     """
@@ -60,7 +62,15 @@ def search_code(pattern: str, max_results: int = 20) -> str:
                 hits.append(f"{relative}:{line_number}: {line.strip()[:200]}")
                 if len(hits) >= max_results:
                     return "\n".join(hits)
-    return "\n".join(hits) if hits else f"no matches for {pattern!r}"
+    if hits:
+        return "\n".join(hits)
+    return (
+        f"no matches for {pattern!r} — searched only the AI Workspace Assistant's "
+        "OWN repository, the sole code this tool can see. An ingested repository "
+        "is searched with search_docs instead. Zero literal hits proves little: "
+        "retry with different terms (synonyms, camelCase/snake_case identifiers, "
+        "file names)."
+    )
 
 
 @mcp.tool()

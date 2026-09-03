@@ -7,6 +7,102 @@ this file records what changed after the initial nine phases.
 
 ## Unreleased
 
+### Fixed
+- **A fabricated code answer, traced to four cooperating causes — each fixed
+  at its own layer.** Asked "which file calculates the meter percentage?"
+  about an ingested React repo, the assistant (a) once answered "not found in
+  the indexed documentation" with **zero tool calls**, and (b) once invented
+  a plausible file, variable and formula (`Meter.tsx`,
+  `(progress / total) * 100`) — the real answer being `Progress.jsx` and
+  `completedAmount / totalAmount`. The causes and fixes:
+  1. **Tokenization** (the real retrieval bug): `completedPercentage` was
+     lowercased before tokenizing, so the query word "percentage" could never
+     match it and the relevance gate discarded the exact chunk holding the
+     answer. A shared identifier-aware `tokenize()` (camelCase/ALLCAPS/digit
+     splitting, whole identifier kept) now feeds the sparse encoder, the
+     gate and the reranker alike. Golden-set metrics unchanged
+     (0.83/1.00/0.92 — re-measured).
+  2. **Our own prompt taught the surrender**: "do not repeat a similar call
+     — say plainly that you could not find the answer" sanctioned one-try
+     give-ups. Replaced with a retry contract (different terms, then report
+     what was searched) plus two honesty rules: claims about repo/code
+     content require a tool result from the current turn, and read-only
+     tools are called, never asked permission for.
+  3. **`search_docs`' zero-result text said "do not retry with a rephrased
+     query"** — replaced by `_zero_result_help`: live per-repo inventory,
+     indexed filenames sharing a query token, and the retry contract, at the
+     exact point of decision.
+  4. **`code__search_code`'s "no matches"** now states its scope (the
+     assistant's own repo only) and redirects to `search_docs` for ingested
+     repositories.
+  Verified end to end on the original question: `search_docs →
+  repo_read_file → Progress.jsx` with both real formulas, no permission
+  question, no fabrication.
+
+### Added
+- **Code, without a PAT: `ingest_repo(include_code=true)` + `repo_read_file`.**
+  The gap that made the project feel local-only is closed, and closed
+  tokenless: for any *public* repository the agent can now index source files
+  into the hybrid KB (the sparse lexical vector matches identifiers exactly;
+  lockfiles, `node_modules` and minified bundles are skipped, ≤300 KB/file)
+  and open any exact file on demand (`repo_read_file`, one validated GET —
+  the model never supplies a URL). The flow is retrieval-then-read: ingest a
+  repo with code → `search_docs` surfaces the chunk with its
+  `owner/repo/path` source → `repo_read_file` shows the real file.
+  `ASSISTANT_GITHUB_TOKEN` extends both to private repos; it is never
+  required for public ones. Found by asking the live system "give me the
+  block of code in charge of payment" — it reached for the only code tool it
+  had, searched the wrong repository (its own checkout), and embellished the
+  gap with invented providers.
+- **Tool results capped at 20k chars before re-entering the prompt.** Tool
+  output is billed prompt tokens; measured live, one PR listing against a
+  busy repository came back as ~149k prompt tokens ($0.0154 — 57x a normal
+  turn), and a large enough result would overflow the context. The cap sits
+  in `Tool.run`, so native and MCP tools inherit it in all three backends,
+  and the truncation marker tells the model to narrow the request rather
+  than trust a silently partial listing.
+- **`ingest_repo` — repository ingestion as an agent tool.** "Ingest the docs
+  from owner/name" in chat makes the agent pull that repository's
+  documentation (every `.md`/`.txt`/`.rst`, up to 100 files, ≤2 MB each) into
+  the knowledge base: two listing requests plus one raw fetch per file,
+  indexed with **`owner/repo/path` sources**. The namespace fixes a real
+  incident — flat basenames let a second project's `README.md` silently
+  replace the first's. Public repos need no credentials;
+  `ASSISTANT_GITHUB_TOKEN` (fine-grained, read-only) unlocks private ones.
+
+  This is the agent's **only write capability**, and it is additive-only: the
+  read-only story becomes "read-only plus one named exception", pinned three
+  ways — the allowlist test on the tool surface, `KB_WRITE_TOOLS` in the
+  output guard (so a truthful "I updated the knowledge base" after a real
+  ingest is not "corrected", while the same sentence without the tool call
+  still is), and the system prompt naming the exception. A dedicated
+  `POST /api/documents/from-repo` endpoint existed briefly and was folded
+  into the tool: one capability, one place. Verified live end to end:
+  ingest → cited answer → per-source delete. 13 offline tests (respx).
+
+### Removed
+- **The background-job layer, in full.** `worker.py` (taskiq broker +
+  `reindex_docs` + the nightly `0 3 * * *` cron), the `taskiq`/`taskiq-redis`
+  dependencies, the `worker` and `scheduler` compose services,
+  `POST /api/reindex`, the `ASSISTANT_CORPUS_DIR` setting, and the UI's
+  Re-index button.
+
+  It was a no-op in every real configuration. Its only job was re-ingesting a
+  folder of Markdown from disk, but the knowledge base is filled at upload
+  time — a document is embedded once, when it arrives, so there was no batch
+  left to schedule. With no corpus folder configured the nightly task logged
+  "skipped" and returned 0, and the Re-index button returned 400 by design.
+
+  What was lost is the "task queue" line in the stack description. The honest
+  version is better: *documents are indexed on upload, so there is no batch to
+  schedule.* Keeping a queue in order to be able to point at a queue is how
+  dead weight gets defended. The taskiq-vs-arq decision record is kept in
+  `tech-stack.md`, marked reversed — it was the right pick for a job that
+  turned out not to exist.
+
+  `POST /api/documents` bearer-auth coverage moved off the deleted
+  `/api/reindex` and onto `/api/documents`, so the guard stayed tested.
+
 ### Changed
 - **Groq removed; two modes, both documented.** The project now runs either
   fully **mocked** (`ASSISTANT_LLM_PROVIDER=fake` — no key, no network, no
@@ -106,7 +202,7 @@ this file records what changed after the initial nine phases.
   yaml/toml/json, private-key, merge-marker and large-file checks that run
   nowhere else in CI.
 - **`pytest-xdist`**, used in CI (`-n auto`) but deliberately not in `addopts`.
-  Measured on 301 tests: serial 26.3s, `-n 2` 19.0s, `-n 4` **16.1s**, `-n 8`
+  Measured on the full suite: serial 26.3s, `-n 2` 19.0s, `-n 4` **16.1s**, `-n 8`
   22.4s, `-n auto` (12 workers) 30.1s — *slower than serial*, because each
   worker pays interpreter and fixture startup for a half-minute suite. CI uses
   `auto` because its runners have four cores.

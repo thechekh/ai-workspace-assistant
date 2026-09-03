@@ -5,11 +5,13 @@ Full per-tool schemas, examples, and failure modes live in
 the working understanding: the inventory, how execution flows, and the
 guards.
 
-## The inventory (7 tools, 2 origins)
+## The inventory (9 tools, 2 origins)
 
 | Tool | Origin | One line |
 |---|---|---|
 | `search_docs` | native | RAG over internal docs (chapter 05) — architecture, services, deployment, guidelines, onboarding. Cites `[source — heading]` |
+| `repo_read_file` | native | One exact file from any GitHub repo — tokenless for public repos; the "show me the real code" tool |
+| `ingest_repo` | native | **The one write tool**: "ingest the docs from owner/name" pulls a repo's `.md`/`.txt`/`.rst` into the KB as `owner/repo/path` sources. Additive only — pinned by test |
 | `fetch_url` | native | Public web pages (HTML→text) and GitHub: repo URL → description+README via API, account URL → public repo list. The "never guess a page's content" tool |
 | `code__search_code` | MCP `code` server | Case-insensitive regex over **this** repository (pure Python walker; respects text extensions, skips build dirs) |
 | `code__read_file` | MCP `code` server | Read a file from this repository (path-escape guarded, windowed by lines) |
@@ -38,11 +40,41 @@ Two things that measurement turned up, both worth knowing before you swap:
   tokens-per-minute allowance for `gpt-4.1-nano`. Use the server's
   toolset flags (`--toolsets pull_requests,issues`) to trim it if you swap.
 
-That cost is the real argument for the mock, and it is a better answer than
-"we didn't have a token": the mock proves the *architecture* — discovery,
-namespacing, graceful degradation — at 3 tools instead of 44.
+That cost is the real argument for the mock in *development*, and it is a
+better answer than "we didn't have a token": the mock proves the
+*architecture* — discovery, namespacing, graceful degradation — at 3 tools
+instead of 44, for free, in CI, with no credentials.
+
+It is not the answer for a demo. The mock is the development profile; the
+production profile runs the real server. See
+[demo-runbook.md](../project/demo-runbook.md) and
+[`.env.production.example`](../../.env.production.example).
+
+### Two ways to connect the real one
+
+| | Hosted (`transport: http`) | Container (`transport: stdio`) |
+|---|---|---|
+| Endpoint | `https://api.githubcopilot.com/mcp/` | `ghcr.io/github/github-mcp-server` |
+| Needs Docker | no | yes |
+| Auth | `Authorization: Bearer <PAT>` header | `GITHUB_PERSONAL_ACCESS_TOKEN` env |
+| Trim toolsets | `X-MCP-Toolsets` header, `/readonly` path | `GITHUB_TOOLSETS` env |
+
+The hosted route needs authentication headers, which is why `MCPServerConfig`
+carries a **`headers`** field ([config.py](../../src/assistant/config.py)):
+without it the `http` transport can only reach unauthenticated servers, so the
+hosted GitHub server was unreachable regardless of the PAT. The headers become
+an `httpx` client handed to the transport in
+[`MCPRegistry._connect`](../../src/assistant/mcp/registry.py), and
+`tests/test_mcp.py` asserts the credential actually reaches the wire.
 
 ## How a tool call executes (the seam)
+
+Five guards live on this one seam, so every tool — native or MCP, any
+backend — gets them for free: crash isolation (a tool exception becomes an
+`error:` *result*), the duplicate-call guard, telemetry (span + metrics +
+log), and a **20k-char cap on the result** before it re-enters the prompt —
+tool output is billed prompt tokens, and an uncapped listing once cost 57x a
+normal turn.
 
 Every call — from any of the three backends — funnels through **`Tool.run`**
 ([agent/tools/base.py](../../src/assistant/agent/tools/base.py)):

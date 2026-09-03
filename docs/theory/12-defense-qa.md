@@ -11,7 +11,7 @@ cite one, be ready to run the command.
 
 | Claim | Value | How to prove it |
 |---|---|---|
-| Tests | 212 backend + 16 frontend | `uv run pytest -q`, `npm run test:run` |
+| Tests | 344 backend tests + 35 frontend tests | `uv run pytest -q`, `npm run test:run` |
 | Coverage | 83.7%, floor enforced in CI | `uv run pytest --cov` |
 | Retrieval quality | recall@1 **0.83**, recall@5 **1.00**, MRR **0.92** | `uv run python evals/run_retrieval.py --memory` |
 | Agent backends | 98 / 266 / 278 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
@@ -172,11 +172,12 @@ build step and why `test_docs_consistency.py` asserts the numbers the
 documents quote.
 
 **Q: Where does the knowledge base come from?**
-It starts **empty** — no seed data ships with the app. Documents are added
-at runtime: a Documents panel in the UI, `POST /api/documents`, or an
-ingest CLI, with an optional `ASSISTANT_CORPUS_DIR` for a folder you want
-kept in sync. `evals/corpus/` exists only as the retrieval test fixture that
-the golden set's answers live in.
+It starts **empty** — no seed data ships with the app, and nothing pre-loads
+it. Documents are added at runtime: a Documents panel in the UI,
+`POST /api/documents`, or a one-off ingest CLI. There is no scheduled
+re-index, because a document is embedded once at upload — nothing drifts.
+`evals/corpus/` exists only as the retrieval test fixture that the golden
+set's answers live in.
 
 **Q: What happens when retrieval finds nothing useful?**
 It says so, and distinguishes two cases the model must handle differently:
@@ -305,7 +306,7 @@ accounts.
 Remove the nondeterminism from every layer except the one under evaluation:
 scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-**309 tests in ~22 seconds, fully offline** — no network, no containers, no
+**344 tests in ~23 seconds, fully offline** — no network, no containers, no
 keys. Model *quality* is deliberately out of unit scope; that's what the
 eval harness is for.
 

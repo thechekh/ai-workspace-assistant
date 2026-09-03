@@ -77,22 +77,33 @@ provisioned dashboard in Grafana (:3000, no login). Chapter 07 is the tour.
 ### Everything in containers (full platform)
 
 ```sh
-docker compose --profile app up --build   # api + worker + scheduler + redis + qdrant
+docker compose --profile app up --build   # api + redis + qdrant
 ```
 
-## Background jobs (optional in dev)
+## Filling the knowledge base
+
+It starts empty and stays empty until you put something in it. Nothing
+pre-loads it, and nothing re-indexes on a schedule — a document is embedded
+once, when it is uploaded, so there is no batch job to run.
+
+Four ways in:
 
 ```sh
-uv run taskiq worker assistant.worker:broker        # processes queued re-index jobs
-uv run taskiq scheduler assistant.worker:scheduler  # fires the nightly cron (03:00)
+# 1. ask the assistant, in chat:
+#      "ingest the docs from thechekh/demo-payments-platform"
+#      (add "including the code" and source files are indexed too)
+#    -> the agent calls its ingest_repo tool; the next question answers from them
+# 2. the UI's Documents panel  (drag in .md / .txt / .rst, or paste text)
+# 3. over HTTP
+curl -F "files=@architecture.md" localhost:8000/api/documents
+# 4. a folder, one-off from the CLI
+uv run python -m assistant.rag.ingest <folder> [--recreate]
 ```
 
-Both only do something when **`ASSISTANT_CORPUS_DIR`** points at a folder;
-without it the nightly job is a no-op and the UI's **Re-index** button returns
-400, because documents added through `POST /api/documents` live in Qdrant and
-need no re-indexing. With a corpus configured and real Redis the button queues
-a job (needs the worker running); with `fakeredis://` it re-indexes inline.
-CLI alternative: `uv run python -m assistant.rag.ingest <folder> [--recreate]`.
+`ingest_repo` names every source `owner/repo/path`, so two repositories can
+never overwrite each other's `README.md`. Public repos work with no token;
+set `ASSISTANT_GITHUB_TOKEN` (fine-grained, read-only) for private ones. It
+is the agent's **only** write capability — additive, and pinned by a test.
 
 ## Frontend development
 
@@ -126,10 +137,10 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 | `SESSION_TTL_SECONDS` | `86400` | How long transcript, summary and audit trail live in Redis |
 | `RATE_LIMIT_ENABLED` | `true` | Master switch for both limiters below |
 | `RATE_LIMIT_TURNS_PER_MINUTE` | `20` | Chat turns per session; `0` disables just this bucket |
-| `RATE_LIMIT_UPLOADS_PER_HOUR` | `50` | Indexing requests per caller (`POST /api/documents`, `/api/reindex`) |
+| `RATE_LIMIT_UPLOADS_PER_HOUR` | `50` | Indexing requests per caller (`POST /api/documents`) |
 | `SYSTEM_PROMPT` | *(see config.py)* | Steers tool choice and the honesty rules — override to change persona/behaviour |
 | `DEBUG` | `true` | Also serves the minimal WS console at `/dev` |
-| `CORPUS_DIR` | *(unset)* | Optional folder to (re)ingest from; unset means the knowledge base is filled via `POST /api/documents` |
+| `GITHUB_TOKEN` | *(unset)* | For the `ingest_repo` tool: unset = public repos only (60 req/h); a read-only PAT unlocks private repos |
 | `MCP_ENABLED` | `true` | Master switch for MCP tool servers |
 | `MCP_SERVERS` | *(two bundled stdio servers)* | JSON list — see `.env.example` for the real-GitHub swap |
 | `REDIS_URL` | `redis://localhost:6379/0` | `fakeredis://` = in-memory, zero setup |

@@ -66,12 +66,6 @@ own model layer and typed tools; langgraph models the loop as a state graph.
 *Where:* [agent/backends/](../../src/assistant/agent/backends/);
 measured comparison: [backend comparison](../reference/backend-comparison.md).
 
-### taskiq + taskiq-redis
-Background jobs over the same Redis: the UI's Re-index button queues a job;
-a scheduler fires the nightly re-index (cron `0 3 * * *`). In `fakeredis://`
-mode re-indexing runs inline instead (no queue available).
-*Where:* [worker.py](../../src/assistant/worker.py).
-
 ## Observability
 
 ### structlog
@@ -120,7 +114,7 @@ per-turn stats line, the "details" audit timeline, and the deep-health dot.
 ## Testing & quality
 
 ### pytest + pytest-asyncio + fakeredis + in-memory Qdrant
-129 deterministic tests, no network, no Docker: the WS suite runs across all
+344 deterministic tests, no network, no Docker: the WS suite runs across all
 three backends via parametrized fixtures; provider quirks (429s, a provider's
 `tool_use_failed`, leaked tool syntax) are reproduced with scripted fakes.
 *Where:* [tests/](../../tests/); chapter 09.
@@ -137,4 +131,4 @@ frontend job (typecheck → vitest → build) and a Docker image build.
 |---|---|
 | `docker compose up -d` | redis, qdrant (dev default) |
 | `docker compose --profile observability up -d` | + jaeger, prometheus, grafana |
-| `docker compose --profile app up --build` | + api, worker, scheduler (everything in containers) |
+| `docker compose --profile app up --build` | + api (everything in containers) |

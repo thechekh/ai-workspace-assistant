@@ -69,3 +69,58 @@ async def test_disabled_server_is_skipped():
     tools = await registry.start()
     await registry.close()
     assert tools == []
+
+
+async def test_http_transport_sends_auth_headers(monkeypatch):
+    """A remote server's credentials must reach the wire.
+
+    GitHub's hosted MCP server authenticates with `Authorization: Bearer <PAT>`,
+    so `headers` has to arrive as an httpx client on the transport — without
+    this the http transport can only ever talk to unauthenticated servers.
+    """
+    captured: dict[str, object] = {}
+
+    def fake_transport(url: str, *, http_client=None, **kwargs):
+        captured["url"] = url
+        captured["headers"] = dict(http_client.headers) if http_client else None
+        raise RuntimeError("stop here — the handshake is not what is under test")
+
+    monkeypatch.setattr("assistant.mcp.registry.streamable_http_client", fake_transport)
+
+    registry = MCPRegistry(
+        [
+            MCPServerConfig(
+                name="github",
+                transport="http",
+                url="https://api.githubcopilot.com/mcp/",
+                headers={"Authorization": "Bearer ghp_example"},
+            )
+        ]
+    )
+    tools = await registry.start()  # degrades gracefully past the RuntimeError
+    await registry.close()
+
+    assert tools == []
+    assert captured["url"] == "https://api.githubcopilot.com/mcp/"
+    headers = captured["headers"]
+    assert isinstance(headers, dict)
+    assert headers.get("authorization") == "Bearer ghp_example"
+
+
+async def test_http_transport_without_headers_passes_no_client(monkeypatch):
+    """No headers configured = no bespoke client, so the SDK keeps its defaults."""
+    captured: dict[str, object] = {}
+
+    def fake_transport(url: str, *, http_client=None, **kwargs):
+        captured["http_client"] = http_client
+        raise RuntimeError("stop here")
+
+    monkeypatch.setattr("assistant.mcp.registry.streamable_http_client", fake_transport)
+
+    registry = MCPRegistry(
+        [MCPServerConfig(name="plain", transport="http", url="http://localhost:9999/mcp")]
+    )
+    await registry.start()
+    await registry.close()
+
+    assert captured["http_client"] is None

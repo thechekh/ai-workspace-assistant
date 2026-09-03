@@ -99,7 +99,7 @@ Why this is good engineering, not a shortcut:
   work?"** (sessions, streaming, tool loop, retrieval — testable
   deterministically) from **"is the model smart?"** (a model-quality
   question you evaluate separately).
-- All 309 tests run in seconds, offline, at $0 — no flaky network, no burnt
+- All 344 tests run in seconds, offline, at $0 — no flaky network, no burnt
   quota, no nondeterministic assertions.
 - The demo works on a train. With a OpenAI key it becomes a real model with
   zero code changes.

@@ -29,7 +29,7 @@ Modern Python stack for the bench project. For each area: the chosen technology,
 | Embeddings | **text-embedding-3-small → compare voyage-3** 🧪 | BGE-M3 (local), jina | Cheap start, then measured comparison on a golden set; see §Embeddings |
 | Vector DB | **Qdrant** | Weaviate, Chroma, pgvector, LanceDB | Fast, great payload filters, native hybrid search, single container |
 | Short-term memory | **Redis** + conversation summarization | in-process dicts, Postgres | Spec'd; survives restarts, TTLs for sessions, doubles as job broker |
-| Background jobs | **taskiq** (+ taskiq-redis, taskiq-fastapi) | arq, Celery, Dramatiq, RQ | Async-native and actively maintained; see §Background jobs |
+| Background jobs | **none** (taskiq removed) | taskiq, arq, Celery, Dramatiq, RQ | Chosen, built, then removed — nothing left to schedule; see §Background jobs |
 | Observability | **Logfire + Langfuse combined** via OpenTelemetry | pick one | Both are OTel-based so they compose; see §Observability |
 | Testing | **pytest + pytest-asyncio + httpx + respx** + golden RAG evals | — | Standard modern stack |
 | Frontend | **Vue 3 + Vite + TypeScript** | single-file HTML, Streamlit, React | User preference; real SPA experience with WS streaming |
@@ -200,7 +200,16 @@ The description names "OpenAI / Claude" — in a production version the same con
 
 ## Background jobs
 
-**taskiq + taskiq-redis + taskiq-fastapi.** ✅ (Celery explicitly rejected.)
+**taskiq + taskiq-redis.** Chosen, built in Phase 8 — and **removed in full**.
+
+> **Reversed 2026-09-01.** The only job was a nightly re-index of a corpus
+> folder, and the knowledge base is filled at upload time instead: a document
+> is embedded once, when it arrives, so there was no batch left to run. The
+> job was a no-op in every real configuration. taskiq, the worker and
+> scheduler services, `POST /api/reindex`, `ASSISTANT_CORPUS_DIR` and the UI
+> Re-index button are all gone. The reasoning below is kept as the record of
+> why taskiq beat the alternatives — it was the right pick for a job that
+> turned out not to exist.
 
 Why taskiq over arq (both were candidates):
 
@@ -289,7 +298,6 @@ src/assistant/       # Python backend
 | Service | Image / build | Purpose |
 |---|---|---|
 | `api` | project Dockerfile (uv-based) | FastAPI + uvicorn |
-| `worker` | same image, taskiq entrypoint | ingestion & scheduled jobs |
 | `qdrant` | `qdrant/qdrant` | vector DB (volume-persisted) |
 | `redis` | `redis:7-alpine` | memory + task broker |
 | `frontend` | node build stage → nginx (or served by `api`) | Vue SPA |

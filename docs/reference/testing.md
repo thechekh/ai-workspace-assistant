@@ -88,7 +88,7 @@ uv run uvicorn assistant.main:app --port 8000
 ```sh
 docker compose up -d               # redis + qdrant
 # .env: remove/comment ASSISTANT_REDIS_URL (defaults to localhost:6379)
-uv run python -m assistant.rag.ingest evals/corpus   # or click "Re-index"
+uv run python -m assistant.rag.ingest evals/corpus   # fills the empty KB
 uv run uvicorn assistant.main:app --port 8000
 ```
 
@@ -97,9 +97,6 @@ uv run uvicorn assistant.main:app --port 8000
 - [ ] **Real RAG**: `Which service generates PDF invoices?` → `search_docs`
       returns actual chunks like `[architecture/services.md — billing-service]
       (score …)`; the answer cites the source file.
-- [ ] **Re-index button** *(only with `ASSISTANT_CORPUS_DIR` set — without it the endpoint returns 400 by design, because uploaded documents need no re-indexing)*: toast `Re-index queued` (real Redis → taskiq path;
-      run `uv run taskiq worker assistant.worker:broker` to process it) or
-      `Re-indexed N chunks` inline when on fakeredis.
 - [ ] **Sessions survive restarts**: restart uvicorn, reload page — history
       still there (Redis persistence).
 - [ ] **Degradation drill**: `docker stop bench_project-qdrant-1` → dot turns
@@ -170,7 +167,7 @@ docker compose --profile observability up -d   # Jaeger + Prometheus + Grafana
 ```
 
 - [ ] Open `http://localhost:8000/?token=s3cret` once → UI works (token is
-      persisted); without it the WS closes (1008) and `/api/reindex`,
+      persisted); without it the WS closes (1008) and `/api/documents`,
       `/api/sessions/{id}/turns` return 401. `/api/info`, `/api/health`,
       `/healthz`, `/metrics` stay open.
 - [ ] `details` timeline still loads (the UI sends the bearer header).

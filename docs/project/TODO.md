@@ -19,10 +19,10 @@ All 9 planned phases are **complete**, plus a code-quality pass:
 | Tools | `search_docs`, `fetch_url` (web + GitHub API), 2 MCP servers; per-turn duplicate guard; one telemetry seam |
 | MCP | Client registry + 2 bundled stdio servers (real code-search, mock GitHub with real tool names) |
 | Memory | Rolling summarization — prompts provably stop growing (tested ×3 backends) |
-| Platform | taskiq worker + nightly re-index, optional bearer auth, /api/info + /api/reindex, Vue UI |
+| Platform | optional bearer auth, /api/info + /api/documents, Vue UI |
 | Observability | structlog JSON + correlation IDs, OTel spans → Jaeger, /metrics + Grafana, deep health, audit trail, per-turn stats + cost in UI |
 | Provider hardening | 429 backoff, a provider's `tool_use_failed` retry + salvage, leaked-tool-syntax parsing, friendly WS errors, 60s timeout |
-| Quality | 212 Python tests (83.8% coverage, floor enforced) + 16 frontend tests; ruff (strict rules) + pyright clean |
+| Quality | 344 Python tests (84.9% coverage, floor enforced) + 35 frontend tests; ruff (strict rules) + pyright clean |
 | CI | Python 3.12 **and** 3.13 matrix, frontend typecheck/test/build, Docker image build, coverage gate, retrieval quality gate, pre-commit hooks |
 | Docker | Multi-stage build ✅ verified; non-root; healthchecks; pinned tags; `--profile app` stack ✅ verified end-to-end |
 | Docs | All under [docs/](../README.md): [handbook](../handbook/README.md) (9 chapters), [theory](../theory/README.md) course (13), [reference](../reference/tools.md), project/ |
@@ -85,7 +85,7 @@ and blocking CPU/IO moved off the event loop.
       Deferred deliberately — the codebase is already at 0 errors on
       `standard`, and 552 suppressions would buy nothing.
 - [x] **`pytest-xdist`** — added to the dev group and used in CI (`-n auto`,
-      4 runner cores). Measured on 309 tests: serial **26.3s**, `-n 2` 19.0s,
+      4 runner cores). Measured on the full suite: serial **26.3s**, `-n 2` 19.0s,
       `-n 4` **16.1s**, `-n 8` 22.4s, `-n auto` (12 workers here) **30.1s** —
       slower than serial, because each worker pays interpreter and fixture
       startup for a suite that only lasts 26s. Deliberately *not* in
@@ -125,6 +125,12 @@ and blocking CPU/IO moved off the event loop.
       to HTML — consider an optional `ASSISTANT_GITHUB_TOKEN`).
 
 ## D. Features
+
+> Tool ideas that were *evaluated and deferred* (clone-based indexing,
+> repo_map, repo_insights, get_doc, run_sql, Atlassian, and more) have a
+> dedicated decision record with costs and revisit-triggers:
+> [future-tools.md](future-tools.md).
+
 
 - [ ] **Your side (.env, minutes each)**: ~~OpenAI key~~ *(done)*; OpenAI key →
       real rows in the embedding comparison
@@ -222,7 +228,6 @@ was done about it.
   (verified: `provider: openai` through the container); healthchecks on
   redis/qdrant with `condition: service_healthy`; all image tags pinned
   (Qdrant matched to the installed client version); healthcheck disabled on
-  worker/scheduler, which share the image but serve no HTTP.
 
 ### Tests & tooling ✅
 
@@ -235,7 +240,7 @@ was done about it.
   other.
 - pytest: `--strict-markers`/`--strict-config`, `filterwarnings = error`,
   explicit asyncio loop scope, and a `slow` marker for the subprocess-spawning
-  MCP tests (`pytest -m "not slow"` → 238 tests in ~11s).
+  MCP tests (`pytest -m "not slow"` → 305 tests in ~15s).
 - ruff: added `S` (bandit), `PT`, `LOG`, `G`, `T20` with scoped per-file
   ignores. Findings fixed properly rather than suppressed — md5 marked
   `usedforsecurity=False`, type-narrowing `assert`s replaced with `cast` (they

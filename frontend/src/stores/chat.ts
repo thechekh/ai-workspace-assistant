@@ -134,23 +134,6 @@ export const useChatStore = defineStore("chat", () => {
   void loadHealth();
   setInterval(() => void loadHealth(), 10_000);
 
-  async function reindex(): Promise<void> {
-    try {
-      const response = await fetch("/api/reindex", { method: "POST", headers: authHeaders() });
-      const payload = await response.json();
-      if (response.ok) {
-        toast(
-          "ok",
-          payload.mode === "inline" ? `Re-indexed ${payload.chunks} chunks` : "Re-index queued",
-        );
-      } else {
-        toast("error", `Re-index failed: ${payload.detail ?? response.status}`);
-      }
-    } catch (error) {
-      toast("error", `Re-index failed: ${String(error)}`);
-    }
-  }
-
   // Re-evaluated on every (re)connect: reconnects resume the same session,
   // and the backend switch rides along as a query param.
   const wsUrl = computed(() => {
@@ -353,7 +336,10 @@ export const useChatStore = defineStore("chat", () => {
 
   async function deleteDocument(source: string): Promise<void> {
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(source)}`, {
+      // Encode per segment: repo-ingested sources are "owner/repo/path" and the
+      // slashes must survive as path separators for the {source:path} route.
+      const encoded = source.split("/").map(encodeURIComponent).join("/");
+      const response = await fetch(`/api/documents/${encoded}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -466,7 +452,6 @@ export const useChatStore = defineStore("chat", () => {
     loadSessions,
     switchSession,
     deleteSession,
-    reindex,
     fetchTurnEvents,
     documents,
     documentsLoading,

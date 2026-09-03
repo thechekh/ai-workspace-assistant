@@ -21,7 +21,7 @@ put to you at that exact point, and the answer.
 
 If you only have ten minutes before you present, read these six:
 
-1. [`api/ws.py` → `_handle_turn`](../../src/assistant/api/ws.py#L172) — the conductor
+1. [`api/ws.py` → `_handle_turn`](../../src/assistant/api/ws.py#L173) — the conductor
 2. [`agent/backends/custom.py` → `CustomAgent.run`](../../src/assistant/agent/backends/custom.py#L53) — the agent loop, 45 lines
 3. [`agent/tools/base.py` → `Tool.run`](../../src/assistant/agent/tools/base.py#L34) — the one seam every tool call passes through
 4. [`rag/retriever.py` → `search`](../../src/assistant/rag/retriever.py#L43) — retrieve → rerank → gate
@@ -37,7 +37,7 @@ If you only have ten minutes before you present, read these six:
 
 `create_app` is a factory, not a module-level app. Everything a request needs
 is assembled once in `build_runtime` into a
-[`Runtime` dataclass](../../src/assistant/main.py#L47) — Redis, the LLM client,
+[`Runtime` dataclass](../../src/assistant/main.py#L53) — Redis, the LLM client,
 the session store, memory, the three agent backends, the HTTP client, Qdrant,
 the MCP registry — and released in order by `Runtime.aclose`.
 
@@ -46,7 +46,7 @@ Two deliberate details:
 - **The keyword overrides** (`redis_client=`, `llm=`, `retriever=`) exist so
   tests substitute whole collaborators — fakeredis, `FakeLLM`, in-memory
   Qdrant — without the factory growing `if x is None` branches.
-- **[`__getattr__`](../../src/assistant/main.py#L229)** builds the app lazily.
+- **[`__getattr__`](../../src/assistant/main.py#L230)** builds the app lazily.
   uvicorn resolves `assistant.main:app` with `getattr`, so the documented run
   command is unchanged, but *importing* the module no longer reads a
   developer's `.env`, reconfigures global logging, or installs an OTLP tracer.
@@ -54,7 +54,7 @@ Two deliberate details:
 
 **If asked — "why a factory instead of a module-level `app`?"**
 Because a module-level app runs its side effects at import time, and the test
-suite imports the module. Lazy construction is what lets 309 tests run with no
+suite imports the module. Lazy construction is what lets 344 tests run with no
 `.env`, no network and no containers.
 
 ---
@@ -96,7 +96,7 @@ incoming = TypeAdapter(ClientMessage).validate_json(raw)
 The critical structural decision is a few lines down: the turn is started as
 an **`asyncio.Task`**, not awaited inline. A loop that awaits the answer cannot
 read the next frame, and reading the next frame is the only way a `cancel` can
-arrive mid-stream. A [done-callback](../../src/assistant/api/ws.py#L162)
+arrive mid-stream. A [done-callback](../../src/assistant/api/ws.py#L163)
 retrieves the task's exception so a failure cannot vanish into asyncio's
 "Task exception was never retrieved" at GC time.
 
@@ -109,7 +109,7 @@ is exactly what a WebSocket provides.
 
 ## Step 3 — The budget guard
 
-**[`_within_rate_limit`](../../src/assistant/api/ws.py#L141)** →
+**[`_within_rate_limit`](../../src/assistant/api/ws.py#L142)** →
 **[`RateLimiter.check`](../../src/assistant/api/rate_limit.py#L49)**
 
 Checked *before* the turn starts, so a runaway client costs one Redis round
@@ -127,7 +127,7 @@ against a stuck client. The provider's 429 is handled separately in
 
 ## Step 4 — The conductor
 
-**[`_handle_turn`](../../src/assistant/api/ws.py#L172)**
+**[`_handle_turn`](../../src/assistant/api/ws.py#L173)**
 
 Owns the socket, the `agent.turn` span, error mapping and persistence. The
 *accounting* deliberately lives elsewhere, in

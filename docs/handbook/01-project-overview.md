@@ -42,7 +42,6 @@ flowchart LR
     subgraph Infra
         REDIS[(Redis<br/>sessions + audit)]
         QDRANT[(Qdrant<br/>docs collection)]
-        WORKER[taskiq worker<br/>nightly re-index]
     end
     subgraph Providers
         PROVIDER[OpenAI / Ollama / Gemini<br/>or offline FakeLLM]
@@ -60,7 +59,6 @@ flowchart LR
     WS --> MEM --> REDIS
     API -. OTel spans .-> JAEGER
     PROM -. scrapes /metrics .-> API
-    WORKER --> QDRANT
 ```
 
 ## One message, end to end (the walkthrough to memorize)
@@ -100,7 +98,7 @@ src/assistant/
   config.py            all settings (pydantic-settings, ASSISTANT_* env vars)
   api/  ws.py          WebSocket chat: the turn conductor
         turn_recorder.py  per-turn accounting -> stats frame + audit record
-        routes.py      /api/info /api/health /api/sessions/{id}/turns /api/reindex
+        routes.py      /api/info /api/health /api/documents /api/sessions/{id}/turns
         schemas.py     typed WS protocol (incl. TurnSummary)
   agent/ base.py       the AgentBackend contract + event types
         registry.py    settings -> {custom, pydantic_ai, langgraph}
@@ -114,12 +112,11 @@ src/assistant/
   mcp_servers/         bundled stdio servers: code_search, fake_github
   memory/              SessionStore (Redis), ConversationMemory, summarizer
   logs.py telemetry.py observability.py    the observability layer
-  worker.py            taskiq broker + nightly re-index (cron 0 3 * * *)
 frontend/              Vue 3 + Pinia + Vite chat UI
 evals/corpus/          retrieval test fixture (golden-set answers live here)
 observability/         Prometheus config + Grafana provisioning + dashboard
 evals/                 golden set + retrieval quality + embedding comparison
-tests/                 129 deterministic tests (no network, no Docker needed)
+tests/                 344 deterministic tests (no network, no Docker needed)
 docs/                  ALL documentation (handbook, theory, reference, project)
 ```
 
@@ -127,7 +124,7 @@ docs/                  ALL documentation (handbook, theory, reference, project)
 
 Phases 1–8 built the platform incrementally: WS chat + sessions → RAG →
 tool-calling agent loop → MCP → the two alternative agent runtimes →
-conversation memory → platform features (taskiq jobs, auth, Vue UI) → docs
+conversation memory → platform features (auth, Vue UI) → docs
 and evals. Phase 9 added maximum observability (logs+correlation IDs, OTel
 spans → Jaeger, /metrics + Grafana, deep health, audit trail, per-turn UI
 stats), followed by provider hardening (rate-limit backoff, llama tool-call

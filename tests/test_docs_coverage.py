@@ -163,14 +163,13 @@ def test_every_runtime_dependency_is_named() -> None:
         "docker compose up",
         "npm run dev",
         "npm run build",
-        "uv run taskiq worker",
         "python -m assistant.rag.ingest",
         "evals/run_retrieval.py",
         "pre-commit",
     ],
 )
 def test_every_command_a_reader_needs_appears(command: str) -> None:
-    """How to run it: install, serve, test, lint, ingest, evaluate, background."""
+    """How to run it: install, serve, test, lint, ingest, evaluate."""
     assert _mentioned(command), f"no document shows how to run `{command}`"
 
 

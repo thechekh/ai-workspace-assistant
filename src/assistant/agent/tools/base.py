@@ -19,6 +19,24 @@ logger = structlog.get_logger("assistant.tools")
 
 ToolHandler = Callable[[dict[str, object]], Awaitable[str]]
 
+# Whatever a tool returns is pasted verbatim into the next LLM request, and
+# every character of it is billed — measured live, one PR listing against a
+# busy repository came back as ~149,000 prompt tokens ($0.0154, 57x a normal
+# turn), and a large enough result would overflow the context outright. 20k
+# chars (~5k tokens) keeps any single tool result to a bounded worst case;
+# the marker tells the model the cut happened so it can narrow the request
+# instead of trusting a silently partial listing.
+TOOL_RESULT_MAX_CHARS = 20_000
+
+
+def _cap_result(result: str) -> str:
+    if len(result) <= TOOL_RESULT_MAX_CHARS:
+        return result
+    return result[:TOOL_RESULT_MAX_CHARS] + (
+        f"\n...[truncated: {len(result):,} chars total — ask for fewer or "
+        "more specific results to see the rest]"
+    )
+
 
 @dataclass(frozen=True)
 class Tool:
@@ -53,7 +71,7 @@ class Tool:
         with tracer.start_as_current_span("tool.execute") as span:
             span.set_attribute("tool.name", self.name)
             try:
-                result = await self.handler(dict(arguments))
+                result = _cap_result(await self.handler(dict(arguments)))
             except Exception as exc:  # a tool crash must not kill the agent loop
                 status = "crash"
                 result = f"error: tool {self.name!r} failed: {exc}"

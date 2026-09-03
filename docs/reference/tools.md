@@ -108,6 +108,44 @@ match on the host; production would resolve DNS and enforce an egress
 allowlist). GitHub API calls are unauthenticated (60 req/h per IP) — enough
 for chat use; on rate-limit the tool falls back to fetching the HTML page.
 
+### `ingest_repo` — add a GitHub repo's docs to the knowledge base (native, **the one write**)
+
+| Parameter | Type | Required | Meaning |
+|---|---|---|---|
+| `repo` | string | yes | `owner/repository`, e.g. `thechekh/demo-payments-platform` |
+| `ref` | string | no | branch/tag/SHA; default branch when omitted |
+
+Fetches every `.md`/`.txt`/`.rst` in the repository (≤100 files, ≤2 MB each) —
+and with `include_code=true` also its source files (`.py`/`.ts`/`.go`/…,
+≤300 KB each; lockfiles, `node_modules` and minified bundles are skipped) —
+and indexes them as `owner/repo/path` sources — re-running refreshes that
+repo's documents in place, and two repos can never overwrite each other.
+Returns the indexed source list so the model can cite what it just learned;
+failures come back as `error:` text (missing repo, no docs, bad name).
+Additive only — it cannot delete or modify anything, which
+`test_review_regressions.py` pins as the sole exception to the otherwise
+read-only tool surface. Uses `ASSISTANT_GITHUB_TOKEN` for private repos.
+*Implementation:* [agent/tools/ingest_repo.py](../../src/assistant/agent/tools/ingest_repo.py),
+[rag/repo.py](../../src/assistant/rag/repo.py).
+
+### `repo_read_file` — one exact file from any GitHub repo (native)
+
+| Parameter | Type | Required | Meaning |
+|---|---|---|---|
+| `repo` | string | yes | `owner/repository` |
+| `path` | string | yes | file path inside the repo, e.g. `services/payments/adapter.py` |
+| `ref` | string | no | branch/tag/SHA; default branch when omitted |
+
+The other half of the code story: `ingest_repo(include_code=true)` makes a
+repo's source searchable, `search_docs` finds the chunk (source =
+`owner/repo/path`), and this opens the full file so the answer can show real
+code. **Public repositories need no token** — the project's value never
+hinges on a PAT; `ASSISTANT_GITHUB_TOKEN` extends it to private repos.
+Read-only; one validated GET against `api.github.com` (the model never
+supplies a URL); long files are truncated by the shared 20k result cap.
+*Implementation:* [agent/tools/repo_read.py](../../src/assistant/agent/tools/repo_read.py),
+[rag/repo.py](../../src/assistant/rag/repo.py).
+
 ### `code__search_code` — regex search over a repository (MCP: `code` server)
 
 | | |

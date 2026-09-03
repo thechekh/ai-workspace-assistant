@@ -13,6 +13,7 @@ from assistant.agent.base import (
     ErrorEvent,
     FinalEvent,
 )
+from assistant.agent.output_guard import correct_unsupported_action_claims
 from assistant.api.rate_limit import RateLimiter
 from assistant.api.schemas import CancelRequest, ClientMessage, SessionStarted
 from assistant.api.turn_recorder import TurnRecorder
@@ -203,6 +204,18 @@ async def _handle_turn(
                 await store.append(session_id, ChatMessage(role="user", content=user_message))
 
                 async for event in agent.run(history=history, user_message=user_message):
+                    if isinstance(event, FinalEvent):
+                        # Guard here, not in a backend: all three funnel through
+                        # this loop, and the UI replaces the streamed text with
+                        # `final.content`, so correcting the event corrects what
+                        # the user actually reads and what history keeps.
+                        event = event.model_copy(
+                            update={
+                                "content": correct_unsupported_action_claims(
+                                    event.content, tools_used=recorder.tool_calls
+                                )
+                            }
+                        )
                     await websocket.send_text(event.model_dump_json())
                     recorder.observe(event)
                     if isinstance(event, FinalEvent):

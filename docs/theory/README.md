@@ -21,7 +21,7 @@ questions you're likely to get at the workshop — with answers.
 | 07 | [Conversation memory](07-memory.md) | Why chat needs memory, and how rolling summarization keeps prompts bounded |
 | 08 | [Real-time & WebSockets](08-realtime-websockets.md) | Streaming tokens to the browser: our typed WS protocol |
 | 09 | [Observability & evals](09-observability-and-evals.md) | Tracing LLM apps, and how we test something nondeterministic deterministically |
-| 10 | [Infrastructure](10-infrastructure.md) | The supporting cast: FastAPI, Redis, Qdrant, taskiq, Docker, uv/ruff/pyright, auth |
+| 10 | [Infrastructure](10-infrastructure.md) | The supporting cast: FastAPI, Redis, Qdrant, Docker, uv/ruff/pyright, auth |
 | 11 | [Glossary](11-glossary.md) | Every term in one line |
 | 12 | [Defense Q&A](12-defense-qa.md) | The hard questions and strong answers |
 

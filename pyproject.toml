@@ -20,8 +20,6 @@ dependencies = [
     "opentelemetry-api>=1.27",  # telemetry.py imports the tracer API directly
     "opentelemetry-sdk>=1.27",  # observability.py builds the provider directly
     "opentelemetry-exporter-otlp-proto-http>=1.27",
-    "taskiq>=0.11",
-    "taskiq-redis>=1.0",
     "structlog>=24.4",
     "prometheus-client>=0.20",
     "fakeredis>=2.26",  # ASSISTANT_REDIS_URL=fakeredis:// is a documented runtime mode

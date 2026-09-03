@@ -142,6 +142,7 @@ Read in **pipeline order** — this is how a document becomes an answer.
 | [`rag/rerank.py`](../../src/assistant/rag/rerank.py) | 67 | reorder + the relevance gate |
 | [`rag/retriever.py`](../../src/assistant/rag/retriever.py) | 88 | the orchestrator |
 | [`rag/ingest.py`](../../src/assistant/rag/ingest.py) | 134 | the write path |
+| [`rag/repo.py`](../../src/assistant/rag/repo.py) | 140 | GitHub repo → knowledge base, sources namespaced `owner/repo/path` |
 
 **Read:** [theory 02 — embeddings](../theory/02-embeddings-and-vector-search.md) ·
 [theory 03 — RAG](../theory/03-rag.md) ·
@@ -171,6 +172,9 @@ pipeline.
 | [`agent/tools/base.py`](../../src/assistant/agent/tools/base.py) | 102 — **the single most important file for safety** |
 | [`agent/tools/search_docs.py`](../../src/assistant/agent/tools/search_docs.py) | 76 |
 | [`agent/tools/fetch.py`](../../src/assistant/agent/tools/fetch.py) | 173 |
+| [`agent/tools/repo_read.py`](../../src/assistant/agent/tools/repo_read.py) | 82 — one exact file from any GitHub repo, tokenless for public |
+| [`agent/tools/ingest_repo.py`](../../src/assistant/agent/tools/ingest_repo.py) | 100 — the one write tool: adds a repo's docs, nothing else |
+| [`agent/output_guard.py`](../../src/assistant/agent/output_guard.py) | 54 — why a prompt rule is not a control |
 | [`agent/backends/custom.py`](../../src/assistant/agent/backends/custom.py) | 98 — the ReAct loop, no framework |
 
 **Read:** [theory 04 — tool calling & agents](../theory/04-tool-calling-and-agents.md) ·
@@ -262,7 +266,6 @@ uv run pytest tests/test_memory.py -v
 | [`logs.py`](../../src/assistant/logs.py) | 56 |
 | [`api/routes.py`](../../src/assistant/api/routes.py) | 344 |
 | [`api/rate_limit.py`](../../src/assistant/api/rate_limit.py) | 87 |
-| [`worker.py`](../../src/assistant/worker.py) | 46 |
 
 **Read:** [theory 09 — observability & evals](../theory/09-observability-and-evals.md) ·
 [handbook 07](../handbook/07-observability.md) ·
@@ -350,16 +353,16 @@ Every source file, and the session that covers it. Nothing is left over.
 | Configuration & wiring | `config.py`, `main.py`, `agent/registry.py`, `agent/base.py` | 1 |
 | WebSocket & protocol | `api/schemas.py`, `api/ws.py`, `api/turn_recorder.py` | 2 |
 | LLM layer | `llm/client.py`, `llm/errors.py`, `llm/fake.py` | 3 |
-| RAG | `rag/chunking.py`, `embeddings.py`, `sparse.py`, `store.py`, `rerank.py`, `retriever.py`, `ingest.py` | 4 |
-| Tools & the loop | `agent/tools/base.py`, `search_docs.py`, `fetch.py`, `backends/custom.py` | 5 |
+| RAG | `rag/chunking.py`, `embeddings.py`, `sparse.py`, `store.py`, `rerank.py`, `retriever.py`, `ingest.py`, `repo.py` | 4 |
+| Tools & the loop | `agent/tools/base.py`, `search_docs.py`, `fetch.py`, `ingest_repo.py`, `repo_read.py`, `agent/output_guard.py`, `backends/custom.py` | 5 |
 | Frameworks | `backends/pydantic_ai.py`, `backends/langgraph.py` | 6 |
 | MCP | `mcp/registry.py`, `mcp_servers/code_search.py`, `fake_github.py` | 7 |
 | Memory | `memory/session.py`, `conversation.py`, `summarizer.py` | 8 |
-| Observability & ops | `telemetry.py`, `observability.py`, `logs.py`, `api/routes.py`, `api/rate_limit.py`, `worker.py` | 9 |
+| Observability & ops | `telemetry.py`, `observability.py`, `logs.py`, `api/routes.py`, `api/rate_limit.py` | 9 |
 | Frontend | `types.ts`, `stores/chat.ts`, `App.vue`, components | 10 |
 | Tests & evals | `tests/` (25 files), `evals/` (4 scripts) | 11 |
 
-**35 source files. 12 sessions. No gaps.**
+**38 source files. 12 sessions. No gaps.**
 
 ---
 

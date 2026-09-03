@@ -8,7 +8,7 @@ from qdrant_client import AsyncQdrantClient
 from assistant.rag.chunking import chunk_markdown
 from assistant.rag.embeddings import HashEmbedder, VoyageEmbedder, build_embedder
 from assistant.rag.ingest import ingest
-from assistant.rag.rerank import LexicalReranker
+from assistant.rag.rerank import LexicalReranker, query_overlap
 from assistant.rag.retriever import Retriever
 from assistant.rag.sparse import encode_sparse
 from assistant.rag.store import RetrievedChunk, VectorStore
@@ -153,3 +153,25 @@ def test_build_embedder_requires_voyage_key():
     settings = HermeticSettings(embedding_provider="voyage")
     with pytest.raises(ValueError, match="ASSISTANT_VOYAGE_API_KEY"):
         build_embedder(settings)
+
+
+def test_identifiers_are_searchable_by_their_words():
+    """camelCase/snake_case split at tokenization — the live 'meter percentage' miss.
+
+    `completedPercentage` lowercased-then-tokenized is one opaque token; the
+    query word "percentage" could never match it, so the relevance gate
+    discarded the exact chunk that held the answer. Splitting must keep the
+    whole identifier AND its subwords, on all three consumers (sparse, gate,
+    reranker share `tokenize`).
+    """
+    from assistant.rag.sparse import tokenize
+
+    tokens = tokenize("let completedPercentage = completedAmount / totalAmount;")
+    assert "completedpercentage" in tokens  # exact identifier still searchable
+    assert {"percentage", "completed", "total"} <= set(tokens)
+
+    assert {"snake", "case"} <= set(tokenize("snake_case_name"))
+    assert "server" in tokenize("HTTP2Server")
+
+    # The gate that failed live now passes for the natural-language question.
+    assert query_overlap("meter percentage formula", "completedPercentage = a / b") >= 1

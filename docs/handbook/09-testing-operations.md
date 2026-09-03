@@ -1,6 +1,6 @@
 # 09 — Testing, operations & troubleshooting
 
-## The automated suite (309 tests, fully offline)
+## The automated suite (344 tests, fully offline)
 
 ```sh
 uv run pytest -q          # ~26s. No network, no Docker, no keys.
@@ -88,22 +88,19 @@ model → observability).
 | **Documents** | add/remove what the assistant can search, at runtime |
 | **Standard / Dev** | hide or show tool cards and the per-turn stats line |
 | backend selector | switch agent runtime; the session carries over |
-| **Re-index** | re-ingest `ASSISTANT_CORPUS_DIR` (only if one is configured) |
 
 ## Operating it
 
 | Task | Command |
 |---|---|
 | API server (dev) | `uv run uvicorn assistant.main:app --reload` |
-| Job worker (re-index queue) | `uv run taskiq worker assistant.worker:broker` |
-| Nightly scheduler (cron 03:00) | `uv run taskiq scheduler assistant.worker:scheduler` |
-| Re-index now (CLI) | `uv run python -m assistant.rag.ingest <folder> [--recreate]` |
+| Ingest a folder (CLI) | `uv run python -m assistant.rag.ingest <folder> [--recreate]` |
 | Retrieval quality | `uv run python evals/run_retrieval.py --memory` |
 | Everything in containers | `docker compose --profile app up --build` |
 
 **Auth mode**: set `ASSISTANT_AUTH_TOKEN=<secret>` → `POST`/`DELETE
 /api/documents`, both `/api/sessions/{id}/turns[...]` routes and
-`/api/reindex` need `Authorization: Bearer`, and the WS needs `?token=`.
+`/api/documents` need `Authorization: Bearer`, and the WS needs `?token=`.
 Deliberately open: `GET /api/documents` (the panel lists before you
 authenticate), open the UI once as `/?token=<secret>` (persisted). `/api/info`,
 `/api/health`, `/healthz`, `/metrics` stay open by design. Production path:
@@ -127,7 +124,6 @@ keeps them out of logs. The `log_prompts` toggle is dev-only by policy
 | `search_docs` returns chunks from a repo you tested with | you ingested extra sources into `docs` | `uv run python -m assistant.rag.ingest evals/corpus --recreate` |
 | Chat: *"LLM authentication failed"* / *"Model not available"* | bad key / model name typo | fix `ASSISTANT_LLM_API_KEY` / `ASSISTANT_LLM_MODEL`, restart |
 | UI loads but "disconnected" | server down, or auth on and no `?token=` | start server / open `/?token=<secret>` |
-| Re-index button says "queued" but nothing happens | real Redis without a running worker | start the worker, or use the CLI ingest |
 | No traces in Jaeger | `ASSISTANT_OTLP_ENDPOINT` unset, or stack not up | set it + restart server; check :16686 is reachable |
 | Prometheus target down at `api:8000` | you run the server on the host | expected — `host.docker.internal:8000` is the live target |
 | `fetch_url` shows GitHub page chrome instead of clean README | unauthenticated GitHub API rate limit (60 req/h) → HTML fallback | wait an hour, or accept — the model still reads it |

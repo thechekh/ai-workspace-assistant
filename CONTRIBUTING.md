@@ -19,7 +19,7 @@ for the four run modes.
 The same gates run in CI, so run them locally first:
 
 ```sh
-uv run pytest -q            # 212 tests, offline, ~15s
+uv run pytest -q            # 344 tests, offline, ~20s
 uv run ruff check . && uv run ruff format --check .
 uv run pyright
 cd frontend && npm run lint && npm run typecheck && npm run test:run

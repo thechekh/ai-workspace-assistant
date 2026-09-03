@@ -49,8 +49,13 @@ the documents it should answer from at runtime:
 - **Over HTTP**: `POST /api/documents` (multipart `files=` and/or
   `text=`+`source=`), `GET /api/documents` to list, `DELETE
   /api/documents/{source}` to remove.
-- **From a folder**: `uv run python -m assistant.rag.ingest <folder>`, or set
-  `ASSISTANT_CORPUS_DIR` to keep one synced (nightly job + Re-index button).
+- **From a GitHub repository, by asking in chat**: *"ingest the docs from
+  owner/name"* — the agent's `ingest_repo` tool pulls every `.md`/`.txt`/`.rst`
+  and indexes it as `owner/repo/path`, so two repos' files can never collide.
+  It is the agent's only write capability (additive, pinned by a test).
+  Public repos need no token; `ASSISTANT_GITHUB_TOKEN` unlocks private ones.
+- **From a folder**: `uv run python -m assistant.rag.ingest <folder>` — a
+  one-off CLI, run when you choose to.
 
 Re-uploading the same source replaces it — chunk ids are deterministic.
 
@@ -176,19 +181,17 @@ uv run pyright              # type check
 uv run pre-commit install   # install git hooks (once)
 ```
 
-## Background jobs & full platform
-
-Document re-indexing runs as a **taskiq** job (nightly cron at 03:00, plus
-the UI's Re-index button / `POST /api/reindex`). In zero-infra mode
-(`fakeredis://`) the reindex runs inline instead of queuing.
+## Full platform
 
 ```sh
-uv run taskiq worker assistant.worker:broker        # job worker
-uv run taskiq scheduler assistant.worker:scheduler  # nightly cron
-
-# Entire platform in containers (api + worker + scheduler + redis + qdrant):
+# Entire platform in containers (api + redis + qdrant):
 docker compose --profile app up --build
 ```
+
+The knowledge base starts empty and stays that way until documents are added
+— through the UI, `POST /api/documents`, or the ingest CLI. Nothing pre-loads
+it and nothing re-indexes on a schedule: an uploaded document is embedded once
+at upload, so there is no batch to run.
 
 Optional auth: set `ASSISTANT_AUTH_TOKEN` — `/api/*` then requires a bearer
 header and the chat WS a `?token=`; open the UI once as
@@ -201,7 +204,7 @@ src/assistant/
 ├── main.py            # create_app() factory, lifespan wiring, /healthz, /dev
 ├── config.py          # pydantic-settings (ASSISTANT_* env vars)
 ├── api/               # WS /chat + turn recorder; HTTP: info, health,
-│                   #   documents, sessions/turns, reindex, metrics
+│                   #   documents, sessions/turns, metrics
 ├── agent/             # AgentBackend protocol, events, backends/ (custom | pydantic_ai | langgraph)
 ├── llm/               # provider-agnostic LLM client (fake | openai | ollama | gemini | openai)
 ├── memory/            # Redis-backed session history

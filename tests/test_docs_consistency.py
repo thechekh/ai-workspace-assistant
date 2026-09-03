@@ -21,6 +21,9 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOC_FILES = [*(REPO_ROOT / "docs").rglob("*.md"), REPO_ROOT / "README.md"]
+# Suite-size claims also live in the two root files a contributor reads first,
+# which sat two hundred tests out of date because nothing scanned them.
+COUNT_CLAIM_FILES = [*DOC_FILES, REPO_ROOT / "CLAUDE.md", REPO_ROOT / "CONTRIBUTING.md"]
 
 # Word-boundary matching matters: a substring test for "line" also matches
 # "timeline", which made an HTTP status list (429/401/404) look like a
@@ -140,12 +143,19 @@ def test_test_count_claims_agree_and_are_not_badly_stale() -> None:
     # Historical acceptance records are dated evidence, not current claims,
     # and "not slow" subset counts are a different number by design.
     skip_line = re.compile(r"\d+/\d+ tests green|not slow")
+    # An adjective between the number and "tests" used to hide the claim
+    # entirely: "129 deterministic tests" and "212 Python tests" both drifted
+    # for months because the pattern demanded the two words be adjacent.
+    claim_re = re.compile(r"\b(\d{2,4}) ((?:\w+ ){0,2}?)tests\b")
+    # The frontend suite is a different number by design, not a contradiction.
+    other_suite = re.compile(r"\b(frontend|vitest|npm|ui)\b", re.IGNORECASE)
     claims = [
         (_rel(path), int(claim.group(1)))
-        for path, text in _all_docs()
-        for line in text.splitlines()
+        for path in COUNT_CLAIM_FILES
+        for line in path.read_text(encoding="utf-8").splitlines()
         if not skip_line.search(line)
-        for claim in re.finditer(r"\b(\d{2,4}) (?:backend )?tests\b", line)
+        for claim in claim_re.finditer(line)
+        if not other_suite.search(claim.group(2))
     ]
     assert claims, "no document states the suite size — that claim should exist"
 

@@ -160,11 +160,11 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 
 ## Phase 8 — Platform polish ✅
 
-- [x] taskiq + taskiq-redis: `assistant.worker` with `reindex_docs` task + nightly cron (03:00) via `TaskiqScheduler`; `POST /api/reindex` queues it (or runs inline in zero-infra `fakeredis://` mode) — UI Re-index button included
+- [x] taskiq + taskiq-redis: `assistant.worker` with `reindex_docs` task + nightly cron (03:00) via `TaskiqScheduler`; `POST /api/reindex` queues it (or runs inline in zero-infra `fakeredis://` mode) — UI Re-index button included **— removed 2026-09-01: no batch left to schedule once the knowledge base became upload-only. See tech-stack.md §Background jobs.**
 - [x] Optional bearer-token auth (`ASSISTANT_AUTH_TOKEN`): `/api/*` via Authorization header, chat WS via `?token=` (closed 1008 otherwise); unset = open for zero-config dev; OIDC noted as the production path
 - [x] `GET /api/info`: platform shape for the UI (backends, providers, retrieval mode, auth flag)
 - [x] UI polish: SVG favicon (console 404 gone), provider badge ("fake · hybrid" + collection tooltip), transient ok/error toasts (WS errors + reindex results), Re-index button; token capture from `?token=` persisted locally. *(Sessions sidebar descoped — needs a session-listing API; noted as future work.)*
-- [x] Full-platform compose: `docker compose --profile app up` adds api + worker + scheduler (one multi-stage image: Vue build → uv runtime); plain `docker compose up -d` still starts just redis+qdrant for dev
+- [x] Full-platform compose: `docker compose --profile app up` adds the api (one multi-stage image: Vue build → uv runtime); plain `docker compose up -d` still starts just redis+qdrant for dev
 - [x] `docs/project/workshop.md`: Part 1 slide outline (with our measured numbers), Part 2 click-by-click demo script (offline-capable), Part 3 implementation walkthrough map
 
 **Acceptance (verified):** 72/72 tests green at the time (info shape, inline reindex, 503 path, bearer auth on HTTP + WS ×token cases); browser E2E on the zero-infra path — favicon loads clean, badge renders from /api/info, Re-index button fires and the error toast appears and auto-dismisses (Qdrant intentionally down). *Caveat (resolved 2026-08-08):* the compose `app` profile was unbuilt at the time. It has since been built and run end-to-end — all services healthy, deep health `ok` through the container. Building it also surfaced a real break: `pyproject` declares `readme = "README.md"` but the Dockerfile never copied it, so `uv sync` failed at the project-install step.

@@ -79,7 +79,7 @@ questions*. Read across.
 | **Security** | — | [reference/security.md](reference/security.md) — threat model + controls | [theory/12 §LLM & AI](theory/12-defense-qa.md) |
 | **Any unfamiliar term** | [theory/11 — glossary](theory/11-glossary.md) | — | — |
 
-### The reading roadmap — all 42 documents, in order
+### The reading roadmap — all 46 documents, in order
 
 Read top to bottom and you will have read **every** document in the
 repository, each one landing when you have the background for it. Tick them
@@ -176,14 +176,18 @@ The decisions and the history — this is where "why not X?" gets answered.
 | 37 | [theory/11-glossary.md](theory/11-glossary.md) | 119 terms — cover the definitions and say them aloud |
 | 38 | [theory/12-defense-qa.md](theory/12-defense-qa.md) | The hard questions, with answers. Do this without notes |
 | 39 | [project/workshop.md](project/workshop.md) | Slide outline and the click-by-click demo script |
+| 40 | [project/demo-runbook.md](project/demo-runbook.md) | Running the demo on the real stack: keys, infra, costs |
+| 41 | [reference/localhost.md](reference/localhost.md) | Every localhost link once it runs: dashboards, logs, and browsing the vector DB |
+| 42 | [project/future-tools.md](project/future-tools.md) | Every tool considered and deferred: cost, verdict, trigger to revisit |
+| 43 | [qanda/README.md](qanda/README.md) | The 48 hard questions, each followed by its grounded answer with measured numbers |
 
 #### Stage 9 · Repository conventions — only if you will contribute
 
 | # | Document | Answers |
 |---|---|---|
-| 40 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | How to set up, the quality gates, commit conventions |
-| 41 | [../SECURITY.md](../SECURITY.md) | How to report a vulnerability |
-| 42 | [../CLAUDE.md](../CLAUDE.md) | Instructions for AI coding agents working in this repo |
+| 44 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | How to set up, the quality gates, commit conventions |
+| 45 | [../SECURITY.md](../SECURITY.md) | How to report a vulnerability |
+| 46 | [../CLAUDE.md](../CLAUDE.md) | Instructions for AI coding agents working in this repo |
 
 **The short path.** No time for all of it? **1 → 4 → 6 → 25 → 38** — what it
 is, the architecture, how to run it, the code walkthrough, and the defence

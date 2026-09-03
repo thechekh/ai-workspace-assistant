@@ -31,7 +31,9 @@ Two companion folders:
 ## Every localhost URL (quick reference)
 
 Start commands are in [02-getting-started.md](02-getting-started.md); this is
-the map of what's where once things run.
+the short map. The **full page** — including how to browse the Qdrant
+collection, read logs, and use each dashboard — is
+[reference/localhost.md](../reference/localhost.md).
 
 | URL | What it is | Needs |
 |---|---|---|
@@ -58,7 +60,7 @@ bench_project-redis-1 redis-cli`), Qdrant gRPC `6334`, Jaeger OTLP ingest
 ## The 60-second mental model
 
 FastAPI serves a WebSocket chat. Each user message becomes an **agent turn**:
-an LLM (OpenAI's llama by default, a deterministic fake offline) reasons in a
+an LLM (a deterministic fake by default, OpenAI's gpt-4.1-nano in the real profile) reasons in a
 loop, calling **tools** — `search_docs` (RAG over the knowledge base in
 Qdrant, which starts empty and is filled at runtime through the Documents
 panel or `POST /api/documents`), `fetch_url` (public web/GitHub), and MCP

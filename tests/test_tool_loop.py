@@ -101,3 +101,33 @@ async def test_crashing_tool_becomes_error_result_not_exception():
     assert "failed" in result.result
     assert isinstance(events[-1], FinalEvent)
     assert events[-1].content == "recovered"
+
+
+async def test_a_huge_tool_result_is_capped_before_the_model_sees_it():
+    """Tool output is billed prompt tokens — the seam must bound the worst case.
+
+    Measured live before the cap: one PR listing against a busy repository came
+    back as ~149k prompt tokens ($0.0154, 57x a normal turn). The cap applies
+    in Tool.run, so native and MCP tools alike inherit it in all three
+    backends, and the marker tells the model to narrow the request rather than
+    trust a silently partial listing.
+    """
+    from assistant.agent.tools.base import TOOL_RESULT_MAX_CHARS
+
+    async def firehose(arguments: dict[str, object]) -> str:
+        return "x" * (TOOL_RESULT_MAX_CHARS * 3)
+
+    tool = Tool(name="firehose", description="d", parameters={}, handler=firehose)
+    result = await tool.run({})
+
+    assert len(result) < TOOL_RESULT_MAX_CHARS + 200
+    assert "[truncated:" in result
+    assert "60,000 chars total" in result
+
+    # An ordinary result is untouched — no marker, no reflow.
+    async def small(arguments: dict[str, object]) -> str:
+        return "short and complete"
+
+    assert await Tool(name="s", description="d", parameters={}, handler=small).run({}) == (
+        "short and complete"
+    )

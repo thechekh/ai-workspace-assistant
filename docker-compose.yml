@@ -1,5 +1,5 @@
 # Dev default:      docker compose up -d              -> redis + qdrant only
-# Full platform:    docker compose --profile app up   -> + api, worker, scheduler
+# Full platform:    docker compose --profile app up   -> + api
 # Observability:    docker compose --profile observability up
 #                   -> + Jaeger :16686, Prometheus :9090, Grafana :3000
 #                   (set ASSISTANT_OTLP_ENDPOINT=http://localhost:4318 for traces)
@@ -58,32 +58,6 @@ services:
       redis:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
-
-  worker:
-    profiles: ["app"]
-    build: .
-    <<: *app-env
-    command: ["uv", "run", "--no-sync", "taskiq", "worker", "assistant.worker:broker"]
-    # Shares the api image but serves no HTTP, so the image's HTTP probe
-    # would never pass.
-    healthcheck:
-      disable: true
-    depends_on:
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
-
-  scheduler:
-    profiles: ["app"]
-    build: .
-    <<: *app-env
-    command: ["uv", "run", "--no-sync", "taskiq", "scheduler", "assistant.worker:scheduler"]
-    healthcheck:
-      disable: true # no HTTP server in this role
-    depends_on:
-      redis:
         condition: service_healthy
 
   # --- Observability profile: zero-account local tracing + metrics ---------

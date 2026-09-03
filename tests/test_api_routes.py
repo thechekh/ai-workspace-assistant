@@ -1,12 +1,9 @@
-"""HTTP API tests: /api/info, /api/reindex (inline mode), and bearer auth."""
-
-from pathlib import Path
+"""HTTP API tests: /api/info and bearer auth on the write endpoints."""
 
 import pytest
 from pydantic import SecretStr
 from starlette.websockets import WebSocketDisconnect
 
-import assistant.api.routes as routes
 from tests.conftest import make_client
 
 
@@ -20,44 +17,26 @@ def test_info_reports_platform_shape(client):
     assert payload["auth_required"] is False
 
 
-def test_reindex_inline_mode(monkeypatch: pytest.MonkeyPatch):
-    async def fake_ingest(corpus, settings, **kwargs) -> int:
-        return 30
+def test_bearer_auth_guards_writes_but_not_info() -> None:
+    """`/api/info` stays open so a browser can bootstrap; writes do not.
 
-    monkeypatch.setattr(routes, "ingest", fake_ingest)
-    with make_client(corpus_dir=Path("evals/corpus")) as client:
-        response = client.post("/api/reindex")
-    assert response.status_code == 200
-    assert response.json() == {"mode": "inline", "chunks": 30}
-
-
-def test_reindex_failure_returns_503(monkeypatch: pytest.MonkeyPatch):
-    async def broken_ingest(corpus, settings, **kwargs) -> int:
-        raise RuntimeError("qdrant unreachable")
-
-    monkeypatch.setattr(routes, "ingest", broken_ingest)
-    with make_client(corpus_dir=Path("evals/corpus")) as client:
-        response = client.post("/api/reindex")
-    assert response.status_code == 503
-    assert "qdrant unreachable" in response.json()["detail"]
-
-
-def test_bearer_auth_guards_reindex_but_not_info(monkeypatch: pytest.MonkeyPatch):
-    async def fake_ingest(corpus, settings, **kwargs) -> int:
-        return 1
-
-    monkeypatch.setattr(routes, "ingest", fake_ingest)
-    with make_client(auth_token=SecretStr("s3cret"), corpus_dir=Path("evals/corpus")) as client:
+    Retargeted from `/api/reindex` when the background-job layer was removed:
+    the endpoint went away, the guard it was covering did not.
+    """
+    with make_client(auth_token=SecretStr("s3cret")) as client:
         assert client.get("/api/info").status_code == 200
         assert client.get("/api/info").json()["auth_required"] is True
 
-        assert client.post("/api/reindex").status_code == 401
+        upload = {"source": "guarded.md", "text": "# guarded\n\nsome content"}
+        assert client.post("/api/documents", data=upload).status_code == 401
         assert (
-            client.post("/api/reindex", headers={"Authorization": "Bearer wrong"}).status_code
+            client.post(
+                "/api/documents", data=upload, headers={"Authorization": "Bearer wrong"}
+            ).status_code
             == 401
         )
-        ok = client.post("/api/reindex", headers={"Authorization": "Bearer s3cret"})
-        assert ok.status_code == 200
+        ok = client.post("/api/documents", data=upload, headers={"Authorization": "Bearer s3cret"})
+        assert ok.status_code == 200, ok.text
 
 
 def test_ws_requires_token_when_auth_enabled():

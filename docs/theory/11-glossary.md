@@ -140,7 +140,6 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Async / concurrency** — one process serving many conversations by awaiting I/O rather than threading (08, 10).
 - **Qdrant** — the vector database holding the knowledge base (02, 10).
 - **Redis** — the store holding sessions, summaries, audit trails and rate-limit windows (07, 10).
-- **taskiq** — async task queue running our background re-index + nightly cron (10).
 - **uv / ruff / pyright** — modern Python toolchain: packaging / lint+format / type checking (10).
 - **Compose profile** — optional service group; `--profile app` starts the full platform (10).
 

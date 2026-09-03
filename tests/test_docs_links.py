@@ -88,5 +88,5 @@ def test_all_prose_docs_live_under_docs():
 
 def test_docs_index_links_every_subfolder():
     index = (REPO_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
-    for folder in ("handbook/", "theory/", "reference/", "project/"):
+    for folder in ("handbook/", "theory/", "reference/", "project/", "qanda/"):
         assert folder in index, f"docs/README.md does not mention {folder}"
