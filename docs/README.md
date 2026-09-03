@@ -178,7 +178,7 @@ The decisions and the history — this is where "why not X?" gets answered.
 | 38 | [project/demo-runbook.md](project/demo-runbook.md) | Running the demo on the real stack: keys, infra, costs |
 | 39 | [reference/localhost.md](reference/localhost.md) | Every localhost link once it runs: dashboards, logs, and browsing the vector DB |
 | 40 | [project/future-tools.md](project/future-tools.md) | Every tool considered and deferred: cost, verdict, trigger to revisit |
-| 41 | [qanda/README.md](qanda/README.md) | The 48 hard questions, each followed by its grounded answer with measured numbers |
+| 41 | [qanda/README.md](qanda/README.md) | The 69 hard questions — 48 general, 21 on this codebase — each followed by its grounded answer with measured numbers |
 
 #### Stage 9 · Repository conventions — only if you will contribute
 
