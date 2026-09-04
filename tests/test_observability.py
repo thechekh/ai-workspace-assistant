@@ -5,6 +5,7 @@ network. Prometheus counters are process-global, so tests assert presence and
 structure, never exact values.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -220,3 +221,125 @@ async def test_instrumented_llm_consumes_usage_and_accumulates_stats():
     assert stats.completion_tokens == 7
     assert stats.usage_estimated is False
     assert stats.llm_ms >= 0
+
+
+def test_logfire_instrumentation_excludes_scrapes_and_health_polls(monkeypatch) -> None:
+    """Prometheus hits /metrics every 5 s and the UI polls /api/health every
+    10 s. Instrumented, those alone were 1,000+ traces an hour in every cloud
+    dashboard, burying the real turns. The exclusion is what keeps a Logfire
+    or Langfuse view readable, so it is pinned here — with a stub Logfire, no
+    token, no network."""
+    import sys
+    import types
+
+    from fastapi import FastAPI
+
+    from assistant.observability import NOISY_PATHS, configure_observability
+    from tests.conftest import HermeticSettings
+
+    calls: dict[str, dict] = {}
+    stub = types.SimpleNamespace()  # anything in sys.modules satisfies `import logfire`
+    stub.configure = lambda **kwargs: calls.setdefault("configure", kwargs)
+    stub.instrument_fastapi = lambda app, **kwargs: calls.setdefault("fastapi", kwargs)
+    stub.instrument_httpx = lambda **kwargs: calls.setdefault("httpx", kwargs)
+    stub.instrument_pydantic_ai = lambda **kwargs: calls.setdefault("pydantic_ai", kwargs)
+    stub.SamplingOptions = lambda **kwargs: kwargs
+    monkeypatch.setitem(sys.modules, "logfire", stub)
+
+    settings = HermeticSettings(
+        llm_provider="fake", mcp_enabled=False, logfire_token=SecretStr("stub-token")
+    )
+    configure_observability(FastAPI(), settings)
+
+    assert calls["configure"]["send_to_logfire"] == "if-token-present"
+    excluded = calls["fastapi"]["excluded_urls"]
+    assert excluded == NOISY_PATHS
+    for path in ("/metrics", "/api/health"):
+        assert path in excluded
+    # The straggler: httpx has no URL exclusion, so the head sampler catches
+    # what excluded_urls cannot (the health check's own Qdrant call).
+    assert calls["configure"]["sampling"]["head"].get_description() == "DropNoisyRootSpans"
+
+
+@pytest.mark.parametrize(
+    ("name", "kept"),
+    [
+        ("agent.turn", True),
+        ("HTTP /chat ? backend='custom'", True),
+        ("POST api.openai.com/v1/chat/completions", True),  # a real root call, e.g. from evals
+        ("GET /metrics", False),
+        ("GET /api/health", False),
+        ("POST localhost/collections/docs/points/count", False),  # the health check's Qdrant call
+    ],
+)
+def test_noise_sampler_drops_only_machinery_root_spans(name: str, kept: bool) -> None:
+    from opentelemetry.sdk.trace.sampling import Decision
+
+    from assistant.observability import make_noise_sampler
+
+    result = make_noise_sampler().should_sample(None, 1, name)
+    assert (result.decision == Decision.RECORD_AND_SAMPLE) is kept
+
+
+def test_noise_sampler_follows_the_parent_for_child_spans() -> None:
+    """A child of a sampled turn is kept whatever its name; a child of a
+    dropped root is dropped too, so no orphan fragments reach a dashboard."""
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace.sampling import Decision
+    from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
+
+    from assistant.observability import make_noise_sampler
+
+    sampler = make_noise_sampler()
+    for sampled, expected in ((True, Decision.RECORD_AND_SAMPLE), (False, Decision.DROP)):
+        flags = TraceFlags(TraceFlags.SAMPLED if sampled else TraceFlags.DEFAULT)
+        parent = NonRecordingSpan(
+            SpanContext(trace_id=7, span_id=3, is_remote=False, trace_flags=flags)
+        )
+        context = trace.set_span_in_context(parent)
+        assert sampler.should_sample(context, 7, "GET /metrics").decision == expected
+
+
+@pytest.mark.parametrize(
+    ("attributes", "kept"),
+    [
+        # httpx spans are created as a bare method name and renamed only after
+        # sampling, so the decision has to come from the attributes.
+        ({"http.url": "http://localhost:6333/collections/docs/points/count"}, False),
+        ({"url.full": "http://127.0.0.1:6333/collections/docs/exists"}, False),
+        ({"server.address": "localhost", "server.port": 6333}, False),
+        ({"http.url": "https://api.openai.com/v1/chat/completions"}, True),
+        ({"server.address": "api.githubcopilot.com"}, True),
+        (None, True),
+    ],
+)
+def test_noise_sampler_drops_root_http_calls_to_local_infrastructure(
+    attributes: dict | None, kept: bool
+) -> None:
+    from opentelemetry.sdk.trace.sampling import Decision
+    from opentelemetry.trace import SpanKind
+
+    from assistant.observability import make_noise_sampler
+
+    result = make_noise_sampler().should_sample(
+        None, 1, "POST", kind=SpanKind.CLIENT, attributes=attributes
+    )
+    assert (result.decision == Decision.RECORD_AND_SAMPLE) is kept
+
+
+def test_noise_sampler_never_judges_server_spans_by_host() -> None:
+    """The WebSocket server span for /chat carries server.address=127.0.0.1
+    too; judging it by host dropped every real turn of a locally served app."""
+    from opentelemetry.sdk.trace.sampling import Decision
+    from opentelemetry.trace import SpanKind
+
+    from assistant.observability import make_noise_sampler
+
+    attributes = {
+        "server.address": "127.0.0.1",
+        "http.url": "ws://127.0.0.1:8000/chat?backend=custom",
+    }
+    result = make_noise_sampler().should_sample(
+        None, 1, "HTTP /chat", kind=SpanKind.SERVER, attributes=attributes
+    )
+    assert result.decision == Decision.RECORD_AND_SAMPLE

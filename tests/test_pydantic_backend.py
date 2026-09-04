@@ -53,3 +53,27 @@ async def test_tool_loop_through_shared_registry():
     final = events[-1]
     assert isinstance(final, FinalEvent)
     assert "Based on the tool results" in final.content
+
+
+async def test_run_reports_usage_into_the_turn_stats():
+    """This backend bypasses InstrumentedLLM; before it reported its own
+    usage, the stats line, the cost and the token counters read near zero for
+    one backend out of three. Langfuse showed the truth: ~5,000 prompt tokens
+    per call that the UI called 0."""
+    from assistant.telemetry import TurnStats, current_turn_stats
+
+    stats = TurnStats()
+    token = current_turn_stats.set(stats)
+    try:
+        agent = make_agent()
+        events = [event async for event in agent.run(history=[], user_message="hello")]
+    finally:
+        current_turn_stats.reset(token)
+
+    assert isinstance(events[-1], FinalEvent)
+    assert stats.llm_steps == 1
+    assert stats.prompt_tokens > 0
+    assert stats.completion_tokens > 0
+    assert stats.llm_ms >= 0
+    # The FunctionModel fake estimates its counts; a real provider reports them.
+    assert stats.usage_estimated is True

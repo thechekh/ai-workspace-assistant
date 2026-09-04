@@ -160,7 +160,7 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
    (this is what the UI's header dot polls every 10 s).
 3. Open http://localhost:8000/ → send `ping` → tokens stream, a stats line
    appears under the answer.
-4. `uv run pytest -q` → `340 passed` (fully offline, ~25 s).
+4. `uv run pytest -q` → `366 passed` (fully offline, ~25 s).
 
 Then work through [the testing checklist](../reference/testing.md) — the feature-by-
 feature manual checklist for the mode you're in.

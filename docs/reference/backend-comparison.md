@@ -13,7 +13,7 @@ Measured on this repository (line counts via `wc -l`, docstrings included).
 
 | | custom loop | Pydantic AI | LangGraph |
 |---|---:|---:|---:|
-| Backend file LoC | **98** | **266** | **278** |
+| Backend file LoC | **98** | **286** | **278** |
 | Inherits the shared provider hardening | yes | **no — re-implemented** | yes |
 | …of which framework-adapter code | 0 | ~45 (FunctionModel fake) + ~25 (model builder) | ~95 (`BaseChatModel` adapter) + ~35 (message conversion) |
 | Extra runtime deps | none (shares `llm/client.py`) | `pydantic-ai` (+ its provider SDKs) | `langgraph` + `langchain-core` |

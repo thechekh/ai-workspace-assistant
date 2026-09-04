@@ -553,7 +553,7 @@ user's words.
 **Answer.** Three rails: the **CI eval gate** — recall@5 / MRR floors on the
 golden set fail the build on retrieval regressions
 ([test_eval_gate.py](../../tests/test_eval_gate.py), with
-[history.jsonl](../../evals/history.jsonl) as the trend record); the **340
+[history.jsonl](../../evals/history.jsonl) as the trend record); the **366
 offline tests**, which include behavioral pins (the fake-parity suite keeps
 three backends identical, regression tests pin found bugs); and for
 prompt/description changes, **trajectory comparison** over the per-turn audit
@@ -654,7 +654,7 @@ engineering there first, model upgrades second.**
 will face, and this project *measured* it instead of opining. One
 `AgentBackend` protocol, three implementations behind it — the hand-written
 loop (**98 lines**, [custom.py](../../src/assistant/agent/backends/custom.py)),
-Pydantic AI (**266**), LangGraph (**278**) — switchable per session from the
+Pydantic AI (**286**), LangGraph (**278**) — switchable per session from the
 UI dropdown, with a WebSocket suite parametrized ×3 so every behavior is
 proven identical, and a fake-parity test because a hand-copied fake once
 drifted silently. The comparison
@@ -685,7 +685,7 @@ and picks tools by keyword heuristics (PR words → GitHub tool, "search code
 for X" → code tool, a URL → `fetch_url`, a question → `search_docs`);
 `fakeredis://` replaces Redis in-process; Qdrant runs `:memory:`. Tests use
 `HermeticSettings` (`env_file=None`) so a developer's real keys can never
-leak into a run. Result: **340 tests** in ~20 s, offline, $0 — including
+leak into a run. Result: **366 tests** in ~20 s, offline, $0 — including
 provider quirks reproduced with scripted fakes (429s, `tool_use_failed`,
 leaked markup) and the ×3-backend parity suite. Real-model behavior is
 checked separately, by hand, on the runbook's script — never in CI.

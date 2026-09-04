@@ -26,7 +26,7 @@ the default; history carries over because it lives in Redis, not the agent).
 | Backend | File | What it is | Notable |
 |---|---|---|---|
 | `custom` *(default)* | [backends/custom.py](../../src/assistant/agent/backends/custom.py) | Hand-written ReAct loop over the LLM client | The reference: smallest, fully instrumented via `InstrumentedLLM` |
-| `pydantic_ai` | [backends/pydantic_ai.py](../../src/assistant/agent/backends/pydantic_ai.py) | Pydantic AI `Agent` | Runs its **own** model layer (token stats fall back to estimates); tools adapted via `Tool.from_schema` → still hit `Tool.run` |
+| `pydantic_ai` | [backends/pydantic_ai.py](../../src/assistant/agent/backends/pydantic_ai.py) | Pydantic AI `Agent` | Runs its **own** model layer (reports the run's usage into the shared turn stats); tools adapted via `Tool.from_schema` → still hit `Tool.run` |
 | `langgraph` | [backends/langgraph.py](../../src/assistant/agent/backends/langgraph.py) | LangGraph state graph | Wraps our LLM client as a LangChain chat model; checkpointing in-memory (Redis saver is backlog) |
 
 Measured comparison (code size, latency, behavior parity):

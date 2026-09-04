@@ -79,3 +79,14 @@ curl http://localhost:8000/api/documents         # the app's view: sources + chu
 | 6334 | Qdrant gRPC |
 | 4318 | Jaeger OTLP ingest — where the app sends spans (`ASSISTANT_OTLP_ENDPOINT`) |
 | 5173 | Vite dev server, only during `npm run dev` (hot reload, proxies to :8000) |
+
+## Not on localhost: the cloud dashboards
+
+Two optional tracing destinations live in the cloud, switched on by credentials in `.env` (see [logfire-langfuse.md](logfire-langfuse.md)):
+
+| Tool | Dashboard | Enabled by |
+|---|---|---|
+| Logfire | https://logfire-eu.pydantic.dev (EU token) or https://logfire-us.pydantic.dev (US token) | `ASSISTANT_LOGFIRE_TOKEN` |
+| Langfuse | https://cloud.langfuse.com (EU) or https://us.cloud.langfuse.com (US) | `ASSISTANT_LANGFUSE_PUBLIC_KEY` + `ASSISTANT_LANGFUSE_SECRET_KEY` |
+
+The startup log line `tracing configured (otlp=…, logfire=…, langfuse=…)` says which destinations are live.

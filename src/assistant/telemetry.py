@@ -77,6 +77,29 @@ class TurnStats:
 current_turn_stats: ContextVar[TurnStats | None] = ContextVar("current_turn_stats", default=None)
 
 
+def record_external_usage(
+    *, prompt_tokens: int, completion_tokens: int, steps: int, llm_ms: float, estimated: bool
+) -> None:
+    """Fold usage reported outside `InstrumentedLLM` into the same stats and counters.
+
+    The Pydantic AI backend drives the provider through its own model layer,
+    so its tokens never pass through `stream_step`; it reports them here once
+    per run so the stats line, the cost and the token counters agree across
+    all three backends. The counters stay in this module on purpose: LLM
+    telemetry has one home, whichever code path produced the numbers.
+    """
+    TOKENS_TOTAL.labels(direction="prompt").inc(prompt_tokens)
+    TOKENS_TOTAL.labels(direction="completion").inc(completion_tokens)
+    stats = current_turn_stats.get()
+    if stats is None:
+        return
+    stats.llm_steps += steps
+    stats.llm_ms += llm_ms
+    stats.prompt_tokens += prompt_tokens
+    stats.completion_tokens += completion_tokens
+    stats.usage_estimated = stats.usage_estimated or estimated
+
+
 class InstrumentedLLM:
     """Telemetry decorator for any LLMClient (fake, OpenAI, Ollama, ...)."""
 

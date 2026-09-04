@@ -1,6 +1,6 @@
 # 09 — Testing, operations & troubleshooting
 
-## The automated suite (340 tests, fully offline)
+## The automated suite (366 tests, fully offline)
 
 ```sh
 uv run pytest -q          # ~26s. No network, no Docker, no keys.

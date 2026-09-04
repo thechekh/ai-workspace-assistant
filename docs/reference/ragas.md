@@ -210,7 +210,7 @@ caused it — the same discipline as the retrieval trend.
 
 The scoring itself needs a real model, so it lives outside the suite — but
 everything around it is where the bugs would be, and that runs in the normal
-340-test suite with no key and no Ragas installed: the dataset matches
+366-test suite with no key and no Ragas installed: the dataset matches
 Ragas' field contract exactly (`user_input` / `retrieved_contexts` /
 `response`, asserted as literal strings so a rename fails here instead of
 producing an empty score two hundred calls later), unanswerable questions are

@@ -11,10 +11,10 @@ cite one, be ready to run the command.
 
 | Claim | Value | How to prove it |
 |---|---|---|
-| Tests | 340 backend tests + 35 frontend tests | `uv run pytest -q`, `npm run test:run` |
+| Tests | 366 backend tests + 35 frontend tests | `uv run pytest -q`, `npm run test:run` |
 | Coverage | ~86%, with an 84% floor enforced in CI | `uv run pytest --cov` |
 | Retrieval quality | recall@1 **0.83**, recall@5 **1.00**, MRR **0.92** | `uv run python evals/run_retrieval.py --memory` |
-| Agent backends | 98 / 266 / 278 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
+| Agent backends | 98 / 286 / 278 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
 | Real-model cost | ~$0.012 for a full 8-case acceptance run | the stats line under every answer |
 | Suite runtime | ~25 s, fully offline | no network, no Docker |
 
@@ -25,7 +25,7 @@ cite one, be ready to run the command.
 **Q: Why implement the agent three times? Isn't once enough?**
 Because "which framework?" was a real open question and we wanted an
 evidence-based answer, not a blog-post opinion. The marginal cost was low —
-98/266/278 lines; everything else (tools, memory, telemetry, protocol) is
+98/286/278 lines; everything else (tools, memory, telemetry, protocol) is
 shared — and the payoff is [backend-comparison.md](../reference/backend-comparison.md)
 with measured numbers, plus the choice stays reversible via one config value.
 The comparison *is* a deliverable, not a detour.
@@ -313,7 +313,7 @@ accounts.
 Remove the nondeterminism from every layer except the one under evaluation:
 scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-**340 tests in ~23 seconds, fully offline** — no network, no containers, no
+**366 tests in ~23 seconds, fully offline** — no network, no containers, no
 keys. Model *quality* is deliberately out of unit scope; that's what the
 eval harness is for.
 

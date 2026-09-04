@@ -197,7 +197,7 @@ Only after the hand-written loop makes sense.
 
 | Read | Lines |
 |---|---|
-| [`agent/backends/pydantic_ai.py`](../../src/assistant/agent/backends/pydantic_ai.py) | 266 |
+| [`agent/backends/pydantic_ai.py`](../../src/assistant/agent/backends/pydantic_ai.py) | 286 |
 | [`agent/backends/langgraph.py`](../../src/assistant/agent/backends/langgraph.py) | 278 |
 
 **Read:** [theory 05 — agent frameworks](../theory/05-agent-frameworks.md) ·

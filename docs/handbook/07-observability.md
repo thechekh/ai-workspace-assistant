@@ -24,102 +24,14 @@ docker compose --profile observability up -d      # Jaeger + Prometheus + Grafan
 | Prometheus UI | http://localhost:9090 (`/targets` = scrape status) | ✅ |
 | Logfire / Langfuse cloud | set tokens in `.env` | account |
 
-### Enabling Logfire and Langfuse, step by step
+### The two cloud lenses
 
-Both are dormant until their credentials exist in `.env`; the code path in
-[observability.py](../../src/assistant/observability.py) is the same one that
-feeds Jaeger, so enabling them adds destinations without touching a line of
-code. Free tiers of both cover a workshop many times over. Keep Jaeger on
-while you try them — all three receive the same spans, which is the point.
-
-**1. Logfire (the application view)**
-
-1. Sign in at https://logfire.pydantic.dev (GitHub or Google) and create a
-   project — the name is yours, the service will report itself as
-   `ai-workspace-assistant`.
-2. Project settings → **Write tokens** → create one. It is shown once; copy
-   it straight into `.env`, never into a chat or a commit:
-   ```sh
-   ASSISTANT_LOGFIRE_TOKEN=pylf_v1_...
-   ```
-3. Restart the gateway (`.env` is read at startup):
-   ```sh
-   uv run uvicorn assistant.main:app
-   ```
-   The startup log must say `tracing configured (otlp=True, logfire=True, …)`.
-   With a token present, Logfire's SDK becomes the tracer provider and
-   auto-instruments FastAPI (HTTP and the `/chat` WebSocket), httpx (every
-   call to the LLM provider) and Pydantic AI.
-4. Send one message in the chat, wait a few seconds (spans are batched),
-   and open the project's **Live** view. Expect one `agent.turn` per message
-   with `llm.step`, `rag.retrieve` and `tool.execute` nested inside, wrapped
-   by the WebSocket span; each `llm.step` has an httpx child — the actual
-   `POST …/chat/completions` with its status and duration. Click any span
-   for its attributes: `agent.backend`, `session.id`, `turn.id`,
-   `llm.model`, `rag.top_score`, `tool.status`, and so on.
-5. Switch the backend dropdown to **Pydantic AI** and send another message.
-   `instrument_pydantic_ai` adds the framework's own spans — agent run, model
-   request with token counts, each tool call — which is the one-line
-   instrumentation the framework comparison talks about.
-6. Try the **Explore** tab: Logfire stores spans in a table you can query
-   with SQL, e.g. every turn slower than two seconds:
-   ```sql
-   SELECT start_timestamp, duration, attributes->>'agent.backend' AS backend
-   FROM records WHERE span_name = 'agent.turn' AND duration > 2
-   ORDER BY start_timestamp DESC
-   ```
-
-**2. Langfuse (the LLM view)**
-
-1. Sign in at https://cloud.langfuse.com (EU) or https://us.cloud.langfuse.com
-   (US) and create an organization and a project. Self-hosting with Docker is
-   also an option; only the host changes.
-2. Project **Settings → API Keys → Create**: a public key `pk-lf-…` and a
-   secret key `sk-lf-…`. Into `.env`:
-   ```sh
-   ASSISTANT_LANGFUSE_PUBLIC_KEY=pk-lf-...
-   ASSISTANT_LANGFUSE_SECRET_KEY=sk-lf-...
-   # only if your project is in the US region (the default is the EU host):
-   ASSISTANT_LANGFUSE_HOST=https://us.cloud.langfuse.com
-   ```
-3. Restart the gateway; the log line now ends with `langfuse=True`. There is
-   no Langfuse SDK involved: the same OpenTelemetry spans are exported to
-   `<host>/api/public/otel/v1/traces`, authenticated with the two keys.
-4. Send a message and open **Tracing → Traces**. Each `agent.turn` is one
-   trace; its children are the observations, and the trace's attributes
-   carry the session and turn ids, so filtering one conversation is a
-   search for its `session.id`.
-5. Know what each backend gives Langfuse. The project's own spans
-   (`llm.step`, `tool.execute`, `rag.retrieve`) use project attributes such
-   as `llm.model` and `llm.tool_calls`, so Langfuse shows them as plain spans
-   with timings. Its **generation** view — prompt, completion, token counts,
-   cost per model — fills in only for spans that follow the GenAI semantic
-   conventions, which Logfire's Pydantic AI instrumentation emits. So with
-   both tools enabled and the **Pydantic AI** backend selected, Langfuse
-   shows the LLM calls as generations with cost; with the custom backend it
-   shows the span tree and durations.
-6. Once traces flow, the features that make Langfuse different are one menu
-   away: **Sessions** (every turn of a conversation grouped), **Prompts**
-   (versioned prompt management — the system prompt could live there), and
-   **Scores** — a place to attach the Ragas faithfulness result
-   ([reference/ragas.md](../reference/ragas.md)) to the traces it judged.
-
-**3. Prove all three receive the same turn**
-
-Send one message, then find its `turn.id` in three places: the span in
-Jaeger (http://localhost:16686), the same span in Logfire's Live view, and
-the trace in Langfuse. Same id, same tree, three different lenses — the
-application, the LLM, and the raw waterfall.
-
-**If nothing shows up**
-
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| Startup log says `logfire=False` / `langfuse=False` | the key is not in `.env`, or the server was not restarted | check the variable names above, restart |
-| Logfire Live view stays empty | the token belongs to another project, or is a read token | create a *write* token in the project you are looking at |
-| Langfuse shows nothing, log shows `401`/`403` on export | keys swapped, or wrong region host | public key is `pk-lf-`, secret is `sk-lf-`; set the US host if the project is there |
-| Traces arrive late | spans are exported in batches every few seconds | wait, or stop the server — shutdown flushes |
-| Everything works but Jaeger stopped | `ASSISTANT_OTLP_ENDPOINT` removed while editing `.env` | keep all three lines; they compose |
+Logfire (the application view) and Langfuse (the LLM view) receive the same
+spans as Jaeger the moment their credentials are in `.env`; the startup log
+line `tracing configured (otlp=…, logfire=…, langfuse=…)` says which are
+live. What each one is for, how they compare, how to enable them, what each
+dashboard shows per backend, and what enabling them revealed — all in
+[reference/logfire-langfuse.md](../reference/logfire-langfuse.md).
 
 ## 1) Structured logs — the narrative
 
@@ -247,11 +159,13 @@ A stopped turn ends the same line with `· stopped` and a failed one with
 modes** — an answer cut short must never read as a complete one just because
 the stats are hidden.
 
-**When `usage_estimated` is true.** Three cases, all honest rather than
-broken: the pydantic-ai backend runs its own model layer and never passes
-through `InstrumentedLLM`; a stopped turn's stream is cut before the
-provider's final usage chunk arrives; and a step the provider *aborted* — a
-a provider's `tool_use_failed`, say — reports no usage at all for that attempt. The
+**When `usage_estimated` is true.** Two cases, both honest rather than
+broken: a stopped turn's stream is cut before the provider's final usage
+chunk arrives; and a step the provider *aborted* — a provider's
+`tool_use_failed`, say — reports no usage at all for that attempt. (The
+Pydantic AI backend used to be a third case, because it never passes through
+`InstrumentedLLM`; it now reports its run's usage into the same stats, and
+only the offline fake model marks its counts as estimates.) The
 last one has a consequence worth knowing when reading a cost dashboard: the
 retried attempts really were billed, but the provider never reported them, so
 `cost_usd` reads low on exactly those turns. `(est)` in the UI is the flag

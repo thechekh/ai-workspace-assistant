@@ -21,6 +21,7 @@ recovered, which is precisely the parity the project claims.
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 
 from openai import RateLimitError
@@ -65,6 +66,7 @@ from assistant.llm.client import (
     resolve_provider,
 )
 from assistant.llm.fake import decide_fake_tool_call, echo_reply, stream_words, tool_result_reply
+from assistant.telemetry import record_external_usage
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +118,9 @@ class PydanticAIAgent:
         self, model: Model | str, system_prompt: str, tools: ToolRegistry | None = None
     ) -> None:
         self._system_prompt = system_prompt
+        # FunctionModel (the fake provider) estimates its token counts; a real
+        # provider reports them, and the stats line shows the difference.
+        self._usage_is_estimate = isinstance(model, FunctionModel)
         self._agent = PydanticAgent(
             model,
             system_prompt=system_prompt,
@@ -177,9 +182,11 @@ class PydanticAIAgent:
         self, history: list[ChatMessage], user_message: str
     ) -> AsyncIterator[AgentEvent]:
         message_history = _to_model_messages(self._system_prompt, history) if history else None
+        llm_ms = 0.0
         async with self._agent.iter(user_message, message_history=message_history) as agent_run:
             async for node in agent_run:
                 if PydanticAgent.is_model_request_node(node):
+                    started = time.perf_counter()
                     async with node.stream(agent_run.ctx) as request_stream:
                         async for event in request_stream:
                             if (
@@ -194,6 +201,7 @@ class PydanticAIAgent:
                                 and event.delta.content_delta
                             ):
                                 yield TokenEvent(content=event.delta.content_delta)
+                    llm_ms += (time.perf_counter() - started) * 1000
                 elif PydanticAgent.is_call_tools_node(node):
                     async with node.stream(agent_run.ctx) as tools_stream:
                         async for event in tools_stream:
@@ -215,6 +223,18 @@ class PydanticAIAgent:
                                     tool=part.tool_name or "unknown",
                                     result=truncate_for_event(text),
                                 )
+        # This backend bypasses InstrumentedLLM, so it reports the run's usage
+        # itself — otherwise the stats line, the cost and the token counters
+        # read near zero for one backend out of three, which is exactly the
+        # parity this project claims to have.
+        usage = agent_run.usage  # a property in pydantic-ai 2.x
+        record_external_usage(
+            prompt_tokens=usage.input_tokens or 0,
+            completion_tokens=usage.output_tokens or 0,
+            steps=usage.requests or 0,
+            llm_ms=llm_ms,
+            estimated=self._usage_is_estimate,
+        )
         output = agent_run.result.output if agent_run.result is not None else ""
         yield FinalEvent(content=output if isinstance(output, str) else str(output))
 

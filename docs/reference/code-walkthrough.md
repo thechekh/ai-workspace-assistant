@@ -54,7 +54,7 @@ Two deliberate details:
 
 **If asked — "why a factory instead of a module-level `app`?"**
 Because a module-level app runs its side effects at import time, and the test
-suite imports the module. Lazy construction is what lets 340 tests run with no
+suite imports the module. Lazy construction is what lets 366 tests run with no
 `.env`, no network and no containers.
 
 ---
@@ -378,7 +378,7 @@ Measured comparison: [backend-comparison.md](backend-comparison.md).
 | The bugs a review found stay fixed | `tests/test_review_regressions.py` |
 
 ```sh
-uv run pytest -q                 # 340 tests, offline, no keys
+uv run pytest -q                 # 366 tests, offline, no keys
 uv run pytest -q -n 4            # the same, in parallel
 ```
 

@@ -116,7 +116,7 @@ frontend/              Vue 3 + Pinia + Vite chat UI
 evals/corpus/          retrieval test fixture (golden-set answers live here)
 observability/         Prometheus config + Grafana provisioning + dashboard
 evals/                 golden set + retrieval quality + embedding comparison
-tests/                 340 deterministic tests (no network, no Docker needed)
+tests/                 366 deterministic tests (no network, no Docker needed)
 docs/                  ALL documentation (handbook, theory, reference, project)
 ```
 

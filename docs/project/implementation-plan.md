@@ -139,7 +139,7 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 - [x] Tools node executes through the shared `ToolRegistry` (identical capabilities across backends)
 - [x] Checkpointing: compiled with `InMemorySaver`, fresh `thread_id` per turn — native LangGraph persistence demonstrated while cross-turn memory stays in shared Redis
 - [x] Loop bound: `recursion_limit` → `GraphRecursionError` → same "limit" final message as the other backends
-- [x] `docs/reference/backend-comparison.md` — measured LoC (re-measured since: custom 98 / pydantic-ai 266 / langgraph 278 — pydantic-ai grew when it had to re-implement the provider retries it does not inherit), adapter costs, streaming/tooling/memory/observability/debuggability dimensions, verdict table
+- [x] `docs/reference/backend-comparison.md` — measured LoC (re-measured since: custom 98 / pydantic-ai 286 / langgraph 278 — pydantic-ai grew when it had to re-implement the provider retries it does not inherit), adapter costs, streaming/tooling/memory/observability/debuggability dimensions, verdict table
 
 **Acceptance (verified):** 52/52 tests green — the whole WS suite parametrized ×3 backends, plus 5 direct LangGraph tests (streaming parity, history parity via the same "(N messages in context)" accounting, scripted tool loop, recursion bound, RAG roundtrip). Browser E2E: dropdown switched to langgraph (server log: reconnect `?backend=langgraph`, same session id) and "Show latest PRs" ran the MCP tool card end-to-end on the LangGraph runtime.
 
