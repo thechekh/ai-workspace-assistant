@@ -1,1 +1,2 @@
 {"at": "2026-08-08T23:50:53+00:00", "sha": "0fad9d8034c2", "embedder": "hash-512", "mode": "hybrid", "rerank": true, "k": 5, "questions": 18, "metrics": {"recall@1": 0.8333, "recall@5": 1.0, "mrr": 0.9167}}
+{"at": "2026-09-04T00:19:17+00:00", "sha": "41a3157e4337", "suite": "ragas", "judge_model": "gpt-4.1-nano", "questions": 18, "metrics": {"faithfulness": 0.9957}, "control": {"faithfulness": 0.4763}}

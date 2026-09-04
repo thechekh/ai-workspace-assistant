@@ -18,6 +18,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = {
     "node_modules",
     ".venv",
+    # The judge's own Python 3.13 environment (evals/run_ragas.py): ~100
+    # package READMEs that are neither ours nor under docs/.
+    ".venv-evals",
     ".playwright-mcp",
     ".git",
     "htmlcov",

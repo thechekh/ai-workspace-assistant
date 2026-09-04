@@ -64,8 +64,10 @@ actually grounded its answer in what was retrieved — is measured separately
 and deliberately outside CI, because every one of its metrics is an LLM call:
 
 ```sh
-uv sync --group evals                          # opt-in, ~35 extra packages
-uv run python -m evals.run_ragas --limit 3     # groundedness, judged by an LLM
+# once: the judge gets a Python 3.13 environment of its own (ragas has no 3.14 wheels)
+UV_PROJECT_ENVIRONMENT=.venv-evals uv sync --python 3.13 --group evals
+# groundedness judged by an LLM, gated by a floor, with a negative control that proves the judge
+UV_PROJECT_ENVIRONMENT=.venv-evals uv run python -m evals.run_ragas --check --control
 ```
 
 Both metrics families, and why only one of them can be a build gate, are

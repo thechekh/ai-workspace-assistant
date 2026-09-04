@@ -113,7 +113,12 @@ because they fail independently: perfect retrieval + ungrounded answer, and
 vice versa. Deterministic retrieval metrics run in **CI**
 ([test_eval_gate.py](../../tests/test_eval_gate.py)); LLM-judged RAGAS runs
 **manually only** ([run_ragas.py](../../evals/run_ragas.py)) — a judge model
-in CI is nondeterminism plus a bill. Full treatment:
+in CI is nondeterminism plus a bill — but as a normal, provable flow:
+`--check` enforces a floor (0.80) and `--control` re-judges the same answers
+with three fabricated claims appended, which must score visibly lower.
+Recorded 2026-09-04 on all 18 questions: faithfulness **1.00** clean,
+**0.48** poisoned. The second number is what makes the first one credible —
+a judge that says yes to everything also scores 1.00. Full treatment:
 [metrics.md](../reference/metrics.md).
 
 **2. How did you build the eval set?** — hand-labeled Q→chunk pairs or LLM-generated? How many? Pitfalls of LLM-as-judge (bias toward verbose answers, self-preference).

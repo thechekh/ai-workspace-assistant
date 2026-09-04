@@ -208,7 +208,8 @@ same model. If you do swap in the real GitHub server, trim it with its
 2. **Watch your own counter** rather than the OpenAI dashboard — it updates
    per turn: `curl -s localhost:8000/metrics | grep assistant_cost_usd_total`
 3. **Keep `gpt-4.1-nano`** unless an answer is visibly too weak.
-4. **Use `--limit` on Ragas.** The full 18-question run is ~200 LLM calls.
+4. **Use `--limit` on Ragas.** The full 18-question run is ~200 LLM calls,
+   and `--control` judges everything twice.
 5. **Leave `ASSISTANT_MCP_SERVERS` unset** unless you need the real server.
 
 ## Switching models — checklist

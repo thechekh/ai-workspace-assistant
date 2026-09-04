@@ -81,3 +81,74 @@ def test_the_runner_refuses_the_fake_provider() -> None:
     assert "run_retrieval.py --memory" in source, (
         "the refusal should name the offline eval that does work"
     )
+
+
+def test_the_control_poisons_answers_but_not_evidence() -> None:
+    """The negative control must change only the thing under test."""
+    from evals.run_ragas import CONTROL_CLAIMS, contaminate
+
+    clean = [Sample(question="Which service bills?", contexts=_CONTEXTS, answer="billing-service.")]
+    [poisoned] = contaminate(clean)
+
+    assert poisoned.question == clean[0].question
+    assert poisoned.contexts == clean[0].contexts
+    assert poisoned.answer.startswith("billing-service.")
+    assert poisoned.answer.endswith(CONTROL_CLAIMS)
+    # The invented claims must be unsupported by the evidence, or the control
+    # proves nothing: no word of them may appear in any context.
+    assert all(
+        word.lower() not in " ".join(_CONTEXTS).lower() for word in ("Rust", "9999", "Frankfurt")
+    )
+
+
+def test_worst_lists_the_lowest_scores_first_and_skips_unscored() -> None:
+    from evals.run_ragas import worst
+
+    samples = [
+        Sample(question=q, contexts=_CONTEXTS, answer="a") for q in ("high", "low", "nan", "mid")
+    ]
+    scores = [{"faithfulness": 1.0}, {"faithfulness": 0.2}, {}, {"faithfulness": 0.6}]
+
+    assert [(score, sample.question) for score, sample in worst(samples, scores, n=2)] == [
+        (0.2, "low"),
+        (0.6, "mid"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("metrics", "control", "expected_fragments"),
+    [
+        # Clean run above the floor, control far below: the judge is proven.
+        ({"faithfulness": 0.92}, {"faithfulness": 0.55}, []),
+        # Below the floor: generation regressed (or the judge got stricter).
+        ({"faithfulness": 0.71}, None, ["0.71 < 0.80 floor"]),
+        # Control barely moved: the judge says yes to everything.
+        ({"faithfulness": 0.95}, {"faithfulness": 0.90}, ["not catching invented claims"]),
+        # No control run: only the floor applies.
+        ({"faithfulness": 0.85}, None, []),
+        # A metric without a rule is ignored rather than failed.
+        ({"faithfulness": 0.85, "other": 0.1}, None, []),
+    ],
+)
+def test_check_judged_enforces_floor_and_control_gap(
+    metrics: dict[str, float], control: dict[str, float] | None, expected_fragments: list[str]
+) -> None:
+    from evals.run_ragas import check_judged
+
+    rules = {"faithfulness": {"floor": 0.80, "control_gap": 0.20}}
+    problems = check_judged(metrics, control, rules)
+
+    assert len(problems) == len(expected_fragments)
+    for fragment, problem in zip(expected_fragments, problems, strict=True):
+        assert fragment in problem
+
+
+def test_the_committed_baseline_has_judged_rules() -> None:
+    """`--check` reads these; a missing section would silently pass everything."""
+    import json
+    from pathlib import Path
+
+    baseline = json.loads(Path("evals/baseline.json").read_text(encoding="utf-8"))
+    rules = baseline["judged"]["faithfulness"]
+    assert 0.5 <= rules["floor"] <= 1.0
+    assert 0.05 <= rules["control_gap"] <= 0.5

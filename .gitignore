@@ -30,3 +30,4 @@ Thumbs.db
 
 # Transient browser-automation output (docs/images/ is curated and tracked)
 .playwright-mcp/
+.venv-evals/

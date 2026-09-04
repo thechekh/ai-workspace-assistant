@@ -19,5 +19,19 @@
     "recall@1": 0.8333,
     "recall@5": 1.0,
     "mrr": 0.9167
+  },
+  "judged": {
+    "_comment": [
+      "LLM-judged floor, checked manually with `python -m evals.run_ragas --check --control`",
+      "(never in CI: every score is a judge-model call, and it is not deterministic).",
+      "floor: the clean answers' mean faithfulness must not fall below this.",
+      "control_gap: the same answers with fabricated claims appended must score at",
+      "least this much lower - that is what proves the judge itself catches invention.",
+      "Both carry headroom below the measured values; tighten only from a recorded run."
+    ],
+    "faithfulness": {
+      "floor": 0.8,
+      "control_gap": 0.2
+    }
   }
 }

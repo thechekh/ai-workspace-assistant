@@ -159,49 +159,80 @@ Three reasons, each sufficient on its own:
    with a 0.005 tolerance. A judge's score moves between runs on identical
    input, so any threshold that tight would flake, and a threshold loose
    enough not to flake would catch nothing.
-3. **It costs real money and quota.** Faithfulness spends several LLM calls
-   per question; all 18 is roughly 200 calls, which is more than a OpenAI
-   free-tier day on `gpt-4.1-nano`.
+3. **It costs real money.** Faithfulness spends several LLM calls per
+   question; all 18 is roughly 200 calls, and the negative control doubles
+   the judging. A few cents on `gpt-4.1-nano` — but cents per push is exactly
+   the spend a free offline gate exists to avoid.
 
-So it is a **trend, recorded on demand** — not a gate. That split is the
-point: *retrieval quality is gated in CI because it is deterministic and free;
-generation quality is measured on demand because it is neither.*
+So it is a **floor with headroom, checked on demand** — `--check` fails the
+run below the `judged` floor in `baseline.json`, `--record` keeps the trend in
+`history.jsonl` — but never a CI gate. That split is the point: *retrieval
+quality is gated in CI because it is deterministic and free; generation
+quality is checked on demand because it is neither.*
 
 ### The measured number
 
-First run, `gpt-4.1-nano` judging four golden-set questions answered by the
-same model:
+The full golden set, `gpt-4.1-nano` both answering and judging, with the
+negative control — recorded 2026-09-04 in
+[history.jsonl](../../evals/history.jsonl):
 
 ```
-judge: gpt-4.1-nano   questions: 4
-faithfulness: 0.92
+judge: gpt-4.1-nano   questions: 18
+faithfulness: 1.00
+faithfulness with fabricated claims: 0.48
+lowest-scoring questions:
+  0.92  What is our deployment architecture?
+judge gate: OK (floor and control gap in evals/baseline.json)
 ```
 
-The metric was sanity-checked before being trusted, by scoring a deliberately
-hallucinated answer against a known context:
+Read the two numbers together. **1.00** on its own would be suspicious — a
+judge that says yes to everything also scores 1.00. **0.48** on the *same*
+answers with three fabricated claims appended is what makes the first number
+mean something: the judge found every invented claim unsupported, and a
+grounded k-claim answer plus three inventions lands at k/(k+3), which for
+answers this short is about a half. The gate in
+[baseline.json](../../evals/baseline.json) demands a floor of 0.80 and a
+control drop of at least 0.20; this run cleared both with room to spare.
 
-| answer | faithfulness |
-|---|---:|
-| "billing-service generates PDF invoices on a nightly schedule" *(supported)* | **1.00** |
-| "billing-service generates invoices every 5 minutes and is written in Rust" *(invented)* | **0.33** |
+The 0.92 is one claim in the deployment-architecture answer that the judge
+could not tie to the retrieved chunks — exactly the line a human should read
+next, which is why the runner prints the lowest scores and not only the mean.
 
-One claim of three survived in the second case, which is the arithmetic
-working exactly as described. A metric that cannot tell those two apart is
-worth nothing, so this check matters more than the headline score.
+History: the first run, on four questions, scored 0.92, and before that the
+metric was sanity-checked by hand — "billing-service generates invoices every
+5 minutes and is written in Rust", scored against the real chunk, came out at
+**0.33**, one claim of three surviving. `--control` is that hand check,
+automated and repeated on every run.
 
 ### Running it
 
 ```sh
-uv sync --group evals                          # opt-in: ~35 extra packages
-uv run python -m evals.run_ragas --limit 3     # start small; watch the budget
-uv run python -m evals.run_ragas --record      # append to evals/history.jsonl
+# once: a Python 3.13 environment of its own (ragas has no 3.14 wheels). The
+# main .venv stays lean; the ~35 extra packages land in .venv-evals instead.
+UV_PROJECT_ENVIRONMENT=.venv-evals uv sync --python 3.13 --group evals
+
+UV_PROJECT_ENVIRONMENT=.venv-evals uv run python -m evals.run_ragas --limit 3   # start small
+UV_PROJECT_ENVIRONMENT=.venv-evals uv run python -m evals.run_ragas --check --control --record
 ```
+
+PowerShell: `$env:UV_PROJECT_ENVIRONMENT = ".venv-evals"` once per shell, then
+the same `uv run` commands.
+
+| Flag | What it does |
+|---|---|
+| `--control` | Judges the same answers a second time with three fabricated claims appended. The score must fall — that is what proves the judge, not just the answers. |
+| `--check` | Exit 1 if the clean score is below `judged.faithfulness.floor` in [baseline.json](../../evals/baseline.json), or if the control fell by less than `control_gap`. |
+| `--record` | Append the run, control included, to [history.jsonl](../../evals/history.jsonl). |
+| `--limit N` | Only the first N golden questions — for pricing a new judge model. |
+| `--json` | Machine-readable output with per-question scores. |
 
 Practical notes, each learned by hitting it:
 
 - **Python ≤ 3.13.** `ragas` depends on `scikit-network`, which ships wheels
   for cp310–cp313 only; on 3.14 the install tries to compile from source and
-  needs a C++ toolchain. The Docker image ships 3.13 and CI runs 3.12/3.13.
+  needs a C++ toolchain. Hence the side environment above: `uv` leaves the
+  3.14 dev venv untouched and gives the judge its own 3.13 one (gitignored).
+  The Docker image ships 3.13 and CI runs 3.12/3.13.
 - **`langchain-community<0.4` is pinned** in the dependency group. ragas 0.4.3
   imports `langchain_community.chat_models.vertexai` at module load, and
   langchain-community 0.4 — now sunset upstream — removed it, so installing
@@ -210,10 +241,12 @@ Practical notes, each learned by hitting it:
   is OpenAI-compatible. A stronger judge than the model under test is the
   usual advice; using the same one is cheaper and still catches gross
   hallucination.
-- **OpenAI serves no embeddings API**, which is why only `Faithfulness` is
-  enabled. Metrics like `ResponseRelevancy` and `SemanticSimilarity` need an
-  embedding model, so they would require an OpenAI or Voyage key
-  (`ASSISTANT_EMBEDDING_API_KEY` / `ASSISTANT_VOYAGE_API_KEY`).
+- **Only `Faithfulness` is enabled** because it needs no embeddings, which
+  keeps the judge runnable against any OpenAI-compatible endpoint — including
+  ones with no embeddings API, such as a local Ollama. `ResponseRelevancy`
+  and `SemanticSimilarity` need an embedding model
+  (`ASSISTANT_EMBEDDING_API_KEY` / `ASSISTANT_VOYAGE_API_KEY`) and would add
+  calls per question for little that the control does not already prove.
 - **Reference-based metrics are unavailable** until the golden set gains
   reference answers. It currently stores *where* an answer lives, not the
   answer itself, which is all recall@k and MRR need — but `LLMContextRecall`
