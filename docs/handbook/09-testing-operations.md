@@ -1,6 +1,6 @@
 # 09 — Testing, operations & troubleshooting
 
-## The automated suite (366 tests, fully offline)
+## The automated suite (382 tests, fully offline)
 
 ```sh
 uv run pytest -q          # ~26s. No network, no Docker, no keys.
@@ -38,6 +38,7 @@ scripted provider errors. Map of the suite:
 | test_docs_links.py | the documentation itself: every relative link resolves, no stray prose outside `docs/`, the index covers every folder |
 | test_docs_consistency.py | numbers quoted in many documents at once (backend line counts, golden-set size, retrieval scores, suite size) agree with the code and with each other |
 | test_docs_coverage.py | every setting, endpoint, metric, wire frame, tool, source file, dependency and run command is mentioned somewhere — so shipping a feature without documenting it fails the build |
+| test_docs_standard.py | the documentation standard's mechanical half (numbered sections, bold scope, reasoned Related links, troubleshooting shape, dated numbers, labelled and used images) on the pages that have adopted it — a ratchet that only grows |
 | test_ragas_harness.py | the LLM-judged eval's plumbing, tested without an LLM: the dataset matches Ragas' field contract, and unanswerable questions are dropped before a judge could score an honest "I don't know" as a hallucination |
 | test_review_regressions.py | the defects a full review found, each reproduced before it was fixed: re-upload leaving orphan chunks, `?limit=0` inverting the cap, a hallucinated tool name becoming a metric label, an SSRF guard walked past by a redirect, a failed turn never reporting its cost |
 

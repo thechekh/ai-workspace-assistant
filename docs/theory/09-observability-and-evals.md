@@ -57,7 +57,7 @@ deliberately evaluating.
 4. **Browser E2E** — Playwright drives the real UI against the real server
    per phase (tool cards render, backends switch, toasts fire).
 
-366 tests, ~23 seconds, fully offline, $0. The fakes aren't a compromise —
+382 tests, ~23 seconds, fully offline, $0. The fakes aren't a compromise —
 they're what makes the suite *possible*.
 
 ## What we deliberately do NOT test with fakes
@@ -72,7 +72,7 @@ Being crisp about this boundary is the strongest answer in this chapter.
 **"How do you know the assistant gives correct answers?"** — Three layers:
 retrieval is *measured* (recall@5 = 1.00 on the golden set — the right
 evidence reaches the model); answers are *grounded* (the model cites
-retrieved chunks the user can inspect); behavior is *pinned* by 366
+retrieved chunks the user can inspect); behavior is *pinned* by 382
 deterministic tests. Model-quality evaluation on real models reuses the
 same golden harness the day a key exists.
 

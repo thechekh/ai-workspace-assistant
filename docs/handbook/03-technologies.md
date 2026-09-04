@@ -115,7 +115,7 @@ per-turn stats line, the "details" audit timeline, and the deep-health dot.
 ## Testing & quality
 
 ### pytest + pytest-asyncio + fakeredis + in-memory Qdrant
-366 deterministic tests, no network, no Docker: the WS suite runs across all
+382 deterministic tests, no network, no Docker: the WS suite runs across all
 three backends via parametrized fixtures; provider quirks (429s, a provider's
 `tool_use_failed`, leaked tool syntax) are reproduced with scripted fakes.
 *Where:* [tests/](../../tests/); chapter 09.

@@ -12,7 +12,7 @@ handbook explains how to run it, the theory course explains the concepts.
 ## Commands
 
 ```sh
-uv run pytest -q                    # 366 tests, offline, no keys, ~20s
+uv run pytest -q                    # 382 tests, offline, no keys, ~20s
 uv run pytest -m "not slow"         # skips real MCP subprocess spawns
 uv run ruff check . && uv run ruff format .
 uv run pyright
@@ -49,6 +49,9 @@ outside `docs/`, and an index that stops covering a folder.
 or the code about test counts, backend line counts, golden-set size, or
 retrieval scores. If you change one of those numbers, the failure names the
 files to update.
+New or rewritten pages follow `docs/project/documentation-standard.md`;
+`tests/test_docs_standard.py` enforces its mechanical half on the pages listed
+in `ADOPTED` there (add a page to the list when you bring it up to standard).
 
 ## Gotchas found the hard way
 

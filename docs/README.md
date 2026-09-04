@@ -56,6 +56,10 @@ honest list of what is not built.
 every deferred tool and non-tool item, with its cost and revisit trigger; the
 record of what's done is [project/implementation-plan.md](project/implementation-plan.md).
 
+**I'm adding or rewriting a page** → [project/documentation-standard.md](project/documentation-standard.md)
+— the fourteen rules every page follows, with ragas.md as the worked
+example, and which of them the tests enforce.
+
 ## By topic — preparing to explain or defend the project
 
 Each row is *concept first, then how this project does it, then the hard
@@ -81,7 +85,7 @@ questions*. Read across.
 | **Security** | — | [reference/security.md](reference/security.md) — threat model + controls | [theory/12 §LLM & AI](theory/12-defense-qa.md) |
 | **Any unfamiliar term** | [theory/11 — glossary](theory/11-glossary.md) | — | — |
 
-### The reading roadmap — all 44 documents, in order
+### The reading roadmap — all 45 documents, in order
 
 Read top to bottom and you will have read **every** document in the
 repository, each one landing when you have the background for it. Tick them
@@ -188,6 +192,7 @@ The decisions and the history — this is where "why not X?" gets answered.
 | # | Document | Answers |
 |---|---|---|
 | 44 | [../CLAUDE.md](../CLAUDE.md) | Instructions for AI coding agents working in this repo |
+| 45 | [project/documentation-standard.md](project/documentation-standard.md) | How pages are written: the fourteen rules, the exemplar, which rules the tests enforce, how to bring a page up |
 
 **The short path.** No time for all of it? **1 → 4 → 6 → 25 → 38** — what it
 is, the architecture, how to run it, the code walkthrough, and the defence
@@ -243,6 +248,7 @@ outline, a click-by-click demo script, and the file-map walkthrough.
 - [description.md](project/description.md) — the project brief (English)
 - [description-original.md](project/description-original.md) — the original brief, as received
 - [workshop.md](project/workshop.md) — slides outline, live-demo script, walkthrough
+- [documentation-standard.md](project/documentation-standard.md) — how pages are written: the rules, the exemplar, the tests that enforce them
 
 ## Not documentation (deliberately outside `docs/`)
 
