@@ -206,6 +206,10 @@ automated and repeated on every run.
 
 ### Running it
 
+The judge has a page of its own — [ragas.md](ragas.md): what Ragas is, how
+each line of its output reads, the captures of a recorded run, the negative
+control, and troubleshooting. The short version:
+
 ```sh
 # once: a Python 3.13 environment of its own (ragas has no 3.14 wheels). The
 # main .venv stays lean; the ~35 extra packages land in .venv-evals instead.

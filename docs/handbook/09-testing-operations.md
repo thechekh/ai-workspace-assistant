@@ -71,7 +71,9 @@ UV_PROJECT_ENVIRONMENT=.venv-evals uv run python -m evals.run_ragas --check --co
 ```
 
 Both metrics families, and why only one of them can be a build gate, are
-explained in [reference/metrics.md](../reference/metrics.md).
+explained in [reference/metrics.md](../reference/metrics.md); the judge
+itself — what Ragas is, how to run and read it, and the control that proves
+it — is [reference/ragas.md](../reference/ragas.md).
 
 Lowering a number in `baseline.json` is a deliberate act: do it in the same
 commit as the change that caused it, and say in the message why the trade-off

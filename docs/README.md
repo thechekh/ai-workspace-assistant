@@ -44,6 +44,7 @@ followed through every layer, with the exact file and line at each step and
 the question a reviewer asks there.
 
 **I need to explain a quality number** → [reference/metrics.md](reference/metrics.md)
+(and [reference/ragas.md](reference/ragas.md) for the judged one)
 — recall@k, MRR and groundedness: what each measures, what it hides, and why
 one is a CI gate and the other never can be.
 
@@ -80,7 +81,7 @@ questions*. Read across.
 | **Security** | — | [reference/security.md](reference/security.md) — threat model + controls | [theory/12 §LLM & AI](theory/12-defense-qa.md) |
 | **Any unfamiliar term** | [theory/11 — glossary](theory/11-glossary.md) | — | — |
 
-### The reading roadmap — all 42 documents, in order
+### The reading roadmap — all 43 documents, in order
 
 Read top to bottom and you will have read **every** document in the
 repository, each one landing when you have the background for it. Tick them
@@ -154,9 +155,10 @@ Not linear; each answers one narrow question completely.
 |---|---|---|
 | 27 | [reference/tools.md](reference/tools.md) | Every tool: parameters, returns, errors, implementation |
 | 28 | [reference/metrics.md](reference/metrics.md) | recall@k, MRR, groundedness — and what each one hides |
-| 29 | [reference/backend-comparison.md](reference/backend-comparison.md) | custom vs Pydantic AI vs LangGraph, measured |
-| 30 | [reference/security.md](reference/security.md) | Threat model, every control, and what is deliberately absent |
-| 31 | [reference/testing.md](reference/testing.md) | The manual checklist, tiered from zero-infra to real model |
+| 29 | [reference/ragas.md](reference/ragas.md) | The LLM judge: what Ragas is, how to run and read it, and the control that proves it |
+| 30 | [reference/backend-comparison.md](reference/backend-comparison.md) | custom vs Pydantic AI vs LangGraph, measured |
+| 31 | [reference/security.md](reference/security.md) | Threat model, every control, and what is deliberately absent |
+| 32 | [reference/testing.md](reference/testing.md) | The manual checklist, tiered from zero-infra to real model |
 
 #### Stage 7 · Why it looks like this *(~1 h)*
 
@@ -164,27 +166,27 @@ The decisions and the history — this is where "why not X?" gets answered.
 
 | # | Document | Why here |
 |---|---|---|
-| 32 | [project/tech-stack.md](project/tech-stack.md) | Every technology decision and the alternatives rejected |
-| 33 | [project/implementation-plan.md](project/implementation-plan.md) | Phase-by-phase build history with acceptance evidence |
-| 34 | [project/description-original.md](project/description-original.md) | The original brief as received — compare with what shipped |
+| 33 | [project/tech-stack.md](project/tech-stack.md) | Every technology decision and the alternatives rejected |
+| 34 | [project/implementation-plan.md](project/implementation-plan.md) | Phase-by-phase build history with acceptance evidence |
+| 35 | [project/description-original.md](project/description-original.md) | The original brief as received — compare with what shipped |
 
 #### Stage 8 · Rehearse the defence *(~1.5 h)*
 
 | # | Document | Why last |
 |---|---|---|
-| 35 | [theory/11-glossary.md](theory/11-glossary.md) | 119 terms — cover the definitions and say them aloud |
-| 36 | [theory/12-defense-qa.md](theory/12-defense-qa.md) | The hard questions, with answers. Do this without notes |
-| 37 | [project/workshop.md](project/workshop.md) | Slide outline and the click-by-click demo script |
-| 38 | [project/demo-runbook.md](project/demo-runbook.md) | Running the demo on the real stack: keys, infra, costs |
-| 39 | [reference/localhost.md](reference/localhost.md) | Every localhost link once it runs: dashboards, logs, and browsing the vector DB |
-| 40 | [project/future-tools.md](project/future-tools.md) | Every tool considered and deferred: cost, verdict, trigger to revisit |
-| 41 | [qanda/README.md](qanda/README.md) | The 69 hard questions — 48 general, 21 on this codebase — each followed by its grounded answer with measured numbers |
+| 36 | [theory/11-glossary.md](theory/11-glossary.md) | 119 terms — cover the definitions and say them aloud |
+| 37 | [theory/12-defense-qa.md](theory/12-defense-qa.md) | The hard questions, with answers. Do this without notes |
+| 38 | [project/workshop.md](project/workshop.md) | Slide outline and the click-by-click demo script |
+| 39 | [project/demo-runbook.md](project/demo-runbook.md) | Running the demo on the real stack: keys, infra, costs |
+| 40 | [reference/localhost.md](reference/localhost.md) | Every localhost link once it runs: dashboards, logs, and browsing the vector DB |
+| 41 | [project/future-tools.md](project/future-tools.md) | Every tool considered and deferred: cost, verdict, trigger to revisit |
+| 42 | [qanda/README.md](qanda/README.md) | The 69 hard questions — 48 general, 21 on this codebase — each followed by its grounded answer with measured numbers |
 
 #### Stage 9 · Repository conventions — only if you will contribute
 
 | # | Document | Answers |
 |---|---|---|
-| 42 | [../CLAUDE.md](../CLAUDE.md) | Instructions for AI coding agents working in this repo |
+| 43 | [../CLAUDE.md](../CLAUDE.md) | Instructions for AI coding agents working in this repo |
 
 **The short path.** No time for all of it? **1 → 4 → 6 → 25 → 38** — what it
 is, the architecture, how to run it, the code walkthrough, and the defence
@@ -231,6 +233,7 @@ outline, a click-by-click demo script, and the file-map walkthrough.
 - [testing.md](reference/testing.md) — manual testing checklist, tiered
 - [backend-comparison.md](reference/backend-comparison.md) — custom vs Pydantic AI vs LangGraph, measured
 - [security.md](reference/security.md) — threat model, what is enforced, what is deliberately not
+- [ragas.md](reference/ragas.md) — the LLM judge: what it is, how to run and read it, the negative control
 
 ### project/ — planning, decisions, delivery
 - [tech-stack.md](project/tech-stack.md) — technology decisions and rationale
