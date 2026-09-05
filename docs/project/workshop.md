@@ -1,5 +1,11 @@
 # Workshop — AI Workspace Assistant
 
+**The slide outline, the click-by-click live-demo script, and the file-map
+walkthrough — everything needed to run the department workshop.** For
+running these same demos against the real stack (keys, infra, cost), see
+[demo-runbook.md](demo-runbook.md); this page is the presentation, not the
+production checklist.
+
 Materials for the department workshop: slide outline, click-by-click live
 demo script, and the implementation walkthrough map. Everything runs
 offline with zero API keys (fake LLM + hash embedder); with a OpenAI key the
@@ -12,14 +18,14 @@ for the hard questions.
 
 ---
 
-## Part 1 — AI architecture (slides outline)
+## 1. Part 1 — AI architecture (slides outline)
 
 1. **The problem** — engineers ask the same questions about the codebase,
    docs, and systems; the answers exist but are scattered.
 2. **RAG** — chunking (heading-aware, breadcrumbs), embeddings, vector
    search. *Our numbers slide:* golden set of 18 questions, measured at zero
-   cost (`evals/run_retrieval.py --memory`) and re-checked by CI on every
-   push:
+   cost on 2026-09-04 (`uv run python evals/run_retrieval.py --memory`) and
+   re-checked by CI on every push:
 
    | | recall@1 | recall@5 | MRR |
    |---|---:|---:|---:|
@@ -34,12 +40,15 @@ for the hard questions.
    follow-up "then why is hybrid your default?" — the answer is in the
    [defense Q&A](../theory/12-defense-qa.md).
 3. **Agentic systems** — the ReAct loop: model → tool call → result → model.
-   Show `backends/custom.py` (98 lines, no framework). Loop bounded at 6
-   iterations; a tool crash becomes an error *result*, never an exception.
+   Show `backends/custom.py` (98 lines, no framework — measured below). Loop
+   bounded at 6 iterations; a tool crash becomes an error *result*, never an
+   exception.
 4. **Three runtimes, one contract** — `AgentBackend` protocol; custom vs
    Pydantic AI vs LangGraph, switchable per session. *Slide source:*
-   [backend-comparison.md](../reference/backend-comparison.md) (measured LoC
-   98/286/278 + verdict table). The same test suite passes on all three.
+   [backend-comparison.md](../reference/backend-comparison.md) — measured LoC
+   **98 / 286 / 278** (`wc -l src/assistant/agent/backends/*.py`, 2026-09-04)
+   + verdict table. The same test suite passes on all three: **382 tests**
+   (`uv run pytest -q`, 2026-09-04).
 5. **MCP** — why a protocol beats N bespoke integrations; stdio vs
    streamable HTTP; tool namespacing; graceful degradation. Our servers:
    `code_search` (real) + `fake_github` (mock borrowing the official server's
@@ -47,18 +56,32 @@ for the hard questions.
    so swapping to real GitHub is a config change, verified live).
 6. **Memory** — short-term Redis history + rolling summarization (context
    stops growing; each message summarized once); long-term = the vector DB.
-7. **Observability** — five views of one turn: structured logs with
-   correlation IDs, `/metrics`, an OTel trace waterfall
-   (`agent.turn → llm.step → tool.execute → rag.retrieve`), per-turn stats
-   **and cost** in the UI, and a replayable audit trail. All local, zero
-   accounts (Jaeger + Prometheus + Grafana in one compose profile); Logfire
-   and Langfuse are optional extra destinations on the same pipeline.
-8. **Making real models behave** — what live testing against OpenAI forced:
-   429 backoff honouring `Retry-After`, retry + salvage when llama emits a
-   malformed tool call, parsing leaked `<function…>` text back into real
-   calls, and a per-turn duplicate-call guard.
+7. **Observability** — five views of the same turn, all local and zero
+   accounts (Jaeger + Prometheus + Grafana in one compose profile):
 
-## Part 2 — Live demo (script)
+   | View | What it shows |
+   |---|---|
+   | Structured logs | Every step, correlated by `turn.id` |
+   | `/metrics` | Prometheus counters and histograms, scraped every 5s |
+   | OTel trace waterfall | `agent.turn → llm.step → tool.execute → rag.retrieve`, exact timing per span |
+   | Per-turn stats **and cost** | Tokens, latency and dollar cost, right under the reply in the UI |
+   | Audit trail | Every turn replayable after the fact |
+
+   Logfire and Langfuse are additional destinations on the same
+   OpenTelemetry pipeline — both verified receiving these same spans on real
+   turns, 2026-09-04 (see
+   [logfire-langfuse.md](../reference/logfire-langfuse.md)).
+8. **Making real models behave** — what live testing against OpenAI (and
+   llama-class models before it) forced, one fix per failure actually hit:
+
+   | Failure mode | Fix |
+   |---|---|
+   | `429` mid-stream | Backoff honouring the provider's `Retry-After` header |
+   | A model emits a malformed tool call | Retry, then salvage what can be parsed |
+   | A model prints a tool call as `<function…>` text instead of calling it | Parsed back into a real tool call |
+   | The same tool called twice in one turn | A per-turn duplicate-call guard |
+
+## 2. Part 2 — Live demo (script)
 
 Setup beforehand:
 
@@ -112,7 +135,7 @@ The knowledge base starts **empty** — filling it is demo step 1.
 Fallback: every step above also works with the offline fake LLM — answers
 are extractive but the full tool loop is real.
 
-## Part 3 — Implementation walkthrough (file map)
+## 3. Part 3 — Implementation walkthrough (file map)
 
 | Area | Where | Talking points |
 |---|---|---|
@@ -131,3 +154,11 @@ are extractive but the full tool loop is real.
 Suggested flow: open the WS test (`tests/test_ws.py`) first — the protocol
 in one screen — then walk `custom.py`, then show the same test suite
 passing ×3 backends (`uv run pytest -q`).
+
+## 4. Related
+
+- [demo-runbook.md](demo-runbook.md) — running the same demos on the real stack: keys, infra, cost
+- [../reference/backend-comparison.md](../reference/backend-comparison.md) — the measured numbers behind slide 4
+- [../reference/metrics.md](../reference/metrics.md) — the retrieval numbers behind slide 2, in full
+- [../theory/12-defense-qa.md](../theory/12-defense-qa.md) — answers to the hard follow-up questions
+- [implementation-plan.md](implementation-plan.md) — the build history slide 8's hardening comes from

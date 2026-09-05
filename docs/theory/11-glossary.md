@@ -1,5 +1,11 @@
 # 11 — Glossary
 
+**What this page answers: what a term means the moment someone in the room
+uses it — one line each, pointing at the chapter that explains it
+properly.** It is not a substitute for those chapters, and a definition
+here is deliberately too short to defend on its own — start at
+[theory/README.md](README.md) for the full explanations.
+
 One line per term. Numbers in parentheses are the theory chapter that
 explains it properly; `sec` points at
 [reference/security.md](../reference/security.md) instead.
@@ -7,7 +13,7 @@ explains it properly; `sec` points at
 Every term here is one this project actually uses — in the code, the docs, or
 both. If a reviewer asks "what do you mean by X", X should be on this page.
 
-## Models and the API
+## 1. Models and the API
 
 - **LLM** — large language model; predicts the next token, repeatedly (01).
 - **Inference** — one run of the model over a prompt to produce output; what you pay for (01).
@@ -26,7 +32,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Hallucination** — a confident fabricated answer; mitigated by grounding in retrieved docs (01, 03).
 - **Prompt injection** — hostile instructions hidden in content the model reads; treated as untrusted input (sec).
 
-## Embeddings and vector search
+## 2. Embeddings and vector search
 
 - **Embedding** — a vector representing a text's meaning; similar meaning → nearby vectors (02).
 - **Vector** — the list of numbers itself; a point in a high-dimensional space (02).
@@ -42,7 +48,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Vector database** — a store optimized for nearest-neighbor search over vectors; ours is Qdrant (02).
 - **HNSW** — the standard approximate nearest-neighbor index inside vector DBs (02).
 
-## RAG
+## 3. RAG
 
 - **RAG** — retrieval-augmented generation: retrieve relevant chunks, then answer from them (03).
 - **Retrieval** — the search step: question in, candidate chunks out (03).
@@ -62,7 +68,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Grounding** — forcing answers to come from retrieved evidence, with citations (03).
 - **Citation** — naming the source file an answer came from, so a reader can check it (03).
 
-## Agents and tool calling
+## 4. Agents and tool calling
 
 - **Tool / function calling** — the model *requests* a function call as JSON; the app executes it (04).
 - **JSON Schema** — the typed description of a tool's arguments (04).
@@ -80,7 +86,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **StateGraph** — LangGraph's model of an agent: nodes and edges rather than a `while` loop (05).
 - **Checkpointing** — LangGraph persisting graph state per thread; durable/resumable runs (05).
 
-## MCP — Model Context Protocol
+## 5. MCP — Model Context Protocol
 
 - **MCP** — Model Context Protocol; the open standard for exposing tools to AI apps (06).
 - **MCP server / client** — the program exposing tools / the app consuming them (06).
@@ -90,7 +96,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Tool namespacing** — `code__search_code`: server name prefixed so tools never collide (06).
 - **Graceful degradation** — unreachable MCP server → warning + skip, agent runs with the rest (06).
 
-## Memory and context management
+## 6. Memory and context management
 
 - **Session** — one conversation, identified by `session_id`, resumable across reconnects (07, 08).
 - **Transcript** — the full stored message history of a session; the audit record (07).
@@ -100,7 +106,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Rolling summary** — persisted digest of older turns; keeps prompts bounded (07).
 - **Context budget** — the character ceiling past which old turns get folded into that summary (07).
 
-## Evaluation and quality
+## 7. Evaluation and quality
 
 - **Eval** — a measured quality check (vs a pass/fail unit test) (09).
 - **Golden set** — annotated question→answer-location pairs used to score retrieval (03, 09).
@@ -115,7 +121,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Groundedness / faithfulness** — the share of an answer's claims supported by the retrieved context; hallucination, measured ([metrics](../reference/metrics.md)) (03, 09).
 - **Ragas** — the LLM-judged RAG evaluation library behind that metric; an optional dependency group (09).
 
-## Observability and LLMOps
+## 8. Observability and LLMOps
 
 - **Observability** — being able to answer "what happened in that turn?" after the fact (09).
 - **Trace / span** — one request's timed tree of nested operations, and a single node of it (09).
@@ -131,7 +137,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Audit trail** — the stored per-turn record — stats plus timeline — that makes a turn replayable (09).
 - **Logfire / Langfuse** — our two OTel backends: app view / LLM view (09).
 
-## Serving and infrastructure
+## 9. Serving and infrastructure
 
 - **WebSocket** — persistent bidirectional connection; carries our typed chat frames (08).
 - **SSE** — server-sent events; one-way streaming alternative we didn't need (08).
@@ -143,7 +149,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **uv / ruff / pyright** — modern Python toolchain: packaging / lint+format / type checking (10).
 - **Compose profile** — optional service group; `--profile app` starts the full platform (10).
 
-## Safety and guardrails
+## 10. Safety and guardrails
 
 - **Untrusted model output** — treating what the model returns as input to validate, never as code to run (sec).
 - **Least privilege** — every tool read-only; nothing writes files, runs shells or mutates state (sec).
@@ -153,7 +159,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Content sanitisation** — stripping instruction-like content from ingested documents; a known gap here (sec).
 - **Data residency** — which jurisdiction your prompts are processed in; a reason the provider is a config value (sec).
 
-## Deliberately not used
+## 11. Deliberately not used
 
 Terms you will be asked about that this project does **not** use. Knowing why
 is worth as much as knowing the term — "we don't, because…" is a better answer
@@ -164,3 +170,32 @@ oversight.
 - **Dot product / inner product** — the other common vector similarity metric. The collection is configured `Distance.COSINE`, but `hash-512` L2-normalizes every vector, and for unit-length vectors cosine and dot product produce *identical rankings*. Cosine is declared because it stays correct if an un-normalized embedder is swapped in (02).
 - **Vector quantization** — compressing stored vectors (scalar/product/binary) to trade a little accuracy for much less memory. Qdrant supports it; not enabled, because it earns its keep at millions of vectors and this knowledge base holds tens (02, 10).
 - **Precision / accuracy** — the classification metrics people expect to hear. Not measured, deliberately: retrieval here feeds *one* answer, so what matters is whether the right chunk is near the top, which is what `recall@k` and `MRR` capture. Precision would score a system that returns everything (03, 09).
+
+## 12. Reading it honestly
+
+A one-line definition is a lookup, not an explanation — it cannot carry a
+mechanism, a trade-off, or a failure mode, and it isn't meant to. Two
+distinctions worth being explicit about:
+
+- **General vs project-specific.** Most terms here (LLM, embedding, RRF,
+  WebSocket) mean the same thing anywhere; the chapter number in parentheses
+  is where the general concept is taught. A few are project-specific
+  *values* wearing a general term's name — recall@5 is a standard IR metric,
+  but this project's recall@5 is **1.00** on the 18-question golden set with
+  the default hybrid+rerank configuration (measured 2026-09-04, `uv run
+  python evals/run_retrieval.py --memory`; full table in
+  [reference/metrics.md](../reference/metrics.md)). The number lives there,
+  not here, precisely so it can't drift out of date in two places at once.
+- **What it cannot do.** It cannot resolve "why not X" — that's
+  [12 — Defense Q&A](12-defense-qa.md) and
+  [project/tech-stack.md](../project/tech-stack.md); it cannot show a worked
+  example — that's every numbered theory chapter; and a term being listed
+  here is proof this project uses it, not proof it uses it well.
+
+## 13. Related
+
+- [theory/README.md](README.md) — the course map; each term's chapter number points back here
+- [reference/metrics.md](../reference/metrics.md) — the numbers behind recall@k, MRR and groundedness, measured and dated
+- [reference/security.md](../reference/security.md) — the safety terms in §10, each with the control behind it
+- [12 — Defense Q&A](12-defense-qa.md) — the terms put to work answering a hard question
+- [reference/ragas.md](../reference/ragas.md) — LLM-as-judge and groundedness, in full

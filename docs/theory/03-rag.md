@@ -1,6 +1,12 @@
 # 03 — RAG (Retrieval-Augmented Generation)
 
-## The problem RAG solves
+**What this chapter answers: why retrieval beats fine-tuning or stuffing the
+prompt, how this project chunks and indexes documents, and how retrieval
+quality is actually measured.** It does not cover how the vectors themselves
+are built — see [02-embeddings-and-vector-search.md](02-embeddings-and-vector-search.md)
+for that; this chapter is retrieval end to end.
+
+## 1. The problem RAG solves
 
 An LLM knows only (a) what was in its training data — public text, frozen at
 a cutoff date — and (b) what's in the current context window. It has never
@@ -18,7 +24,7 @@ Three ways to give a model private knowledge:
 RAG = **R**etrieval-**A**ugmented **G**eneration: retrieve first, then
 generate an answer grounded in what was retrieved.
 
-## Ingestion — done once (and re-run when docs change)
+## 2. Ingestion — done once (and re-run when docs change)
 
 **In this project** the knowledge base starts **empty**. Documents arrive
 three ways, all landing in the same pipeline: the Documents panel in the UI,
@@ -43,12 +49,26 @@ standards, incident response, onboarding.
      construction.
 3. **Embed** each chunk: dense vector + sparse lexical vector (chapter 02).
 4. **Upsert** into Qdrant with payload `{text, source, heading, index}`.
+   Re-ingesting a source is a **replace**, not a merge:
+   [`ingest_chunks`](../../src/assistant/rag/ingest.py) deletes every chunk
+   that source already had before upserting the new ones, precisely because
+   the deterministic id alone isn't enough — shortening a document or
+   renaming a heading changes the id, and the *old* chunk would otherwise
+   sit there forever, still searchable, still cited.
 
 Why ~450-token chunks? Too small → a chunk lacks context to be useful; too
 big → retrieval gets blurry (one vector averaging many topics) and you waste
 prompt budget. Heading-bounded ~300–500 tokens is the well-tested middle.
 
-## Query time — every question
+Markdown, plain text and reStructuredText cover every source this project
+has actually needed to ingest. A heavier ingestion path was on the original
+plan — [tech-stack.md](../project/tech-stack.md) specced `docling` to parse
+PDF, HTML and DOCX before chunking — and it was never built:
+[implementation-plan.md](../project/implementation-plan.md)'s roadmap notes
+that Markdown/text/RST covered every real source, so the extra parser stayed
+unbuilt rather than added on spec.
+
+## 3. Query time — every question
 
 **In this project:** [`rag/retriever.py`](../../src/assistant/rag/retriever.py),
 exposed to the agent as the `search_docs` tool
@@ -68,7 +88,7 @@ Grounding is the anti-hallucination mechanism: the model is instructed to
 answer from the retrieved text and to say so when the docs don't cover the
 question — and the user can always inspect the evidence in the tool card.
 
-## How we know it works: evaluation
+## 4. How we know it works: evaluation
 
 Vibes don't survive a Q&A session; numbers do.
 
@@ -83,7 +103,8 @@ Vibes don't survive a Q&A session; numbers do.
 - Every metric in full — what each hides, and how groundedness differs from
   both — is in [reference/metrics.md](../reference/metrics.md).
 
-Measured, free offline embedder, 18 questions:
+Measured, free offline embedder, 18 questions, recorded 2026-09-04
+(`uv run python evals/run_retrieval.py --memory`):
 
 | config | recall@1 | recall@5 | MRR |
 |---|---:|---:|---:|
@@ -92,14 +113,18 @@ Measured, free offline embedder, 18 questions:
 | dense + rerank | 0.89 | 1.00 | 0.94 |
 | hybrid + rerank (default) | **0.83** | **1.00** | **0.92** |
 
-The instructive question is "What linter and formatter do we use?": the
-docs say "*lint* and *format*" while the question says "*linter/formatter*"
-— different tokens, a pure lexical gap. It is the one question where the
-sparse channel visibly helps (rank 3 dense, rank 2 hybrid). That is the case
-a semantic embedding model closes completely — and `evals/compare_embeddings.py` is standing by
+The instructive question is the golden set's own
+*"What linter and formatter do we use for Python?"*
+([`evals/golden.yaml`](../../evals/golden.yaml)): the corpus answer says
+*"Lint and format with ruff"*
+([`evals/corpus/guidelines/coding-standards.md`](../../evals/corpus/guidelines/coding-standards.md))
+— a verb, not the noun the question asks with. Different tokens, a pure
+lexical gap. It is the one question where the sparse channel visibly helps
+(rank 3 dense, rank 2 hybrid). That is the case a semantic embedding model
+closes completely — and `evals/compare_embeddings.py` is standing by
 to measure exactly that when API keys exist.
 
-## Questions you might get
+## 5. Questions you might get
 
 **"Why RAG instead of fine-tuning?"** — Docs change weekly; re-ingesting is
 minutes and $0, retraining is neither. RAG also cites sources (auditable)
@@ -122,3 +147,35 @@ IDs mean changed chunks overwrite in place.
 benchmark: enough to catch retrieval regressions per change and to compare
 configurations on equal footing. Growing it is a content task, not an
 engineering one.
+
+## 6. Reading it honestly
+
+- **Deleting a file from the corpus folder doesn't delete it from the
+  index.** Re-ingestion only replaces sources it *sees* in the current run
+  ([`rag/ingest.py`](../../src/assistant/rag/ingest.py)); a file removed from
+  the folder is simply never visited again, so its chunks stay searchable
+  and citable until someone runs `--recreate` for a full rebuild. This is a
+  real, acknowledged gap, not a hypothetical one.
+- **recall@k and MRR say nothing about whether the model told the truth.**
+  A system can retrieve the perfect chunk and still write something it never
+  said — that failure mode is invisible to every number in this chapter and
+  is exactly what [reference/ragas.md](../reference/ragas.md)'s groundedness
+  metric exists to catch instead.
+- **18 questions over a 5-document fixture corpus is a regression harness,
+  not a claim about production-scale retrieval.** It proves the pipeline
+  works end to end and catches regressions per change; it does not claim to
+  generalize to a large, messy real knowledge base.
+- **Heading-aware chunking silently degrades on badly-structured source
+  documents.** A file with no headings, or misleading ones, chunks worse and
+  nothing today flags that at ingest time.
+- **The reranker is only evaluated against this one golden set.** There is
+  no separate, held-out set of real production queries to confirm the
+  ablation table generalizes beyond the 18 questions it was measured on.
+
+## 7. Related
+
+- [02-embeddings-and-vector-search.md](02-embeddings-and-vector-search.md) — how the dense and sparse vectors this chapter searches are actually built
+- [04-tool-calling-and-agents.md](04-tool-calling-and-agents.md) — how the model decides to call `search_docs` in the first place
+- [../handbook/05-rag-qdrant.md](../handbook/05-rag-qdrant.md) — the same pipeline as this project runs it, ingest and query both
+- [../reference/metrics.md](../reference/metrics.md) — recall@k, MRR and groundedness defined precisely, with what each hides
+- [../reference/ragas.md](../reference/ragas.md) — the judge that checks what recall@k and MRR cannot: whether the answer was honest

@@ -1,6 +1,12 @@
 # AI Workspace Assistant Platform (Agentic FastAPI + MCP + Vector DB)
 
-## Idea
+**This is the project brief as received on or around 2026-09-01 — it
+describes the target system that was asked for, not what shipped.** For the
+original Ukrainian text, see
+[description-original.md](description-original.md); for what was actually
+built, see [implementation-plan.md](implementation-plan.md).
+
+## 1. Idea
 
 Build an internal AI assistant for engineers that can:
 
@@ -18,7 +24,7 @@ It gives the department:
 - practical use of MCP (Model Context Protocol)
 - an example of an AI-native backend
 
-## Architecture
+## 2. Architecture
 
 ```
 User (Web UI / CLI)
@@ -45,7 +51,7 @@ FastAPI AI Gateway
                 └── Code Search Tool
 ```
 
-## Core Components
+## 3. Core Components
 
 ### 1. FastAPI WebSocket Chat Server
 
@@ -147,7 +153,7 @@ Final Answer
 - **Short-term memory:** Redis
 - **Long-term memory:** Vector DB
 
-## Tech Stack
+## 4. Tech Stack
 
 **Backend**
 
@@ -173,7 +179,7 @@ Final Answer
 - MCP
 - LangGraph or a custom agent implementation
 
-## Expected Outcome
+## 5. Expected Outcome
 
 The bench engineer is expected to deliver:
 
@@ -199,7 +205,7 @@ The agent calls the GitHub tool.
 
 The agent retrieves the architecture documentation.
 
-## Department Workshop
+## 6. Department Workshop
 
 After the bench task is complete, a workshop is held for the department:
 
@@ -230,7 +236,7 @@ Walk through:
 - the vector DB pipeline
 - the MCP tool registry
 
-## Why This Is a Strong Task
+## 7. Why This Is a Strong Task
 
 It covers the team's entire AI competency vector:
 
@@ -242,9 +248,17 @@ It covers the team's entire AI competency vector:
 | Cloud AI        | ✅      |
 | AI tooling      | ✅      |
 
-## Why This Is a Good Bench Project
+## 8. Why This Is a Good Bench Project
 
 1. It is genuinely useful in day-to-day work.
 2. It demonstrates AI engineering maturity.
 3. It produces a reusable platform.
 4. It can be extended over time.
+
+## 9. Related
+
+- [description-original.md](description-original.md) — the same brief as received, in the original Ukrainian
+- [implementation-plan.md](implementation-plan.md) — what actually shipped, phase by phase, against this brief
+- [tech-stack.md](tech-stack.md) — the technology decisions made to deliver it
+- [future-tools.md](future-tools.md) — what the brief asked for that was deliberately deferred
+- [../handbook/01-project-overview.md](../handbook/01-project-overview.md) — the architecture that resulted

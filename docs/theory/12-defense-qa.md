@@ -1,5 +1,11 @@
 # 12 — Defense Q&A
 
+**What this page answers: the hard questions a reviewer is likely to ask,
+grouped by area, each as a decision → reason → evidence a defence can stand
+on.** It is not the concept explanations the answers assume — those are the
+numbered chapters from [01 — LLM basics](01-llm-basics.md) through
+[10 — Infrastructure](10-infrastructure.md).
+
 The questions most likely to come up, with answers that hold.
 
 **General technique:** answer with a **decision → reason → evidence in the
@@ -7,7 +13,8 @@ repo**, and concede trade-offs proactively. The honest concession is what
 makes the rest credible. Every number below is real and reproducible; if you
 cite one, be ready to run the command.
 
-**Numbers worth memorising**
+**Numbers worth memorising** *(current as of 2026-09-04 — §9 below says
+which of these are re-runnable on demand and which can drift)*
 
 | Claim | Value | How to prove it |
 |---|---|---|
@@ -20,7 +27,7 @@ cite one, be ready to run the command.
 
 ---
 
-## Architecture
+## 1. Architecture
 
 **Q: Why implement the agent three times? Isn't once enough?**
 Because "which framework?" was a real open question and we wanted an
@@ -58,7 +65,7 @@ are already externalised, so API pods scale horizontally today.
 
 ---
 
-## LLM & AI
+## 2. LLM & AI
 
 **Q: Which model does this run on, and what does it cost?**
 The provider is a **config value**, not a code decision: one
@@ -122,7 +129,7 @@ failures against OpenAI, not speculation:
 
 ---
 
-## RAG
+## 3. RAG
 
 **Q: Why RAG and not fine-tuning?**
 Facts change weekly; re-ingest is seconds and free, retraining is neither.
@@ -194,7 +201,7 @@ to every caller.
 
 ---
 
-## Vector database
+## 4. Vector database
 
 **Q: Why Qdrant over pgvector, Weaviate, or Chroma?**
 Native **named vectors** — one point carries both a dense and a sparse
@@ -233,7 +240,7 @@ fine for hundreds of documents and would need a payload index beyond that.
 
 ---
 
-## Agents, tools & MCP
+## 5. Agents, tools & MCP
 
 **Q: What actually is the "agent" here?**
 A ReAct loop: the model sees the conversation plus tool schemas, may emit
@@ -271,7 +278,7 @@ log and duplicate guard live — added once, not per tool.
 
 ---
 
-## Observability
+## 6. Observability
 
 **Q: Why so much observability for a demo?**
 Because "the model said something wrong" is unactionable without it. The
@@ -307,7 +314,7 @@ accounts.
 
 ---
 
-## Engineering quality
+## 7. Engineering quality
 
 **Q: How do you test something nondeterministic?**
 Remove the nondeterminism from every layer except the one under evaluation:
@@ -400,7 +407,7 @@ differentiator rather than a demo.
 
 ---
 
-## Questions to ask *back*
+## 8. Questions to ask *back*
 
 Defence goes better when it's a conversation:
 
@@ -410,3 +417,37 @@ Defence goes better when it's a conversation:
   provider is a config value, and that choice changes the answer."
 - "Would you want documents uploaded by users, or a synced folder? Both are
   supported and they have different threat models."
+
+## 9. Reading it honestly
+
+Not every line above carries the same kind of proof, and a reviewer who
+presses on the difference deserves the honest split:
+
+- **Measured, and re-runnable on demand.** The retrieval numbers (§3), the
+  backend line counts (§1), the test count and suite runtime (§7), and the
+  Ragas faithfulness/control numbers (§6) all come from a command named next
+  to them — running it is the actual answer to "how do I know that's true",
+  not the number itself.
+- **Argued, not measured.** Anything about production risk ("what breaks
+  first", §1), security posture (§2, §5), or why an alternative lost is
+  engineering judgment with evidence cited for it — real, but not a number a
+  re-run would reproduce. Treat these as a position to defend, not a
+  benchmark to repeat.
+- **Numbers that can drift.** Cost-per-turn moves with provider pricing;
+  coverage and test counts move with every commit that adds a test (the
+  table at the top of this page is a dated snapshot, not a live query); Ragas
+  scores move run to run on identical input by design — variance is one of
+  its own named failure modes (see
+  [reference/ragas.md §8](../reference/ragas.md)). A number here going stale
+  by the time you read it is expected, not a bug in this page — re-run the
+  command in the table before repeating the number in a room that will check
+  it.
+
+## 10. Related
+
+- [theory/README.md](README.md) — the concept chapters these answers assume are already read
+- [reference/backend-comparison.md](../reference/backend-comparison.md) — the measured three-way comparison behind the Architecture answers
+- [reference/security.md](../reference/security.md) — the full threat model behind every LLM & AI and Agents/MCP answer
+- [reference/ragas.md](../reference/ragas.md) — the judge and negative control behind the Observability numbers
+- [qanda/README.md](../qanda/README.md) — 69 more questions in the same decision → reason → evidence shape
+- [project/workshop.md](../project/workshop.md) — where these answers get rehearsed out loud before a live audience

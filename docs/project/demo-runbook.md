@@ -1,10 +1,15 @@
 # Demo runbook — running the production stack
 
+**Running the real, paid stack for the department demo: credentials,
+infrastructure, the three deliverable queries, and their measured cost.**
+For the offline rehearsal script instead, see [workshop.md](workshop.md);
+this page is the production checklist, not the slides.
+
 Development runs on fakes so the pipeline costs nothing to exercise. The demo
 runs on the real thing. This is the checklist for the second one, and the
 honest account of what "real" means for each component.
 
-## The two profiles
+## 1. The two profiles
 
 | Component | Development ([`.env.example`](../../.env.example)) | Production ([`.env.production.example`](../../.env.production.example)) |
 |---|---|---|
@@ -22,7 +27,7 @@ application code — [`build_embedder`](../../src/assistant/rag/embeddings.py)
 and [`_default_mcp_servers`](../../src/assistant/config.py) pick an
 implementation from config, and the agent cannot tell which it got.
 
-## Setup
+## 2. Setup
 
 ### 1. Credentials
 
@@ -93,10 +98,10 @@ Every component must report real values before you present:
 `"provider": "fake"` means the LLM step above did not take; `points`
 climbs as you ingest.
 
-## The three demo queries
+## 3. The three demo queries
 
 These are the deliverables the brief asks for, in order. Measured against the
-real stack:
+real stack on 2026-09-03 (commit `75f6caa`):
 
 | # | Ask | Query | Tool called | Cost |
 |---|---|---|---|---|
@@ -108,7 +113,7 @@ Three turns cost **$0.00066** — about 1500 full demo runs per dollar. Watch
 each one land in Jaeger (`localhost:16686`) as a four-span trace:
 `agent.turn → llm.step → tool.execute → rag.retrieve`.
 
-## Graceful degradation
+## 4. Graceful degradation
 
 Worth showing on purpose rather than hiding: kill the GitHub server mid-demo
 and the assistant keeps working with the tools that remain.
@@ -122,21 +127,23 @@ failure and continues, and the agent answers from what is left. That is
 [`MCPRegistry.start`](../../src/assistant/mcp/registry.py) catching per-server
 failures instead of aborting the whole registry.
 
-## Cost control
+## 5. Cost control
 
 The two levers that matter, both already set in the profile:
 
 1. **Toolset scoping.** Every tool's JSON schema is re-sent in *every* prompt.
    The full GitHub server is ~44 tools (~12,900 tokens/prompt); scoped to
    `pull_requests,issues` it is a fraction of that. Unscoped, a demo question
-   costs ~12x more for the same answer.
+   costs ~12x more for the same answer (measured 2026-08 → 2026-09; see
+   [implementation-plan.md](implementation-plan.md)).
 2. **Model choice.** `gpt-4.1-nano` at $0.10/$0.40 per 1M tokens. A tool-using
-   turn is 2 LLM steps and lands around $0.0002.
+   turn is 2 LLM steps and lands around $0.0002 — consistent with the
+   $0.000190–$0.000273 measured per query in §3.
 
 Tests and CI never call a provider — they run on `fake` + `fakeredis://` +
 in-memory Qdrant. Re-running the suite costs nothing.
 
-## Teardown
+## 6. Teardown
 
 ```sh
 docker compose --profile observability down
@@ -145,3 +152,11 @@ docker compose down
 
 Sessions and vectors persist in named volumes (`redis-data`, `qdrant-data`),
 so a restart keeps the index — no re-ingest needed unless the embedder changes.
+
+## 7. Related
+
+- [workshop.md](workshop.md) — the slide outline and script this runbook executes for real
+- [../reference/security.md](../reference/security.md) — the threat model behind the PAT scoping and the bearer auth token
+- [../handbook/07-observability.md](../handbook/07-observability.md) — every dashboard URL and what it shows
+- [../reference/logfire-langfuse.md](../reference/logfire-langfuse.md) — the two cloud lenses, if you enable them for the demo
+- [tech-stack.md](tech-stack.md) — why each production-profile technology was chosen

@@ -1,5 +1,11 @@
 # Learning roadmap — how to explore this project
 
+**What to read, run, and self-check, in order, to learn the whole system
+from zero — sequenced across all 38 source files in twelve sessions.** This
+is not the concept course ([theory/](../theory/README.md)) or the operator's
+guide ([handbook/](../handbook/README.md)); it sequences both, and the code,
+into one study plan.
+
 A sequenced plan for understanding the whole system: every technology, every
 source file. Twelve sessions, roughly **12–14 hours** total. You can stop after
 session 5 and still defend the core.
@@ -21,7 +27,13 @@ answer is in the file listed.
 
 ---
 
-## Session 0 — Get it running (30 min)
+## 1. The sessions
+
+Every file's line count in the "Lines" tables below was measured on
+2026-09-04 (`wc -l`) — re-measure rather than re-quoting if the source has
+moved on.
+
+### Session 0 — Get it running (30 min)
 
 Nothing else makes sense until you have seen it work.
 
@@ -50,7 +62,7 @@ possible introduction to the protocol.
 
 ---
 
-## Session 1 — The shape of the system (60 min)
+### Session 1 — The shape of the system (60 min)
 
 Before any detail: how the pieces are assembled.
 
@@ -75,7 +87,7 @@ curl -s localhost:8000/api/info | python -m json.tool
 
 ---
 
-## Session 2 — The protocol and one turn (90 min)
+### Session 2 — The protocol and one turn (90 min)
 
 | Read | Lines |
 |---|---|
@@ -101,7 +113,7 @@ line says afterwards.
 
 ---
 
-## Session 3 — Models, tokens and the provider layer (90 min)
+### Session 3 — Models, tokens and the provider layer (90 min)
 
 | Read | Lines |
 |---|---|
@@ -129,7 +141,7 @@ uv run pytest tests/test_llm_errors.py -v
 
 ---
 
-## Session 4 — RAG, the biggest area (2 hours)
+### Session 4 — RAG, the biggest area (2 hours)
 
 Read in **pipeline order** — this is how a document becomes an answer.
 
@@ -165,7 +177,7 @@ pipeline.
 
 ---
 
-## Session 5 — Agents and tools (90 min)
+### Session 5 — Agents and tools (90 min)
 
 | Read | Lines |
 |---|---|
@@ -191,7 +203,7 @@ uv run pytest tests/test_tool_loop.py tests/test_agent.py -v
 
 ---
 
-## Session 6 — The two frameworks (60 min)
+### Session 6 — The two frameworks (60 min)
 
 Only after the hand-written loop makes sense.
 
@@ -214,7 +226,7 @@ uv run pytest tests/test_fake_parity.py -v     # all three route alike
 
 ---
 
-## Session 7 — MCP (45 min)
+### Session 7 — MCP (45 min)
 
 | Read | Lines |
 |---|---|
@@ -236,7 +248,7 @@ uv run pytest tests/test_mcp.py -v      # spawns the real servers
 
 ---
 
-## Session 8 — Memory (45 min)
+### Session 8 — Memory (45 min)
 
 | Read | Lines |
 |---|---|
@@ -257,7 +269,7 @@ uv run pytest tests/test_memory.py -v
 
 ---
 
-## Session 9 — Observability and operations (90 min)
+### Session 9 — Observability and operations (90 min)
 
 | Read | Lines |
 |---|---|
@@ -287,7 +299,7 @@ Jaeger (:16686) and Grafana (:3000).
 
 ---
 
-## Session 10 — The frontend (60 min)
+### Session 10 — The frontend (60 min)
 
 | Read | Lines |
 |---|---|
@@ -309,7 +321,7 @@ cd frontend && npm run test:run
 
 ---
 
-## Session 11 — How it is all proven (60 min)
+### Session 11 — How it is all proven (60 min)
 
 The part most projects cannot show.
 
@@ -335,7 +347,7 @@ uv run python evals/run_retrieval.py --memory --check
 
 ---
 
-## Session 12 — Rehearsal (60 min)
+### Session 12 — Rehearsal (60 min)
 
 - [defense Q&A](../theory/12-defense-qa.md) — answer each out loud, without notes
 - [glossary](../theory/11-glossary.md) — 119 terms; cover the definition and say it
@@ -344,7 +356,7 @@ uv run python evals/run_retrieval.py --memory --check
 
 ---
 
-## Coverage checklist
+## 2. Coverage checklist
 
 Every source file, and the session that covers it. Nothing is left over.
 
@@ -366,9 +378,17 @@ Every source file, and the session that covers it. Nothing is left over.
 
 ---
 
-## If you only have one evening
+## 3. If you only have one evening
 
 Sessions **0, 2, 4, 5** — running it, the protocol, RAG, and the agent loop.
 That is the spine, and it is what most questions are about. Then read the
 [10-minute version](../reference/code-walkthrough.md#the-10-minute-version) of
 the walkthrough and the [defense Q&A](../theory/12-defense-qa.md).
+
+## 4. Related
+
+- [../theory/README.md](../theory/README.md) — the concepts each session assumes, from zero
+- [../handbook/README.md](../handbook/README.md) — how to run and operate what each session reads
+- [../reference/code-walkthrough.md](../reference/code-walkthrough.md) — the same code in execution order instead of session order
+- [workshop.md](workshop.md) — the demo script for presenting what this roadmap teaches
+- [../theory/12-defense-qa.md](../theory/12-defense-qa.md) — session 12's rehearsal material

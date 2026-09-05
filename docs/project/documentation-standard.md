@@ -125,6 +125,12 @@ enforced — *tested* (fails the build, see §4) or *reviewed* (the checklist).
 | `project/` | 1, 4, 8, 9, 14 | decisions and records; this page follows them itself |
 | `qanda/` | exempt | its question-then-answer format is the point of the page |
 
+Two mechanical conventions apply to every adopted page regardless of folder,
+because the tests are simpler that way and readers cross-reference by "§3":
+H2 sections are numbered contiguously (`## 1. …`), and the page carries the
+date of its measurements. Rule 2's *fixed order* of sections is what
+reference pages alone must follow.
+
 ## 4. How the rules are enforced
 
 The mechanical half lives in
@@ -173,11 +179,13 @@ Order of work, furthest from the standard first:
 without captures or a demo script), then the theory chapters that quote
 numbers without a date, then the handbook chapters.
 
-Known debt for that pass: the UI captures in `docs/images/chat-turn1-stats.png`,
-`grafana-dashboard.png` and `jaeger-trace-waterfall.png` predate the Groq and
-Re-index removals and show a header that no longer exists; two stale,
-unreferenced captures were deleted on 2026-09-04 rather than kept. Re-capture
-from the current build before adopting the pages that use them.
+Known debt for that pass: no browser capture of the current UI exists. The
+last UI screenshot predated the Groq and Re-index removals and was deleted on
+2026-09-05 rather than shown; `docs/images/jaeger-trace-waterfall.png` is a
+real trace from 2026-08-07, before the cloud lenses added httpx spans, and
+`grafana-dashboard.png` shows the provisioned panels with no traffic. Both
+are captioned as such; re-capture all three from the current build when a
+browser is available.
 
 ## 6. The skeleton, ready to paste
 

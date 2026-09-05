@@ -1,6 +1,12 @@
 # AI Workspace Assistant Platform (Agentic FastAPI + MCP + Vector DB)
 
-## Ідея
+**This is the original brief, in Ukrainian, as received on or around
+2026-09-01 — it describes the target system that was asked for, not what
+shipped.** For the English translation, see
+[description.md](description.md); for what was actually built, see
+[implementation-plan.md](implementation-plan.md).
+
+## 1. Ідея
 
 Створити внутрішнього AI асистента для інженерів, який може:
 
@@ -18,7 +24,7 @@
 - використання MCP
 - приклад AI-native backend
 
-## Архітектура
+## 2. Архітектура
 
 ```
 User (Web UI / CLI)
@@ -45,7 +51,7 @@ FastAPI AI Gateway
                 └── Code Search Tool
 ```
 
-## Основні компоненти
+## 3. Основні компоненти
 
 ### 1️⃣ FastAPI WebSocket Chat Server
 
@@ -152,7 +158,7 @@ Long-term memory:
 
 - Vector DB
 
-## Tech Stack
+## 4. Tech Stack
 
 **Backend**
 
@@ -178,7 +184,7 @@ Long-term memory:
 - MCP
 - LangGraph / custom agent
 
-## Очікуваний результат
+## 5. Очікуваний результат
 
 Bench engineer має зробити:
 
@@ -206,7 +212,7 @@ User: "What is our deployment architecture?"
 
 Agent: retrieves architecture docs
 
-## Workshop для департаменту
+## 6. Workshop для департаменту
 
 Після bench-задачі робиться воркшоп:
 
@@ -239,7 +245,7 @@ Examples:
 - vector DB pipeline
 - MCP tool registry
 
-## Чому це сильна задача
+## 7. Чому це сильна задача
 
 Вона покриває ваш AI vector:
 
@@ -251,9 +257,17 @@ Examples:
 | Cloud AI        | ✅      |
 | AI tooling      | ✅      |
 
-## Чому це хороший bench project
+## 8. Чому це хороший bench project
 
 1. Реально корисний
 2. Показує AI engineering maturity
 3. Дає reusable platform
 4. Можна розширювати
+
+## 9. Related
+
+- [description.md](description.md) — the English translation, for reference alongside this documentation
+- [implementation-plan.md](implementation-plan.md) — what actually shipped, phase by phase, against this brief
+- [tech-stack.md](tech-stack.md) — the technology decisions made to deliver it
+- [future-tools.md](future-tools.md) — what was deliberately left out, and why
+- [../handbook/01-project-overview.md](../handbook/01-project-overview.md) — the architecture that resulted

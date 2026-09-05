@@ -1,6 +1,12 @@
 # 05 — Agent frameworks: Pydantic AI & LangGraph
 
-## Why frameworks exist at all
+**What this chapter answers: what a framework buys over the raw loop in the
+previous chapter, and what Pydantic AI and LangGraph each cost, measured on
+identical ground.** It does not re-derive the loop itself — see
+[04-tool-calling-and-agents.md](04-tool-calling-and-agents.md) for that; this
+chapter is the comparison built on top of it.
+
+## 1. Why frameworks exist at all
 
 Chapter 04 showed the whole agent loop in ~100 lines. Frameworks exist
 because production agents accumulate the same needs over and over: provider
@@ -14,7 +20,7 @@ This project's deliberately unusual move: we implemented the same agent
 interface, so the trade-offs are *measured on identical ground* instead of
 argued from blog posts.
 
-## The one-protocol design (the thing to defend hardest)
+## 2. The one-protocol design (the thing to defend hardest)
 
 ```
 agent/base.py        AgentBackend protocol + AgentEvent stream (the contract)
@@ -24,6 +30,10 @@ agent/backends/
   pydantic_ai.py 286 lines  Pydantic AI runtime
   langgraph.py   278 lines  LangGraph runtime
 ```
+
+Line counts measured with `wc -l src/assistant/agent/backends/*.py`,
+2026-09-04 — see [backend-comparison.md](../reference/backend-comparison.md)
+for the full table these numbers are drawn from.
 
 Every backend receives the same tools, the same history, and must emit the
 same event stream. Consequences:
@@ -35,7 +45,16 @@ same event stream. Consequences:
 - The choice of framework stays **reversible** — an architecture property,
   not a slide claim.
 
-## Pydantic AI in five points
+The alternative to "one protocol, three modules in `main`" was three git
+branches, one per phase — and [tech-stack.md](../project/tech-stack.md) named
+that option and rejected it before writing a single backend: the shared code
+(WS server, RAG, MCP registry, memory) would drift across branches, two
+backends could never be demoed side by side in the same running app, and
+every improvement would need merging three times over. Short-lived feature
+branches are still used *while building* each phase — the comparison itself
+just never gets to live on one.
+
+## 3. Pydantic AI in five points
 
 ([`backends/pydantic_ai.py`](../../src/assistant/agent/backends/pydantic_ai.py))
 
@@ -55,7 +74,7 @@ Cost of admission we're honest about: the offline fake had to be
 **re-implemented** against its `FunctionModel` interface (~45 lines) because
 this backend doesn't speak our `LLMClient` protocol.
 
-## LangGraph in five points
+## 4. LangGraph in five points
 
 ([`backends/langgraph.py`](../../src/assistant/agent/backends/langgraph.py))
 
@@ -76,11 +95,19 @@ this backend doesn't speak our `LLMClient` protocol.
    (`stream_mode=["messages", "updates"]`) — powerful, and the fiddliest
    API of the three (two real gotchas cost debugging time).
 
-## What the comparison actually showed
+## 5. What the comparison actually showed
 
 Full write-up with measured numbers:
-[`docs/backend-comparison.md`](../reference/backend-comparison.md). The verdict
-in one breath:
+[`docs/backend-comparison.md`](../reference/backend-comparison.md). The
+numbers side by side:
+
+| Backend | File | LoC | Framework-adapter cost | Best for |
+|---|---|---:|---|---|
+| custom | [`custom.py`](../../src/assistant/agent/backends/custom.py) | **98** | none — talks to `LLMClient` directly | learning and debugging; smallest surface, full control |
+| Pydantic AI | [`pydantic_ai.py`](../../src/assistant/agent/backends/pydantic_ai.py) | **286** | ~45 lines (`FunctionModel` fake) + ~25 (model builder) | best effort-to-capability ratio for a typed FastAPI service |
+| LangGraph | [`langgraph.py`](../../src/assistant/agent/backends/langgraph.py) | **278** | ~95 lines (`BaseChatModel` adapter) + ~35 (message conversion) | durable state, human-in-the-loop interrupts, branching multi-agent workflows |
+
+The verdict in one breath — the reasoning a table can't carry:
 
 - **custom** — best for learning and debugging; smallest surface; you own
   everything.
@@ -89,7 +116,7 @@ in one breath:
 - **langgraph** — pays off when you need durable state, human-in-the-loop
   interrupts, or branching multi-agent workflows; steepest learning curve.
 
-## Questions you might get
+## 6. Questions you might get
 
 **"Why not LangChain?"** — Classic LangChain agents are the legacy API the
 LangChain team itself superseded with LangGraph — which is what we
@@ -100,7 +127,7 @@ scope is a single assistant with tools. Adding a fourth backend later is
 exactly one module implementing `AgentBackend`.
 
 **"Isn't maintaining three backends wasteful?"** — The shared code (tools,
-RAG, memory, WS) is written once; each backend is 100–280 lines. The price
+RAG, memory, WS) is written once; each backend is 98–286 lines. The price
 of keeping the comparison alive is small, and the payoff is an evidence-based
 framework decision — which was a stated goal of the bench project.
 
@@ -108,3 +135,38 @@ framework decision — which was a stated goal of the bench project.
 service (typed, FastAPI-native, one-line tracing), and the platform makes
 that a config default rather than a rewrite — that reversibility is the
 actual answer.
+
+## 7. Reading it honestly
+
+- **The comparison runs on one small POC-shaped workload.** Few tools, short
+  turns, one small model. "Best effort-to-capability ratio" is measured
+  here, not proven to generalize to a large multi-team codebase with dozens
+  of tools.
+- **LoC alone flatters a framework that replaces the model layer.** The
+  custom loop's 98 lines lean on `llm/client.py`'s hardening (429 backoff,
+  `tool_use_failed` retry, leaked-`<function>` salvage) for free. Pydantic AI
+  routes around that client entirely, so it had to re-earn parts of the same
+  hardening inside its own 286 — the fair comparison is line count *plus*
+  what silently stopped applying, not line count alone
+  ([backend-comparison.md](../reference/backend-comparison.md) has the
+  incident that exposed this).
+- **LangGraph's flagship feature is not exercised here.** The graph compiles
+  with an in-memory checkpointer, fresh per turn — durable Redis/Postgres
+  persistence is deliberately deferred
+  ([future-tools.md](../project/future-tools.md)), so this comparison shows
+  LangGraph's mechanics, not the production persistence story it's chosen
+  for.
+- **"Debuggability" and "effort" were judged against one small model and the
+  offline fake.** A harder model, or a much larger tool set, could change
+  which framework's guardrails matter most.
+- **The three backends were compared once, not soaked.** No load test or
+  long-run comparison exists between them — only the same 18-question-scale
+  functional parity the WS suite checks ×3.
+
+## 8. Related
+
+- [04-tool-calling-and-agents.md](04-tool-calling-and-agents.md) — the loop mechanics all three backends in this chapter implement
+- [../reference/backend-comparison.md](../reference/backend-comparison.md) — the full measured comparison this chapter summarizes
+- [06-mcp.md](06-mcp.md) — the tool-server protocol all three backends share unchanged
+- [../project/tech-stack.md](../project/tech-stack.md) — the phased decision, and the branches-vs-modules reasoning in full
+- [../project/future-tools.md](../project/future-tools.md) — the LangGraph Redis checkpointer, deferred, and what would trigger building it

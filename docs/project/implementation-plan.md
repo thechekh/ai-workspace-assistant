@@ -1,5 +1,12 @@
 # Implementation Plan — AI Workspace Assistant
 
+**What shipped, phase by phase, with the acceptance evidence recorded on the
+day it passed.** This is the build history, not the decision rationale — see
+[tech-stack.md](tech-stack.md) for why each technology was chosen. Numbers
+inside a dated phase are historical evidence and are never updated when later
+work supersedes them; the "After the phases" section below is where every
+reversal is recorded.
+
 Simple → complex, one phase at a time. Working agreement:
 
 - Every phase ends **green**: `ruff check`, `ruff format --check`, `pyright`, `pytest` all pass.
@@ -16,7 +23,7 @@ Status: `[x]` done · `[~]` in progress · `[ ]` pending
 
 ---
 
-## Phase 0 — Scaffolding ✅
+## 1. Phase 0 — Scaffolding ✅
 
 Goal: a modern Python project skeleton that installs, lints, type-checks, and tests in one command each.
 
@@ -34,7 +41,7 @@ Goal: a modern Python project skeleton that installs, lints, type-checks, and te
 
 ---
 
-## Phase 1a — WebSocket chat core (backend) ✅
+## 2. Phase 1a — WebSocket chat core (backend) ✅
 
 Goal: a working streaming chat over WebSocket with session memory — no tools yet, but every interface the later phases need.
 
@@ -53,7 +60,7 @@ Goal: a working streaming chat over WebSocket with session memory — no tools y
 
 ---
 
-## Phase 1b — Vue 3 client ✅
+## 3. Phase 1b — Vue 3 client ✅
 
 Goal: replace the dev console with a real SPA.
 
@@ -70,7 +77,7 @@ Goal: replace the dev console with a real SPA.
 
 ---
 
-## Phase 2 — RAG pipeline ✅
+## 4. Phase 2 — RAG pipeline ✅
 
 Goal: the assistant can answer from *our* docs.
 
@@ -88,7 +95,7 @@ Goal: the assistant can answer from *our* docs.
 
 ---
 
-## Phase 3 — Custom agent tool loop ✅
+## 5. Phase 3 — Custom agent tool loop ✅
 
 Goal: the real ReAct loop — the model decides when to call tools.
 
@@ -104,7 +111,7 @@ Goal: the real ReAct loop — the model decides when to call tools.
 
 ---
 
-## Phase 4 — MCP integration ✅
+## 6. Phase 4 — MCP integration ✅
 
 Goal: tools come from MCP servers, not just local functions. Built **credential-free**: everything runs locally with zero env vars; real GitHub is a config swap later.
 
@@ -119,7 +126,7 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 
 ---
 
-## Phase 5 — Pydantic AI backend + observability ✅
+## 7. Phase 5 — Pydantic AI backend + observability ✅
 
 - [x] `pydantic-ai` 1.47; `agent/backends/pydantic_ai.py` — same `AgentEvent` stream via the graph iteration API (`agent.iter`), same shared ToolRegistry via `Tool.from_schema`
 - [x] MCP tools flow in through the shared registry (deliberate change from "native pydantic-ai MCP client": one tool source keeps all backends identical for the comparison; native MCP support noted as the framework's alternative)
@@ -132,7 +139,7 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 
 ---
 
-## Phase 6 — LangGraph backend + comparison ✅
+## 8. Phase 6 — LangGraph backend + comparison ✅
 
 - [x] `langgraph` 1.2; `agent/backends/langgraph.py` — explicit two-node StateGraph (`agent` ⇄ `tools`), same `AgentBackend` contract, streaming via `stream_mode=["messages", "updates"]`
 - [x] `LLMClientChatModel`: a ~95-line `BaseChatModel` adapter over our `LLMClient` protocol — every provider (fake/Groq/…) and every scripted test LLM runs on LangGraph unchanged
@@ -145,7 +152,7 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 
 ---
 
-## Phase 7 — Memory & retrieval upgrades ✅
+## 9. Phase 7 — Memory & retrieval upgrades ✅
 
 - [x] Conversation summarization: `ConversationMemory` folds over-budget history into a **persisted rolling summary** (each message summarized once); context = system + summary + recent turns verbatim. Offline `ExtractiveSummarizer` (fake provider) + `LLMSummarizer` for real models; all three backends accept the summary system message
 - [x] Hybrid search: sparse lexical vectors (stable 32-bit token hashing, TF weights) alongside dense in one named-vector collection; RRF fusion via the Qdrant Query API; auto-recreates old single-vector collections
@@ -158,7 +165,7 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 
 ---
 
-## Phase 8 — Platform polish ✅
+## 10. Phase 8 — Platform polish ✅
 
 - [x] taskiq + taskiq-redis: `assistant.worker` with `reindex_docs` task + nightly cron (03:00) via `TaskiqScheduler`; `POST /api/reindex` queues it (or runs inline in zero-infra `fakeredis://` mode) — UI Re-index button included **— removed 2026-09-01: no batch left to schedule once the knowledge base became upload-only. See tech-stack.md §Background jobs.**
 - [x] Optional bearer-token auth (`ASSISTANT_AUTH_TOKEN`): `/api/*` via Authorization header, chat WS via `?token=` (closed 1008 otherwise); unset = open for zero-config dev; OIDC noted as the production path
@@ -171,7 +178,7 @@ Goal: tools come from MCP servers, not just local functions. Built **credential-
 
 ---
 
-## After the phases — hardening, measured (2026-08 → 2026-09)
+## 11. After the phases — hardening, measured (2026-08 → 2026-09)
 
 The changelog that used to live at the repository root, condensed: what
 changed after the nine build phases, with the numbers that justified it.
@@ -241,3 +248,11 @@ changed after the nine build phases, with the numbers that justified it.
   Golden-set metrics unchanged at 0.83/1.00/0.92.
 - A flat source namespace let one project's `README.md` silently overwrite
   another's → repository sources are `owner/repo/path`.
+
+## 12. Related
+
+- [tech-stack.md](tech-stack.md) — the decisions this build history executes, and the alternatives that lost
+- [future-tools.md](future-tools.md) — what was deliberately left out, and the trigger to revisit it
+- [../reference/backend-comparison.md](../reference/backend-comparison.md) — the measured comparison Phase 6 produced
+- [../handbook/09-testing-operations.md](../handbook/09-testing-operations.md) — the test suite these acceptance numbers were measured against
+- [workshop.md](workshop.md) — how this history is presented to the department

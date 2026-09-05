@@ -1,10 +1,15 @@
 # Technology Specification — AI Workspace Assistant Platform
 
+**Which technology was chosen for each layer, what alternatives lost and
+why, and where a decision was later reversed.** For what these decisions
+produced phase by phase, see [implementation-plan.md](implementation-plan.md);
+this page is the *why*, not the build log.
+
 Modern Python stack for the bench project. For each area: the chosen technology, the alternatives that were considered, and why the choice is the best fit. Decisions already agreed are marked ✅; open experiments are marked 🧪.
 
 ---
 
-## Guiding principles
+## 1. Guiding principles
 
 1. **Async-native end to end** — FastAPI + asyncio; every I/O-bound dependency (LLM, Qdrant, Redis, jobs) has a first-class async client.
 2. **Provider-agnostic LLM layer** — the model is a config value, not a code decision. Dev runs on free tiers, "real" runs on paid keys, switching is a `.env` change.
@@ -14,7 +19,7 @@ Modern Python stack for the bench project. For each area: the chosen technology,
 
 ---
 
-## Decision summary
+## 2. Decision summary
 
 | Area | Chosen ✅ | Alternatives considered | Why this one |
 |---|---|---|---|
@@ -25,19 +30,19 @@ Modern Python stack for the bench project. For each area: the chosen technology,
 | Config | **pydantic-settings** | dynaconf, environs, raw os.environ | Typed settings, `.env` support, validation at startup, same ecosystem as FastAPI |
 | Agent runtime | **Custom loop → Pydantic AI → LangGraph** (phased, all three) | pick one framework | The comparison is the learning goal; see §Agent runtime |
 | LLM (dev) | **`fake` provider** — deterministic, offline (+ Ollama as a local option) | Groq free tier *(used, then retired)*, Gemini free tier, OpenRouter `:free` | Zero cost, zero keys: the whole tool loop runs without a network |
-| LLM (real) | **OpenAI `gpt-4.1-nano`** (existing $25 budget) | — | $0.10 / $0.40 per 1M tokens; a demo turn is a fraction of a cent |
+| LLM (real) | **OpenAI `gpt-4.1-nano`** (existing $25 budget) | Anthropic Claude (Sonnet/Haiku, API key) | $0.10 / $0.40 per 1M tokens; a demo turn is a fraction of a cent. Claude would run ~10–19× that per turn at measured ~7k-token turns (~$0.008 Haiku / ~$0.015 Sonnet vs ~$0.0008 nano) — see [future-tools.md](future-tools.md); deferred as a same-seam API-key swap, not rejected |
 | Embeddings | **text-embedding-3-small → compare voyage-3** 🧪 | BGE-M3 (local), jina | Cheap start, then measured comparison on a golden set; see §Embeddings |
 | Vector DB | **Qdrant** | Weaviate, Chroma, pgvector, LanceDB | Fast, great payload filters, native hybrid search, single container |
 | Short-term memory | **Redis** + conversation summarization | in-process dicts, Postgres | Spec'd; survives restarts, TTLs for sessions, doubles as job broker |
 | Background jobs | **none** (taskiq removed) | taskiq, arq, Celery, Dramatiq, RQ | Chosen, built, then removed — nothing left to schedule; see §Background jobs |
-| Observability | **Logfire + Langfuse combined** via OpenTelemetry | pick one | Both are OTel-based so they compose; see §Observability |
+| Observability | **Logfire + Langfuse combined** via OpenTelemetry | Logfire alone, Langfuse alone | Both are OTel-based so they compose; alone, either loses one view (Logfire the LLM cost/prompt side, Langfuse the app-latency side) — see §Observability |
 | Testing | **pytest + pytest-asyncio + httpx + respx** + golden RAG evals | — | Standard modern stack |
 | Frontend | **Vue 3 + Vite + TypeScript** | single-file HTML, Streamlit, React | User preference; real SPA experience with WS streaming |
 | Containerization | **Docker Compose** | k8s (overkill) | One command brings up app, worker, Qdrant, Redis, frontend |
 
 ---
 
-## Language & tooling
+## 3. Language & tooling
 
 - **Python 3.12+** (3.13 if all deps are green).
 - **uv** for everything: `uv init`, `uv add`, `uv run`, `uv lock`. No pip, no poetry.
@@ -48,7 +53,7 @@ Modern Python stack for the bench project. For each area: the chosen technology,
 
 ---
 
-## Backend framework
+## 4. Backend framework
 
 **FastAPI + uvicorn[standard] + Pydantic v2 + pydantic-settings.** ✅
 
@@ -92,7 +97,7 @@ class Settings(BaseSettings):
 
 ---
 
-## Agent runtime — three implementations, one interface
+## 5. Agent runtime — three implementations, one interface
 
 **Decision: implement all three, in phases, behind a common protocol — selected at runtime by `ASSISTANT_AGENT_BACKEND`.** ✅
 
@@ -130,7 +135,7 @@ Lines of code · streaming support · effort to attach MCP tools · memory/check
 
 ---
 
-## LLM providers
+## 6. LLM providers
 
 **Strategy: everything speaks the OpenAI-compatible chat API (or goes through Pydantic AI's model abstraction), so the provider is pure config.** ✅
 
@@ -161,7 +166,7 @@ The description names "OpenAI / Claude" — in a production version the same con
 
 ---
 
-## Embeddings
+## 7. Embeddings
 
 **Shipped default: `hash-512` (offline, free — dev and CI). Real profile: OpenAI `text-embedding-3-small`. Measured comparison against Voyage `voyage-3`.** ✅🧪
 
@@ -179,7 +184,7 @@ The description names "OpenAI / Claude" — in a production version the same con
 
 ---
 
-## Vector DB & retrieval
+## 8. Vector DB & retrieval
 
 **Qdrant.** ✅
 
@@ -191,7 +196,7 @@ The description names "OpenAI / Claude" — in a production version the same con
 
 ---
 
-## Memory
+## 9. Memory
 
 **Short-term: Redis. Long-term: Qdrant. Plus conversation summarization.** ✅
 
@@ -201,7 +206,7 @@ The description names "OpenAI / Claude" — in a production version the same con
 
 ---
 
-## Background jobs
+## 10. Background jobs
 
 **taskiq + taskiq-redis.** Chosen, built in Phase 8 — and **removed in full**.
 
@@ -230,7 +235,7 @@ It was used for: the nightly corpus re-index and a queued Re-index button — bo
 
 ---
 
-## Observability
+## 11. Observability
 
 **Logfire and Langfuse, combined — yes, this works, because both are OpenTelemetry-based.** ✅
 
@@ -257,7 +262,7 @@ Honest caveat: there is overlap, and two dashboards is a cost in attention. If i
 
 ---
 
-## Testing & evals
+## 12. Testing & evals
 
 ✅ Agreed as proposed:
 
@@ -268,7 +273,7 @@ Honest caveat: there is overlap, and two dashboards is a cost in attention. If i
 
 ---
 
-## Frontend
+## 13. Frontend
 
 **Vue 3 + Vite + TypeScript SPA.** ✅ (User preference — replaces the "single HTML file" idea.)
 
@@ -294,7 +299,7 @@ src/assistant/       # Python backend
 
 ---
 
-## Infrastructure
+## 14. Infrastructure
 
 **Docker Compose** services:
 
@@ -309,7 +314,7 @@ MCP servers (GitHub, custom code-search via FastMCP) run either as sidecar conta
 
 ---
 
-## Phased roadmap
+## 15. Phased roadmap
 
 *The original phase plan, kept as written. What actually shipped, phase by phase, is in [implementation-plan.md](implementation-plan.md) — e.g. the docling ingestion step was never needed (Markdown, text and reStructuredText covered every real source).*
 
@@ -327,6 +332,14 @@ MCP servers (GitHub, custom code-search via FastMCP) run either as sidecar conta
 
 ---
 
-## Final stack, one line each
+## 16. Final stack, one line each
 
 Python 3.12 · uv · ruff · pyright · FastAPI · uvicorn · Pydantic v2 · pydantic-settings · WebSockets · custom-loop / Pydantic AI / LangGraph (comparative) · fake provider (dev/CI) → OpenAI gpt-4.1-nano ($25 budget) · hash-512 (dev) → text-embedding-3-small, voyage-3 (comparative) · Qdrant (+hybrid+rerank) · Redis (+summarization) · MCP (FastMCP + official servers) · Logfire + Langfuse over OpenTelemetry · pytest/respx + golden evals · Vue 3 + Vite + TS · Docker Compose.
+
+## 17. Related
+
+- [implementation-plan.md](implementation-plan.md) — what these decisions produced, phase by phase
+- [future-tools.md](future-tools.md) — tools and platform ideas evaluated and deferred, same discipline
+- [../handbook/03-technologies.md](../handbook/03-technologies.md) — what each technology does and where it lives, without the alternatives
+- [../reference/backend-comparison.md](../reference/backend-comparison.md) — the three agent runtimes, measured
+- [documentation-standard.md](documentation-standard.md) — the rule (9) that requires losing alternatives to be named

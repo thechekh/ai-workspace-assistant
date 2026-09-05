@@ -1,5 +1,11 @@
 # Tools evaluated and deferred — the decision record
 
+**Every tool idea that reached a real evaluation and did not ship: the cost
+to build it, the cost to run it, and why the POC said no.** This is a
+decision record, not a wishlist — for what shipped instead, see
+[implementation-plan.md](implementation-plan.md). Verdicts current as of
+2026-09-04.
+
 Every tool idea that reached a real evaluation and did **not** ship, each with
 its purpose, what it would cost to build and to run, why the POC says no, and
 what would change the answer. This is deliberately a *decision record*, not a
@@ -21,7 +27,7 @@ front, because they answer most "why not X?" questions before they are asked:
    tools get conservative docstrings; routing convenience never overrides the
    explicit-ask rule on the one write tool.
 
-## The scorecard
+## 1. The scorecard
 
 | Tool | One line | Build cost | Run cost | Verdict |
 |---|---|---|---|---|
@@ -35,7 +41,7 @@ front, because they answer most "why not X?" questions before they are asked:
 | GitHub `repos` toolset | vendor code-read tools | zero code (one header) | +10–15 schemas every prompt | **Superseded** by native `repo_read_file` (tokenless) |
 | `workspace-mcp` over HTTP | serve our tools to editors | ~hours + auth design | none | **Deferred** — mechanism already proven both directions |
 
-## The details
+## 2. The details
 
 ### `index_repo(url, ref)` — local clone as the enabler
 **Purpose:** shallow-clone into a managed folder, symbol-chunk, index; the
@@ -155,7 +161,7 @@ the useful tool to serve would be `search_docs`, and exposing the knowledge
 base over unauthenticated HTTP contradicts the security posture. "We can,
 and chose not to yet" is the stronger demo.
 
-## The narrative this page supports
+## 3. The narrative this page supports
 
 The [brief](description.md) describes the target platform; this POC is the
 **deliberate subset**, and the cuts on this page — Jira, the
@@ -164,7 +170,7 @@ constraints, not gaps. Presenting it that way is the strongest material in
 the workshop: every row above is a decision that can be defended, priced,
 and reversed on a stated trigger.
 
-## Other deferred work — not tools, same discipline
+## 4. Other deferred work — not tools, same discipline
 
 The rest of the former backlog, kept here so "what's next?" has one answer.
 Each is deliberate, and each says what would trigger it.
@@ -174,7 +180,7 @@ Each is deliberate, and each says what would trigger it.
 | **OIDC / SSO** at the gateway (replacing the single bearer token) | Single-tenant POC; no user identity to key on | Any second team, or per-user quotas/audit |
 | **Long-term memory facts store** (distilled facts in Qdrant across sessions) | A wrongly extracted fact poisons every later conversation; needs provenance, TTLs, a correction path | A user base that asks the same things across sessions |
 | **LangGraph Redis checkpointer** (durable, resumable runs) | The LangGraph backend is one of three equals; its flagship persistence is not needed for one-turn tools | Long multi-step runs that must survive a restart |
-| **Cloud tracing backends** (Logfire / Langfuse) | Pipeline exists and is inert; tokens were never requested | Someone who will look at the dashboards |
+| **Cloud tracing backends** (Logfire / Langfuse) | **Done, 2026-09-04** — both verified live on real turns, across all three backends; see [../reference/logfire-langfuse.md](../reference/logfire-langfuse.md) | — |
 | **Grafana is fully open** (anonymous admin) | Correct for localhost | The compose file seeding any shared deployment |
 | **Dev-grade SSRF guard** (string match, no DNS resolution) | Documented gap; fine on localhost | Leaving localhost — resolve DNS, allowlist egress |
 | **`pyright` strict** | Measured, *not* free: **552** errors, mostly `reportUnknown*` in tests (791 with `src/`-only strict); `standard` is at 0 | A typing pass over the test suite as its own task |
@@ -183,3 +189,11 @@ Each is deliberate, and each says what would trigger it.
 | **TypeScript 7** | `vue-tsc` embeds the compiler; TS 7's native rewrite has no compiler API yet | vuejs/language-tools shipping TS 7 support |
 | **`LICENSE`, `CODEOWNERS`, issue/PR templates** | Owner's choice; `CONTRIBUTING.md` / `SECURITY.md` were added and removed as clutter for a single-maintainer POC | Publishing, or a second maintainer |
 | **Workshop prep** | Mermaid sequence diagrams for the theory chapters; a mock Q&A rehearsal against [qanda](../qanda/README.md) | The week of the workshop |
+
+## 5. Related
+
+- [implementation-plan.md](implementation-plan.md) — what shipped instead, phase by phase
+- [tech-stack.md](tech-stack.md) — the decisions that were made instead
+- [description.md](description.md) — the brief this POC deliberately narrowed
+- [../reference/security.md](../reference/security.md) — the SQL-injection story behind the `run_sql` verdict
+- [../qanda/README.md](../qanda/README.md) — "why not X" questions answered in interview form

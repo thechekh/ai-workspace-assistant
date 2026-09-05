@@ -1,5 +1,11 @@
 # Theory — how this platform works, from zero
 
+**What this index answers: which chapter explains which concept, in what
+order, and how one request moves through all of them end to end.** It does
+not explain any concept itself — that's each numbered chapter below — and
+it is not the project-specific "how we built it" side of the same topics,
+which is [docs/README.md](../README.md)'s by-topic table.
+
 Working through this alongside the code? [project/learning-roadmap.md](../project/learning-roadmap.md) sequences these chapters with the source files and a command to run for each.
 
 Self-contained explanations of every technology in this project, written for
@@ -8,7 +14,7 @@ explains the concept in plain language, walks through how it works step by
 step, shows exactly where it lives in this repository, and ends with the
 questions you're likely to get at the workshop — with answers.
 
-## Reading order
+## 1. Reading order
 
 | # | Chapter | You'll understand |
 |---|---|---|
@@ -28,7 +34,7 @@ questions you're likely to get at the workshop — with answers.
 **Short on time?** Read 01 → 03 → 04 → 06 → 12. That covers the demo's
 storyline and the most likely questions.
 
-## The big picture — one request, end to end
+## 2. The big picture — one request, end to end
 
 ```
 User types: "What is our deployment architecture?"
@@ -55,3 +61,18 @@ Done — and every step is traceable (09) and tested (09)
 MCP tools (06) enter the same flow: `github__list_pull_requests` and
 `code__search_code` sit in the same tool registry as `search_docs`, so the
 loop in (04) treats them identically.
+
+Every step in that path is traceable and tested — 382 tests, offline, $0
+(2026-09-04, `uv run pytest -q`) — and the retrieval step is additionally
+*measured*: recall@5 = 1.00 on the golden set with the default
+hybrid+rerank configuration (2026-09-04, `uv run python
+evals/run_retrieval.py --memory`). "We built it" and "we checked it" are
+answered by different chapters (09), but neither is left to memory.
+
+## 3. Related
+
+- [project/learning-roadmap.md](../project/learning-roadmap.md) — these chapters paired with source files and a command to run for each
+- [docs/README.md](../README.md) — the full documentation index, including the by-topic table this course's project-specific counterpart lives in
+- [11 — Glossary](11-glossary.md) — every term from every chapter, one line each
+- [12 — Defense Q&A](12-defense-qa.md) — the hard questions, answered, once the chapters are read
+- [handbook/README.md](../handbook/README.md) — how to run the project this course explains
