@@ -1,14 +1,19 @@
 # Documentation — the single source of truth
 
-Every document for this project lives under `docs/`. Four folders, four
-different jobs:
+**The index of every document in this project: which folder answers which
+kind of question, where to start for a given need, the topics to prepare
+for a defence, and the reading order that covers all 45 pages.** Every
+document lives under `docs/`, and every page follows
+[the documentation standard](project/documentation-standard.md). Five
+folders, five jobs:
 
 | Folder | Answers | Start with |
 |---|---|---|
 | **[handbook/](handbook/README.md)** | *How do I run and operate **this** project?* | [handbook/README.md](handbook/README.md) |
 | **[theory/](theory/README.md)** | *What **is** an LLM / embedding / agent / MCP?* (from zero) | [theory/README.md](theory/README.md) |
-| **[reference/](reference/tools.md)** | *Precise details of one subject* | [reference/tools.md](reference/tools.md) |
+| **[reference/](reference/tools.md)** | *Precise details of one subject, measured* | [reference/tools.md](reference/tools.md) |
 | **[project/](project/implementation-plan.md)** | *Why it's built this way, what's deferred, how to present it* | [project/implementation-plan.md](project/implementation-plan.md) |
+| **[qanda/](qanda/README.md)** | *The hard questions, each followed by its grounded answer* | [qanda/README.md](qanda/README.md) |
 
 The repository [README](../README.md) stays at the root — it is the GitHub
 landing page and the packaging `readme` — and links here.
