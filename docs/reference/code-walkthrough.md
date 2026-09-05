@@ -375,21 +375,66 @@ Line by line, mapped to the steps above:
 - **`POST …/chat/completions`** at `11:51:50.901` — step 7 again, the answer.
 - **`turn.summary …`** — step 12: every number the stats line shows.
 
-![A Jaeger trace of one turn: agent.turn at the root, two llm.step spans, one tool.execute containing rag.retrieve — five spans in 1.52 s](../images/jaeger-trace-waterfall.png)
+![The chat UI in Dev mode after a turn on the walkthrough's question, 2026-09-05: the answer, and the stats line 8.9s · first token 7964 ms · 3 LLM steps · 14609→273 tok · ~$0.0016 · search_docs, repo_read_file](../images/ui-chat-turn.png)
 
-The same shape as a trace, captured 2026-08-07 before the cloud lenses were
-enabled: `agent.turn` spans the whole 1.52 s; the first `llm.step` (1.07 s)
-ends with a tool call; `tool.execute` (43 ms) wraps `rag.retrieve` (42 ms)
-— an offline hash-embedder turn, hence the speed; the second `llm.step`
-(394 ms) writes the answer. With Logfire on, the same tree gains the httpx
-calls beneath each step ([logfire-langfuse.md](logfire-langfuse.md)).
+The same question in the browser, a later turn than the log above (this one
+opened the file as well, so three steps and two tools):
 
-![The provisioned Grafana dashboard: Turns, Tokens, Tool calls, Errors, turn rate and duration by backend, LLM step duration, tokens per minute — with no traffic yet](../images/grafana-dashboard.png)
+- **The header** — the `openai · hybrid` badge (provider and retrieval
+  mode from `/api/info`), the **Dev** toggle on, **Chats**, **Documents
+  (30)** with the knowledge base's source count, the backend dropdown on
+  *custom loop*, and the green **connected** pill — step 1's socket.
+- **The tool-result card** above the answer (scrolled) shows the
+  `RELEASE-DOCS.md` excerpt the model read — step 8's result, as the user
+  sees it.
+- **The answer** — the release steps, quoted from that file — step 10.
+- **The stats line** — `8.9s · first token 7964 ms · 3 LLM steps ·
+  14609→273 tok · ~$0.0016 · search_docs, repo_read_file` — step 12's
+  `turn` frame rendered: three LLM steps because the model searched, then
+  read the file, then answered; real token counts (no `(est)`); the cost at
+  list price. **details** opens the timeline ([handbook/07 §5](../handbook/07-observability.md)).
 
-Metrics are always on and scraped from `/metrics`; this is the provisioned
-dashboard as it looks before any turn has run — every panel reads *No data*
-except *Errors* at 0. Send the question above and the top row moves on the
-next 5-second refresh.
+![A Jaeger trace of one real turn on 2026-09-05: the WebSocket request at the root, agent.turn beneath it, three llm.step spans and two tool.execute spans, the first containing rag.retrieve — 15 spans in 6.44 s](../images/jaeger-trace-waterfall.png)
+
+Line by line — trace `01a0713`, captured 2026-09-05 with the cloud lenses on,
+so Logfire's HTTP spans appear beneath the app's own four:
+
+- **`HTTP`** at the root (6.44 s) — the WebSocket request itself, added by
+  Logfire's FastAPI instrumentation; without Logfire, `agent.turn` is the root.
+- **`agent.turn`** (5.73 s) — the whole turn, the span a search in Jaeger is
+  aimed at.
+- **`llm.step`** (842 ms) with its **`POST`** child (766 ms) — LLM step 1, the
+  actual call to the provider, which returned a `search_docs` call.
+- **`tool.execute`** (1.42 s) — the tool seam. Inside it: a 5 ms **`GET`**
+  (the collection-exists check) and **`rag.retrieve`** (1.39 s), which holds
+  two `POST`s — 1.33 s to the embeddings endpoint and 11 ms to Qdrant. The
+  embedding round trip is the retrieval's cost; the search itself is fast.
+- **`llm.step`** (812 ms) — step 2, which asked for a second tool.
+- **`tool.execute`** (444 ms) with a 416 ms **`GET`** — `repo_read_file`
+  fetching the file from GitHub's API.
+- **`llm.step`** (2.17 s) — step 3, writing the answer; the longest span is
+  the one generating text.
+
+Metrics are always on and scraped from `/metrics`:
+
+![The provisioned Grafana dashboard after three real turns on 2026-09-05: Turns 3, Tokens 40630, Tool calls 5, Errors 0, plus turn rate and p50/p95 by backend, LLM step p95 by provider, and tokens per minute](../images/grafana-dashboard.png)
+
+Line by line — the *AI Workspace Assistant* dashboard, last 15 minutes,
+captured 2026-09-05 after three turns:
+
+- **Turns 3 · Tokens 40630 · Tool calls 5 · Errors 0** — the stat tiles are
+  `increase()` over the window: three turns, five tool calls between them
+  (one turn used two tools), no user-visible failure.
+- **Turn rate by backend** — one series, `custom`, because all three turns
+  ran on the custom loop; a backend switch adds a line.
+- **Turn duration p50 / p95 by backend** — between 4 and 8 s, dominated by
+  the provider's latency, not the app's.
+- **LLM step duration p95 by provider** — `openai` around 4.4 s: the p95 of
+  a single model round trip, the number to watch when answers feel slow.
+- **Tokens per minute** — a prompt spike near 30k and a small completion
+  line: prompts dominate, which is why tool-result size and schema count
+  decide the bill ([handbook/04](../handbook/04-llm-models-tokens.md)).
+
 
 ## 6. Proving it
 
@@ -438,9 +483,10 @@ Then send the question and read the log aloud against §5.
 - **Line anchors drift.** The coverage test only proves each anchor lands
   on a non-blank line; the symbol name is the durable reference. Six anchors
   were found 7–69 lines off in an audit on 2026-09-04 and corrected.
-- **The trace capture predates the cloud lenses**, and the Grafana capture
-  shows an idle dashboard; both are real but not current, and the standard
-  lists their re-capture as debt.
+- **Each capture is its own turn.** The UI, trace and dashboard captures
+  were taken on 2026-09-05 from the current build, and their turn ids differ
+  from the logged turn `b099e9cd40ff` the walk follows; the shape is the
+  same, the milliseconds are not.
 - **Timings are one sample.** The 1,003 ms of retrieval is mostly one
   embeddings round trip to OpenAI; offline the same step takes tens of
   milliseconds, as the Jaeger capture shows.

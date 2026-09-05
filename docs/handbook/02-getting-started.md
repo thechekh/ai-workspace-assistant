@@ -47,7 +47,7 @@ uv run uvicorn assistant.main:app --reload
 ```sh
 docker compose up -d                                   # redis :6379, qdrant :6333
 # .env: remove ASSISTANT_REDIS_URL override (default = redis://localhost:6379/0)
-uv run python -m assistant.rag.ingest evals/corpus --recreate   # fill the collection
+uv run python -m assistant.rag.ingest evals/corpus --recreate   # optional: index a folder (the eval fixture works for a first try)
 uv run uvicorn assistant.main:app --reload
 ```
 
@@ -57,7 +57,7 @@ http://localhost:6333/dashboard. The fixture corpus this ingests is exactly
 5 files splitting into 30 chunks (measured 2026-09-05 — see
 [05 — RAG & Qdrant §2](05-rag-qdrant.md) for the reproduction command).
 
-### Mode C — real model (OpenAI, free)
+### Mode C — real model (OpenAI)
 
 ```sh
 # .env:
@@ -70,8 +70,8 @@ Restart the server — that's it. Streaming becomes real inference, the stats
 line under each answer shows **real** token counts (no "(est)") and an
 indicative cost. Rate limits and model quirks are handled automatically
 (chapter 04, which also has the full pricing table and what a demo actually
-costs). Daily budget exhausted? Switch to `ASSISTANT_LLM_MODEL=gpt-4o-mini`
-(separate quota).
+costs). A turn with one tool call is about $0.001 on `gpt-4.1-nano`
+(measured 2026-09-05, [reference/backend-comparison.md](../reference/backend-comparison.md)).
 
 ### Mode D — observability stack (Jaeger + Prometheus + Grafana)
 
@@ -139,6 +139,22 @@ Qdrant): `uv run python -c "from pathlib import Path; from assistant.rag.ingest 
 prints `30` — the 5 Markdown files under
 [evals/corpus/](../../evals/corpus/) are what ingestion path 4 above would
 load, and the number [05 — RAG & Qdrant](05-rag-qdrant.md) evaluates against.
+
+![The Documents panel open over the chat, 2026-09-05: a dropzone for .md/.txt/.rst files, a paste-text expander, and the ingested todometer sources listed with their chunk counts and a remove button each](../images/ui-documents.png)
+
+Line by line — way 2 above, as the UI shows it:
+
+- **`Documents (30)`** in the header — the knowledge base holds 30 sources
+  at capture time; the count is live.
+- **`Drop .md / .txt / .rst here, or click to choose`** — way 2's dropzone;
+  the accepted suffixes are the same list `POST /api/documents` enforces.
+- **`or paste text`** — the expander for a named snippet (`name.md` and a
+  body), indexed like a file.
+- **The list** — every source with its chunk count: `cassidoo/todometer/README.md
+  6 chunks`, `…/RELEASE-DOCS.md 5 chunks`, `…/docs/api-and-… 13 chunks`,
+  `…/src/main/index… 12 chunks`. The `owner/repo/path` names are way 1's
+  doing — this knowledge base was filled by asking the assistant to ingest a
+  repository, code included — and the ✕ on each row is the `DELETE` route.
 
 ## 4. Frontend development
 

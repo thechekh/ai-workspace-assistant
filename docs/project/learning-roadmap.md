@@ -30,7 +30,7 @@ answer is in the file listed.
 ## 1. The sessions
 
 Every file's line count in the "Lines" tables below was measured on
-2026-09-04 (`wc -l`) — re-measure rather than re-quoting if the source has
+2026-09-05 (`wc -l`) — re-measure rather than re-quoting if the source has
 moved on.
 
 ### Session 0 — Get it running (30 min)
@@ -120,7 +120,7 @@ line says afterwards.
 | [`llm/client.py`](../../src/assistant/llm/client.py) | 482 — the biggest file; take it in three passes |
 | [`llm/errors.py`](../../src/assistant/llm/errors.py) | 75 |
 | [`llm/fake.py`](../../src/assistant/llm/fake.py) | 93 |
-| [`telemetry.py`](../../src/assistant/telemetry.py) | 160 |
+| [`telemetry.py`](../../src/assistant/telemetry.py) | 183 |
 
 Three passes over `client.py`: (1) `stream_step` — the happy path; (2)
 `_create_stream` — 429 backoff and `stream_options` fallback; (3)
@@ -273,8 +273,8 @@ uv run pytest tests/test_memory.py -v
 
 | Read | Lines |
 |---|---|
-| [`telemetry.py`](../../src/assistant/telemetry.py) | 160 — revisit with fresh eyes |
-| [`observability.py`](../../src/assistant/observability.py) | 92 |
+| [`telemetry.py`](../../src/assistant/telemetry.py) | 183 — revisit with fresh eyes |
+| [`observability.py`](../../src/assistant/observability.py) | 178 |
 | [`logs.py`](../../src/assistant/logs.py) | 56 |
 | [`api/routes.py`](../../src/assistant/api/routes.py) | 313 |
 | [`api/rate_limit.py`](../../src/assistant/api/rate_limit.py) | 87 |
@@ -304,8 +304,8 @@ Jaeger (:16686) and Grafana (:3000).
 | Read | Lines |
 |---|---|
 | [`frontend/src/types.ts`](../../frontend/src/types.ts) | 108 — the protocol, mirrored |
-| [`frontend/src/stores/chat.ts`](../../frontend/src/stores/chat.ts) | 477 — the WS reducer |
-| [`frontend/src/App.vue`](../../frontend/src/App.vue) | 59 |
+| [`frontend/src/stores/chat.ts`](../../frontend/src/stores/chat.ts) | 462 — the WS reducer |
+| [`frontend/src/App.vue`](../../frontend/src/App.vue) | 52 |
 
 Then the components: `ChatWindow`, `ChatMessage`, `ChatInput`, `ToolCard`,
 `ModeToggle`, `SessionsPanel`, `DocumentsPanel`.

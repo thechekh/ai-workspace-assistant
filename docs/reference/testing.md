@@ -280,9 +280,9 @@ only:
 - **Tier C results vary.** The same question can take a different number of
   steps or tools on a different day; what should not vary is the honesty
   contract — no invented facts, refusals in one sentence.
-- **UI captures are stale.** The three UI screenshots elsewhere in the
-  documentation predate the Groq and Re-index removals; re-capture before
-  showing them, as the standard's debt note says.
+- **UI captures are one day's.** The UI and dashboard captures in the
+  handbook were taken on 2026-09-05 from the current build; re-capture
+  when the header or the panels change.
 - **The mock is a mock.** Tier A's `github__*` answers are canned; the hosted
   server is only proven by Tier C's health check listing its 9 tools.
 

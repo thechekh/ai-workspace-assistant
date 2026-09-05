@@ -150,13 +150,23 @@ LLM p95 by provider, tokens/min, tool calls + p95, retrieval p95, errors —
 `host.docker.internal:8000`; the `api:8000` target is for full-compose mode —
 one of the two always shows down, that's expected).
 
-![The provisioned Grafana dashboard: Turns, Tokens, Tool calls, Errors, turn rate and duration by backend, LLM step duration, tokens per minute — with no traffic yet](../images/grafana-dashboard.png)
+![The provisioned Grafana dashboard after three real turns on 2026-09-05: Turns 3, Tokens 40630, Tool calls 5, Errors 0, plus turn rate and p50/p95 by backend, LLM step p95 by provider, and tokens per minute](../images/grafana-dashboard.png)
 
-Line by line: this is the dashboard exactly as provisioned, **before any
-turn has run** — every panel reads *No data* except *Errors*, which reads 0
-because the counter exists from process start. Send one chat message and the
-top-row stat tiles move on the next 5-second refresh; nothing on this panel
-is faked or drawn by hand, it is simply captured at time zero.
+Line by line — the *AI Workspace Assistant* dashboard, last 15 minutes,
+captured 2026-09-05 after three turns:
+
+- **Turns 3 · Tokens 40630 · Tool calls 5 · Errors 0** — the stat tiles are
+  `increase()` over the window: three turns, five tool calls between them
+  (one turn used two tools), no user-visible failure.
+- **Turn rate by backend** — one series, `custom`, because all three turns
+  ran on the custom loop; a backend switch adds a line.
+- **Turn duration p50 / p95 by backend** — between 4 and 8 s, dominated by
+  the provider's latency, not the app's.
+- **LLM step duration p95 by provider** — `openai` around 4.4 s: the p95 of
+  a single model round trip, the number to watch when answers feel slow.
+- **Tokens per minute** — a prompt spike near 30k and a small completion
+  line: prompts dominate, which is why tool-result size and schema count
+  decide the bill ([chapter 04](04-llm-models-tokens.md)).
 
 ## 4. Traces — the anatomy (Jaeger)
 
@@ -179,20 +189,28 @@ destination configured = fully inert** (no-op tracer, zero overhead) —
 proved by the exact startup line `tracing disabled — no
 OTLP/Logfire/Langfuse destination configured` when none of the three are set.
 
-![A Jaeger trace of one turn: agent.turn at the root, two llm.step spans, one tool.execute containing rag.retrieve — five spans in 1.52 s](../images/jaeger-trace-waterfall.png)
+![A Jaeger trace of one real turn on 2026-09-05: the WebSocket request at the root, agent.turn beneath it, three llm.step spans and two tool.execute spans, the first containing rag.retrieve — 15 spans in 6.44 s](../images/jaeger-trace-waterfall.png)
 
-Line by line — a real trace captured 2026-08-07, **before** the cloud lenses
-were enabled, so this is the four-span design with nothing extra beneath it:
+Line by line — trace `01a0713`, captured 2026-09-05 with the cloud lenses on,
+so Logfire's HTTP spans appear beneath the app's own four:
 
-- **`agent.turn`** spans the whole 1.52 s — the root, and the span a search
-  in Jaeger's UI is aimed at.
-- **The first `llm.step`** (1.07 s) ends with a tool call rather than text.
-- **`tool.execute`** (43 ms) wraps **`rag.retrieve`** (42 ms) — an offline
-  hash-embedder turn, hence the speed; a real embedding call over the
-  network is the 1,003 ms figure quoted in §2 instead.
-- **The second `llm.step`** (394 ms) writes the answer.
+- **`HTTP`** at the root (6.44 s) — the WebSocket request itself, added by
+  Logfire's FastAPI instrumentation; without Logfire, `agent.turn` is the root.
+- **`agent.turn`** (5.73 s) — the whole turn, the span a search in Jaeger is
+  aimed at.
+- **`llm.step`** (842 ms) with its **`POST`** child (766 ms) — LLM step 1, the
+  actual call to the provider, which returned a `search_docs` call.
+- **`tool.execute`** (1.42 s) — the tool seam. Inside it: a 5 ms **`GET`**
+  (the collection-exists check) and **`rag.retrieve`** (1.39 s), which holds
+  two `POST`s — 1.33 s to the embeddings endpoint and 11 ms to Qdrant. The
+  embedding round trip is the retrieval's cost; the search itself is fast.
+- **`llm.step`** (812 ms) — step 2, which asked for a second tool.
+- **`tool.execute`** (444 ms) with a 416 ms **`GET`** — `repo_read_file`
+  fetching the file from GitHub's API.
+- **`llm.step`** (2.17 s) — step 3, writing the answer; the longest span is
+  the one generating text.
 
-With Logfire on, the same tree gains the httpx calls beneath each step —
+With Logfire on — as in the capture — the tree gains the httpx calls beneath each step —
 `instrument_httpx()` in [observability.py](../../src/assistant/observability.py)
 adds a client span per outgoing request, so a rebuilt version of this same
 trace would show more than five spans without anything about the agent
@@ -270,6 +288,31 @@ that says "treat this number as approximate".
   `/api/sessions/{id}/turns`:
   `+1284 ms tool_call fetch_url {...} → +2591 ms tool_result (1501 chars) →
   +3290 ms final (439 chars)`.
+
+![The details timeline under an answer in Dev mode, 2026-09-05: the stats line 5.1s · first token 4922 ms · 3 LLM steps · 19489→72 tok · ~$0.0020 · search_docs, repo_read_file, then five timeline rows with millisecond offsets](../images/ui-details.png)
+
+Line by line — the timeline **details** opens, from a real turn on
+*"What does the progress meter in todometer compute?"*:
+
+- **The stats line** — `5.1s · first token 4922 ms · 3 LLM steps ·
+  19489→72 tok · ~$0.0020 · search_docs, repo_read_file · hide` — the
+  `turn` frame; **hide** collapses the timeline again.
+- **`+1978 ms tool_call search_docs {'query': 'progress meter in todometer'}`**
+  — the first LLM step took about two seconds to decide on a search; the
+  offset is from the start of the turn.
+- **`+2307 ms tool_result search_docs → 1501 chars`** — retrieval took
+  ~330 ms here (a warm embeddings call); the `1501 chars` is the UI's
+  display cap on tool results, not what the model received.
+- **`+3618 ms tool_call repo_read_file {'repo': 'cassidoo/todometer', 'path': 'src/main/index.js'}`**
+  — step 2 chose to open the file the search named.
+- **`+4150 ms tool_result repo_read_file → 1501 chars`** — the file came
+  back from GitHub in ~530 ms.
+- **`+5056 ms final answer, 151 chars`** — step 3 wrote the answer; the
+  first visible token had arrived at 4,922 ms, because nothing is written
+  before the tools are done.
+
+The tool-result card above the answer shows the code the model read —
+the `1501 chars` the timeline names, cut with `…`.
 
 ## 6. Deep health — the "controlled" part
 
@@ -358,12 +401,11 @@ About two minutes, real profile with the observability stack up
   provider aborted was genuinely billed but never reported (§5). The
   dashboard has no way to distinguish "free" from "billed but unreported"
   beyond the `(est)` flag.
-- **The two captures here are dated and one predates a real change.**
-  `jaeger-trace-waterfall.png` (§4) was captured 2026-08-07, before the
-  cloud lenses added httpx child spans — a fresh capture would show more
-  than five spans for the same turn. `grafana-dashboard.png` (§3) shows the
-  dashboard with no traffic at all; it proves provisioning, not that the
-  panels read sensibly under load.
+- **The captures are one moment on one machine.** The trace, the dashboard
+  and the details timeline were captured on 2026-09-05 from the current
+  build after three turns of traffic; the numbers on the panels are those
+  turns, not a load test, and the trace's 15 spans include Logfire's HTTP
+  spans, which are absent when only Jaeger is configured.
 - **The dual Prometheus target is confusing by design, not a bug** — in any
   single run exactly one of `api:8000` / `host.docker.internal:8000` is
   ever up, and Prometheus's own `/targets` page will always show one "down".

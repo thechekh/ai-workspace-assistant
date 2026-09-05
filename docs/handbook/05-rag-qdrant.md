@@ -27,9 +27,9 @@ they need different answers, and only the first is the user's to fix.
 ## 2. The eval fixture
 
 [evals/corpus/](../../evals/corpus/) — Markdown files in three areas
-(`architecture/`, `guidelines/`, `onboarding/`). Only `*.md` files under the
-corpus directory are ingested; the chunk's `source` is its relative path
-(that's what citations show). This is the "internal engineering
+(`architecture/`, `guidelines/`, `onboarding/`). The ingest CLI walks `*.md`
+only (the UI and `POST /api/documents` also accept `.txt` and `.rst`); the
+chunk's `source` is its relative path (that's what citations show). This is the "internal engineering
 documentation" the system prompt promises.
 
 Measured 2026-09-05, entirely offline (chunking needs no Qdrant):
@@ -81,12 +81,9 @@ below produces and §5's retrieval table is measured against.
    collection (`docs`) with **named vectors** `dense` (cosine) + `sparse`;
    payload carries text/source/heading.
 
-Three ways to (re)ingest:
-
-| How | When |
-|---|---|
-| `uv run python -m assistant.rag.ingest <folder> [--recreate]` | CLI, always works |
-| same, in `fakeredis://` mode | runs inline in the request |
+Re-ingestion goes through the same paths as §1 (the panel, the API, the
+CLI, or asking the assistant to ingest a repository); `--recreate` on the CLI
+is the only one that drops the collection first.
 
 ## 4. Query pipeline (what `search_docs` actually does)
 
@@ -191,8 +188,9 @@ wording it has never seen. Swapping in a semantic model, same corpus, same
 | `hash-512` (offline default) | 0.83 | 1.00 | 0.92 | $0 |
 | `text-embedding-3-small` | **0.94** | 1.00 | **0.97** | fractions of a cent |
 
-Three of the questions the hash embedder ranked second or third move to
-first place. That is the vocabulary-mismatch gap closing: the semantic model
+Recorded in [evals/results-embeddings.md](../../evals/results-embeddings.md)
+by `evals/compare_embeddings.py`; re-run it to refresh. Three of the
+questions the hash embedder ranked second or third move to first place. That is the vocabulary-mismatch gap closing: the semantic model
 matches *meaning*, so a question phrased with different words than the
 document still lands. It also reframes the hybrid-vs-dense ablation — with a
 lexical stand-in for the dense channel, dense and sparse were measuring

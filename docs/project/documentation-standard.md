@@ -185,13 +185,12 @@ project and handbook pages were brought up by coding agents working from
 this page, each agent's output audited with the snippet in §4 before the
 page was adopted.
 
-Known debt for that pass: no browser capture of the current UI exists. The
-last UI screenshot predated the Groq and Re-index removals and was deleted on
-2026-09-05 rather than shown; `docs/images/jaeger-trace-waterfall.png` is a
-real trace from 2026-08-07, before the cloud lenses added httpx spans, and
-`grafana-dashboard.png` shows the provisioned panels with no traffic. Both
-are captioned as such; re-capture all three from the current build when a
-browser is available.
+The captures were re-taken on 2026-09-05 from the current build: the UI
+(empty state, a turn in Dev mode, the details timeline, the Documents
+panel), a Jaeger trace with the cloud lenses on, the Grafana dashboard with
+traffic, and Qdrant's collection view — all driven through a headless Edge
+over the Chrome DevTools Protocol by a script kept outside the repository.
+Re-capture when the header, the panels or the dashboards change.
 
 ## 6. The skeleton, ready to paste
 

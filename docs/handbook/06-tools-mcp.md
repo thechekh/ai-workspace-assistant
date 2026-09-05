@@ -52,8 +52,8 @@ Two things that measurement turned up, both worth knowing before you swap:
 - **It exposes 44 tools, against the mock's 3.** Their JSON schemas are
   ~12,900 tokens, versus ~260 for the mock, and that rides in *every* prompt
   before the user has asked anything. On a small model that measurably hurts
-  tool selection; on a free tier it alone can exceed a 12k
-  tokens-per-minute allowance for `gpt-4.1-nano`. Use the server's
+  tool selection, and it is twelve times the cost of the same question
+  ([04 — LLM §6](04-llm-models-tokens.md)). Use the server's
   toolset flags (`--toolsets pull_requests,issues`) to trim it if you swap —
   which is exactly what the production `.env` does, restricting the hosted
   server to 9 tools with `X-MCP-Toolsets: pull_requests,issues`
@@ -116,7 +116,7 @@ Three properties to remember:
 - **A tool can never kill a turn.** Exceptions become error *results* the
   model can react to (`status="crash"` in metrics). Qdrant down → the agent
   apologizes about docs but the socket keeps serving.
-- **Duplicate-call guard** — models (llama especially) sometimes repeat the
+- **Duplicate-call guard** — some models repeat the
   exact same call in one turn; we measured 3× the same `fetch_url`, 31 s and
   15k tokens. A per-turn `(tool, canonical-args)` set (carried on the turn's
   `TurnStats` ContextVar) answers repeats with *"you already ran this — use
@@ -257,8 +257,8 @@ which line.
 
 Offline, about a minute, no keys:
 
-1. Start the app with the fake provider (§4 of
-   [09 — Testing & operations](09-testing-operations.md)) and open
+1. Start the app with the fake provider (Mode A in
+   [02 — Getting started §2](02-getting-started.md)) and open
    http://localhost:8000/ in **Dev** mode.
 2. Type *Show latest PRs* — *"the fake model routes on keywords; the tool
    card shows the mocked GitHub server answering over MCP, PR #142 among

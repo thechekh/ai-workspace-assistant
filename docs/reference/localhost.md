@@ -47,6 +47,21 @@ collection to browse points: every chunk with its `source`
 its `text`. The **Console** tab runs raw calls, for example
 `POST collections/docs/points/scroll` with `{"limit": 10, "with_payload": true}`.
 
+![Qdrant's dashboard on the docs collection, 2026-09-05: a point's payload with text, source, heading and index, and its two named vectors, lexical and dense](../images/qdrant-collection.png)
+
+Line by line:
+
+- **`docs` → Points** — one card per stored chunk; the tabs (Info,
+  Optimizations, Memory, Snapshots, Visualize, Graph) are Qdrant's own.
+- **Payload** — `text` (the chunk, here the start of `mcp-path.js`),
+  `source` (`cassidoo/todometer/src/main/mcp-path.js` — the
+  `owner/repo/path` naming that keeps two repositories' files apart),
+  `heading` (empty for a code file; a breadcrumb for Markdown) and `index`.
+- **Vectors: `lexical`, length 22** — the sparse vector: 22 non-zero
+  token positions for this short chunk.
+- **Vectors: `dense`, length 1536** — the real-profile embedding
+  (`text-embedding-3-small`); with the offline hash embedder this reads 512.
+
 ### Logs
 
 | What | Where |

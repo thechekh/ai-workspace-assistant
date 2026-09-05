@@ -36,7 +36,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 
 - **Embedding** — a vector representing a text's meaning; similar meaning → nearby vectors (02).
 - **Vector** — the list of numbers itself; a point in a high-dimensional space (02).
-- **Dimensionality** — how many numbers per vector; ours is 512, real models use 768–3072 (02).
+- **Dimensionality** — how many numbers per vector; 512 with the offline hash embedder, 1536 with `text-embedding-3-small` in the real profile (02).
 - **Dense vector** — semantic embedding: every slot carries a little meaning (02).
 - **Sparse vector** — keyword-style vector: non-zero only for tokens the text contains (02).
 - **Named vectors** — Qdrant storing several vectors per point under names, so one collection holds both dense and sparse (02).
@@ -131,7 +131,7 @@ both. If a reviewer asks "what do you mean by X", X should be on this page.
 - **Token accounting** — summing prompt/completion tokens per turn; real when the provider reports them, estimated otherwise (09).
 - **Cost accounting** — converting those tokens to money at listed prices (09).
 - **Time to first token (TTFT)** — latency until the first character appears; the number a user feels (09).
-- **Throughput limits (TPM / TPD)** — tokens per minute and per day a provider allows; the free tier's real constraint (04, 09).
+- **Throughput limits (TPM / RPM)** — tokens and requests per minute a provider allows; the constraint the client's backoff exists for (04, 09).
 - **Rate limiting / 429 / backoff** — being told to slow down, and waiting the requested time before retrying (04, 09).
 - **Prometheus** — the metrics database scraping `/metrics` for counters and histograms (09).
 - **Audit trail** — the stored per-turn record — stats plus timeline — that makes a turn replayable (09).

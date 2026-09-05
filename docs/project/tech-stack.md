@@ -33,12 +33,12 @@ Modern Python stack for the bench project. For each area: the chosen technology,
 | LLM (real) | **OpenAI `gpt-4.1-nano`** (existing $25 budget) | Anthropic Claude (Sonnet/Haiku, API key) | $0.10 / $0.40 per 1M tokens; a demo turn is a fraction of a cent. Claude would run ~10–19× that per turn at measured ~7k-token turns (~$0.008 Haiku / ~$0.015 Sonnet vs ~$0.0008 nano) — see [future-tools.md](future-tools.md); deferred as a same-seam API-key swap, not rejected |
 | Embeddings | **text-embedding-3-small → compare voyage-3** 🧪 | BGE-M3 (local), jina | Cheap start, then measured comparison on a golden set; see §Embeddings |
 | Vector DB | **Qdrant** | Weaviate, Chroma, pgvector, LanceDB | Fast, great payload filters, native hybrid search, single container |
-| Short-term memory | **Redis** + conversation summarization | in-process dicts, Postgres | Spec'd; survives restarts, TTLs for sessions, doubles as job broker |
+| Short-term memory | **Redis** + conversation summarization | in-process dicts, Postgres | Spec'd; survives restarts, TTLs for sessions; also holds the audit trail and the rate-limit windows |
 | Background jobs | **none** (taskiq removed) | taskiq, arq, Celery, Dramatiq, RQ | Chosen, built, then removed — nothing left to schedule; see §Background jobs |
 | Observability | **Logfire + Langfuse combined** via OpenTelemetry | Logfire alone, Langfuse alone | Both are OTel-based so they compose; alone, either loses one view (Logfire the LLM cost/prompt side, Langfuse the app-latency side) — see §Observability |
 | Testing | **pytest + pytest-asyncio + httpx + respx** + golden RAG evals | — | Standard modern stack |
 | Frontend | **Vue 3 + Vite + TypeScript** | single-file HTML, Streamlit, React | User preference; real SPA experience with WS streaming |
-| Containerization | **Docker Compose** | k8s (overkill) | One command brings up app, worker, Qdrant, Redis, frontend |
+| Containerization | **Docker Compose** | k8s (overkill) | One command brings up the app, Qdrant and Redis, plus Jaeger/Prometheus/Grafana behind a profile |
 
 ---
 
@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     agent_backend: Literal["custom", "pydantic_ai", "langgraph"] = "custom"
 
     # Embeddings
-    embedding_provider: Literal["openai", "voyage"] = "openai"
+    embedding_provider: Literal["hash", "openai", "voyage"] = "hash"
     embedding_model: str = "text-embedding-3-small"
 
     # Infra
@@ -307,7 +307,7 @@ src/assistant/       # Python backend
 |---|---|---|
 | `api` | project Dockerfile (uv-based) | FastAPI + uvicorn |
 | `qdrant` | `qdrant/qdrant` | vector DB (volume-persisted) |
-| `redis` | `redis:7-alpine` | memory + task broker |
+| `redis` | `redis:7-alpine` | sessions, summaries, audit trail, rate-limit windows |
 | `frontend` | node build stage → nginx (or served by `api`) | Vue SPA |
 
 MCP servers (GitHub, custom code-search via FastMCP) run either as sidecar containers or are spawned by the app, depending on transport (stdio vs streamable HTTP).
@@ -321,7 +321,7 @@ MCP servers (GitHub, custom code-search via FastMCP) run either as sidecar conta
 | Phase | Deliverable |
 |---|---|
 | 0 | Scaffolding: uv project, ruff/pyright/pre-commit, CI, compose (qdrant+redis), `Settings` |
-| 1 | WS chat endpoint + Redis sessions + streaming with **OpenAI free tier**; minimal Vue chat page |
+| 1 | WS chat endpoint + Redis sessions + streaming with the **Groq free tier** *(since retired)*; minimal Vue chat page |
 | 2 | RAG: docling ingestion CLI → Qdrant; `search_docs` tool; golden question set v1 |
 | 3 | **Custom agent loop** (backend A) with RAG + first tools; tool-call cards in UI |
 | 4 | MCP: registry + official GitHub server + custom FastMCP `search_code` server |

@@ -168,7 +168,9 @@ never lowered.
 Two workflows on every push. **CI**: ruff → format check → pyright →
 pytest with a coverage floor, across Python 3.12 **and** 3.13, plus a
 frontend job (typecheck → vitest → build) and a Docker image build.
-**Security**: CodeQL, `pip-audit` and `npm audit`, weekly as well as on push.
+**Security**: `pip-audit` and `npm audit`, weekly as well as on push, plus a
+CodeQL job that skips itself while the repository is private (uploading its
+results needs GitHub Advanced Security) and turns on the moment it goes public.
 *Where:* [.github/workflows/ci.yml](../../.github/workflows/ci.yml).
 
 ## 5. Docker Compose profiles

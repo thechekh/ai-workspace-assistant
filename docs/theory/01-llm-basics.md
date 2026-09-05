@@ -136,7 +136,7 @@ Why this is good engineering, not a shortcut:
   question you evaluate separately).
 - All **573 tests** run in seconds, offline, at $0 — no flaky network, no
   burnt quota, no nondeterministic assertions
-  (`uv run pytest -q -p no:cacheprovider`, 2026-09-04).
+  (`uv run pytest -q -p no:cacheprovider`, 2026-09-05).
 - The demo works on a train. With an OpenAI key it becomes a real model with
   zero code changes.
 

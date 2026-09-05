@@ -82,13 +82,15 @@ and the full reasoning are recorded in
 | **uv** | pip + venv + poetry | 10–100× faster; one tool for envs, deps and Python versions; a real lockfile |
 | **ruff** | flake8 + isort + black | Lint *and* format in one, instant |
 | **pyright** | mypy | Faster, better inference, same engine as VS Code |
-| **pytest** (+asyncio, +cov) | — | 573 deterministic tests with a coverage floor (2026-09-04, `uv run pytest -q`; chapter 09) |
+| **pytest** (+asyncio, +cov) | — | 573 deterministic tests with a coverage floor (2026-09-05, `uv run pytest -q`; chapter 09) |
 
 - **GitHub Actions** — every push runs two workflows. *CI*: ruff → format
   check → pyright → pytest+coverage on Python **3.12 and 3.13** (the image
   ships 3.13), a frontend job (vue-tsc → vitest → build), and a Docker image
-  build. *Security*: CodeQL plus `pip-audit` and `npm audit`, also weekly —
-  a dependency clean at merge time can rot later.
+  build. *Security*: `pip-audit` and `npm audit`, also weekly — a dependency
+  clean at merge time can rot later — plus a CodeQL job that skips itself
+  while the repository is private (its upload needs GitHub Advanced
+  Security).
 - **pre-commit** — the same checks locally before each commit.
 
 ## 7. Auth

@@ -109,9 +109,13 @@ real stack on 2026-09-03 (commit `75f6caa`):
 | 2 | MCP demo | *"Show the latest PRs in the repo"* | `github__list_pull_requests` | $0.000200 |
 | 3 | Code search | *"Search the code for the rate limiter"* | `code__search_code` | $0.000190 |
 
-Three turns cost **$0.00066** — about 1500 full demo runs per dollar. Watch
-each one land in Jaeger (`localhost:16686`) as a four-span trace:
-`agent.turn → llm.step → tool.execute → rag.retrieve`.
+Three turns cost **$0.00066** — about 1500 full demo runs per dollar. With a
+code-ingested repository in the knowledge base the tool results are larger:
+the same kind of turn measured **$0.0009** on 2026-09-05
+([backend-comparison.md](../reference/backend-comparison.md)). Watch each one
+land in Jaeger (`localhost:16686`) as a trace whose core is the four spans
+`agent.turn → llm.step → tool.execute → rag.retrieve` — with Logfire on, the
+HTTP calls appear beneath them too.
 
 ## 4. Graceful degradation
 

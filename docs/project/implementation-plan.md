@@ -208,7 +208,9 @@ changed after the nine build phases, with the numbers that justified it.
   $0.0154 listing — 57× a normal turn); the output guard against
   claimed-but-unperformed actions; rate limiting (sliding windows in Redis);
   Stop/cancel mid-stream; the Conversations panel; the CI retrieval gate.
-- **Evals**: Ragas groundedness (faithfulness **0.92**, opt-in, never in CI);
+- **Evals**: Ragas groundedness (faithfulness **0.92** on the first four-question
+  run; later **1.00** on all 18 with a **0.48** negative control, 2026-09-04 —
+  opt-in, never in CI);
   the embedder comparison made real (`text-embedding-3-small` recall@1
   0.83 → 0.94 on the golden set).
 - **Docs-as-tests**: link integrity, cross-document fact consistency (test

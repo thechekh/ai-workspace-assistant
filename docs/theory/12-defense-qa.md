@@ -58,9 +58,10 @@ the test exists; say so.
 
 **Q: What breaks first in production?**
 Honest list: (1) a single shared bearer token → replace with OIDC at the
-gateway; (2) no rate limiting or per-user quotas; (3) LangGraph's in-process
-checkpointer → needs a Redis/Postgres saver to be durable; (4) no session
-management UI. None are architectural — the stateful parts (Redis, Qdrant)
+gateway; (2) rate limits are per session, not per user — they need the same
+OIDC identity; (3) LangGraph's in-process checkpointer → needs a
+Redis/Postgres saver to be durable; (4) single-instance Redis and Qdrant with
+no failover. None are architectural — the stateful parts (Redis, Qdrant)
 are already externalised, so API pods scale horizontally today.
 
 ---
@@ -71,17 +72,16 @@ are already externalised, so API pods scale horizontally today.
 The provider is a **config value**, not a code decision: one
 OpenAI-compatible client covers OpenAI, Ollama and Gemini, plus a
 deterministic offline `fake` used as the dev/test default. The whole test
-suite and all plumbing work runs at **$0**. Real-model work runs on OpenAI's
-free tier (`gpt-4.1-nano`); a full 8-case acceptance pass costs
-about **$0.012** at listed prices — and the app *tells you*, per turn, in
+suite and all plumbing work runs at **$0**. Real-model work runs on OpenAI
+(`gpt-4.1-nano`, paid, a fraction of a cent a turn); a full 8-case
+acceptance pass cost about **$0.012** at listed prices — and the app *tells you*, per turn, in
 the stats line and in `assistant_cost_usd_total`.
 
 **Q: So is the cost real or estimated?**
 Both, labelled. When the provider reports usage (OpenAI does, via
 `stream_options.include_usage`) the numbers are real; otherwise we fall back
 to a `chars/4` estimate and flag it `(est)` in the UI. Cost is priced from a
-small per-model table — indicative at list prices, since the free tier
-actually bills $0.
+small per-model table — indicative at list prices, not an invoice.
 
 **Q: How do you prevent hallucinations?**
 Three layers. **Grounding**: the agent retrieves chunks and answers from
@@ -118,10 +118,10 @@ failures against OpenAI, not speculation:
   which a naive truthiness check silently discards — that was a real bug),
   and the provider's own message surfaced to the user, because per-minute
   and per-day limits need different advice.
-- **`tool_use_failed`** → llama sometimes emits malformed tool-call JSON;
-  the step is retried, then the call is salvaged from OpenAI's
-  `failed_generation` payload.
-- **Leaked tool syntax** → llama sometimes prints `<function.name>{…}` as
+- **`tool_use_failed`** → some models emit malformed tool-call JSON and the
+  provider aborts the stream; the step is retried, then the call is salvaged
+  from the provider's `failed_generation` payload.
+- **Leaked tool syntax** → some models print `<function.name>{…}` as
   *text*; that text is withheld, parsed into a real tool call, and never
   reaches the chat.
 - **Repeated identical calls** → a per-turn duplicate guard; we measured the
@@ -149,8 +149,9 @@ Correct, and it's disclosed everywhere: `hash-512` is lexical feature
 hashing — deterministic, $0, and good enough to build *and measure* the
 whole pipeline. Semantic models (OpenAI `text-embedding-3-small`, voyage-3)
 are a config switch plus a re-ingest, and `evals/compare_embeddings.py`
-prints the comparison table the day a key exists. The pipeline is the
-deliverable; the embedder is a plug.
+measured it: `text-embedding-3-small` lifts recall@1 from 0.83 to **0.94**
+on the same golden set ([evals/results-embeddings.md](../../evals/results-embeddings.md)).
+The pipeline is the deliverable; the embedder is a plug.
 
 **Q: How do you know retrieval is any good?**
 We measure it: an 18-question golden set, recall@1 / recall@5 / MRR, four
@@ -329,8 +330,8 @@ Ruff (lint + format), pyright, the test suite with a coverage floor, a
 frontend job (typecheck + tests + build), a Docker image build, and the
 retrieval quality gate — across Python 3.12 **and** 3.13, because 3.13 is
 what the image ships and testing only the floor version was a real gap. A
-separate security workflow runs CodeQL plus `pip-audit` and `npm audit`
-weekly.
+separate security workflow runs `pip-audit` and `npm audit` weekly, plus a
+CodeQL job that skips itself while the repository is private.
 
 **Q: Did the security scanning find anything?**
 Yes, immediately — which is the point. Eight Python vulnerabilities across
@@ -356,8 +357,8 @@ proves the three route the same prompt to the same tool — offline. Against
 real OpenAI, the pydantic-ai backend failed the same question the other two
 answered, every time. Cause: it drives the provider through pydantic-ai's own
 model layer, so it never passes through `llm/client.py` and inherited none of
-its hardening — no 429 backoff, no retry when llama emits a malformed tool
-call. One bad tool call and the turn was an error instead of an answer.
+its hardening — no 429 backoff, no retry when the provider aborts a
+malformed tool call. One bad tool call and the turn was an error instead of an answer.
 
 The lesson generalises past this project: the parity test compared the
 *happy path*, and the fake provider never rate-limits or emits broken JSON, so
@@ -370,8 +371,11 @@ and how long to retry even though there are two loops.
 Partly automated: `tests/test_docs_links.py` fails the build on any broken
 relative link, on stray prose outside `docs/`, and if the index stops
 covering a folder. It caught seven broken links the moment a module was
-split into a package. The prose claims are kept honest by re-verifying
-numbers before citing them — everything in the table at the top of this page
+split into a package. Three more test files hold the rest: numbers quoted
+in several places must agree with each other and with the code, every
+setting, endpoint, tool and module must be documented somewhere, and each
+page adopted into the documentation standard must keep its shape. The
+prose claims are kept honest by re-verifying numbers before citing them — everything in the table at the top of this page
 is reproducible with one command.
 
 **Q: How do you stop a runaway answer, and what does it cost?**

@@ -122,7 +122,8 @@ back. Transparency is a feature — it's also your live debugging view.
 
 Three sources, one registry, indistinguishable to the loop:
 
-1. Native: `search_docs` over the RAG retriever (chapter 03).
+1. Native: `search_docs` over the RAG retriever (chapter 03), `fetch_url`,
+   `repo_read_file`, and the one write, `ingest_repo`.
 2. MCP servers: `code__search_code`, `github__list_pull_requests` (chapter 06).
 3. (Anything future — the registry is the single extension point.)
 

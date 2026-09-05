@@ -17,7 +17,8 @@ questions three ways:
    (architecture, service catalog, deployment, guidelines, onboarding) stored
    in Qdrant, with citations.
 2. **About your code and workspace** — MCP tool servers: regex code search
-   over this repository, and a GitHub server (mocked data, real tool names).
+   over this repository, and a GitHub server — mocked in the dev profile,
+   GitHub's hosted read-only server in the real one.
 3. **About the outside world** — a `fetch_url` tool for public web pages and
    GitHub repos/accounts, so it never invents what a page contains.
 
@@ -159,7 +160,7 @@ src/assistant/
   agent/ base.py       the AgentBackend contract + event types
         registry.py    settings -> {custom, pydantic_ai, langgraph}
         backends/      the three runtimes
-        tools/         Tool + registry seam, search_docs, fetch_url
+        tools/         Tool + registry seam; search_docs, fetch_url, repo_read_file, ingest_repo
   llm/  client.py      OpenAI-compatible streaming client, retries, salvage
         errors.py      provider-error -> (metric kind, user message)
         fake.py        offline heuristics shared by both fake providers
@@ -221,6 +222,24 @@ About thirty seconds, no keys:
 
 Total: well under a minute, and free to repeat as many times as a question
 needs it.
+
+![The chat UI on first load, 2026-09-05: header controls and the three-line hint about documents, the Documents panel and Dev mode](../images/ui-empty.png)
+
+Line by line — step 1 of the demo, what the room sees before the first
+question:
+
+- **The header row** — the health dot (green: every component answered),
+  the `openai · hybrid` badge, the **Dev** toggle, **Chats**, **Documents**,
+  the backend dropdown, and **connected** — the whole control surface §1
+  describes, in one row.
+- **The hint** — *"Ask about your documents, the codebase, or a URL. Add
+  documents with the Documents panel — the knowledge base starts empty.
+  Turn on Dev in the header to see tools, timings, tokens and cost."* — the
+  three ways of answering and the two panels, stated where a new user looks
+  first. (This capture's `Documents (30)` shows a knowledge base that had
+  already been filled; a fresh instance reads `Documents (0)`.)
+- **The input** — *Ask something… (Enter to send, Shift+Enter for a new
+  line)* and **Send**; Esc or the Stop button interrupts a turn in flight.
 
 ## 8. Reading it honestly
 

@@ -89,10 +89,13 @@ deliberately evaluating.
    configuration (measured 2026-09-04, `uv run python evals/run_retrieval.py
    --memory`; full ablation table in
    [reference/metrics.md](../reference/metrics.md)).
-4. **Browser E2E** — Playwright drives the real UI against the real server
-   per phase (tool cards render, backends switch, toasts fire).
+4. **The browser, by hand and by script** — no Playwright suite lives in
+   the repository; the UI is checked with the tiered manual checklist
+   ([reference/testing.md](../reference/testing.md)), and the handbook's UI
+   captures were taken by driving a headless browser against the real
+   server.
 
-573 tests, offline, in seconds, $0 (2026-09-04, `uv run pytest -q`). The
+573 tests, offline, in seconds, $0 (2026-09-05, `uv run pytest -q`). The
 fakes aren't a compromise — they're what makes the suite *possible*.
 
 ## 4. What we deliberately do NOT test with fakes

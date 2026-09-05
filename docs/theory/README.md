@@ -63,7 +63,7 @@ MCP tools (06) enter the same flow: `github__list_pull_requests` and
 loop in (04) treats them identically.
 
 Every step in that path is traceable and tested — 573 tests, offline, $0
-(2026-09-04, `uv run pytest -q`) — and the retrieval step is additionally
+(2026-09-05, `uv run pytest -q`) — and the retrieval step is additionally
 *measured*: recall@5 = 1.00 on the golden set with the default
 hybrid+rerank configuration (2026-09-04, `uv run python
 evals/run_retrieval.py --memory`). "We built it" and "we checked it" are

@@ -87,7 +87,7 @@ that didn't ship, both from [future-tools.md](../project/future-tools.md):
 |---|---|---|
 | Atlassian's hosted Jira/Confluence MCP server (`jira_search`) | Rejected by owner | no Atlassian org to demo against — but architecturally it is one more `MCPServerConfig` entry plus a token, the same shape the GitHub server already proves live |
 | `workspace-mcp` — serving *this project's own* tools out over streamable HTTP, to editors | Deferred | the mechanism already runs in both directions (our servers are FastMCP; our client already consumes a hosted streamable-HTTP server) — what's missing is a reason to expose the knowledge base over HTTP, not capability |
-| The real `ghcr.io/github/github-mcp-server`, live | Deferred (mock stands in) | prototyped and verified reachable; kept mocked so the demo stays credential-free |
+| The real GitHub server, live | Shipped in the production profile | GitHub's hosted read-only server over streamable HTTP, trimmed to 9 tools with a toolset header — verified connected; the container form (`ghcr.io/github/github-mcp-server`) is the offline-capable alternative; the mock stays the dev/CI default |
 
 ## 5. Trust & security (know this cold)
 
@@ -124,10 +124,11 @@ strongest form of the demo.
 
 ## 7. Reading it honestly
 
-- **The GitHub integration has never faced a real server.** `fake_github`'s
-  canned data means nobody here has seen this codebase handle the official
-  server's actual rate limits, auth failures, or schema drift — the mock
-  proves the pipeline, not resilience to a live third party.
+- **The mock proves the pipeline, not resilience to a live third party.**
+  The real server is faced only in the production profile — GitHub's hosted
+  read-only server, verified connected with 9 tools — and a demo's worth of
+  turns is not a soak: rate limits, auth failures and schema drift on that
+  server have not been exercised here beyond the one rename already found.
 - **Timeouts, not circuit breakers.** A server that connects fine and then
   hangs on every call pays the full 60-second `_CALL_TIMEOUT_S` on each
   request, every time, until someone disables it — there is no

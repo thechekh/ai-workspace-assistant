@@ -58,8 +58,8 @@ live failure rather than anticipated:
    `test_create_stream_drops_stream_options_on_bad_request` in
    [tests/test_llm_errors.py](../../tests/test_llm_errors.py).
 2. **429 backoff** — beyond the SDK's quick built-in retries, up to 2 extra
-   attempts honoring the `Retry-After` header (capped 15 s/wait). Free-tier
-   windows are per-minute; quick retries alone don't outlast them. Four
+   attempts honoring the `Retry-After` header (capped 15 s/wait). Provider
+   rate-limit windows are per-minute; quick retries alone don't outlast them. Four
    tests in the same file cover it, including the edge case that gives this
    line its name in [CLAUDE.md](../../CLAUDE.md): `retry-after: 0` is valid
    and means "retry now," so the code tests the header against `None`, never
@@ -174,11 +174,12 @@ At those limits, per-minute throttling is effectively unreachable for a demo
 — which is the practical difference from a free tier, where the schemas of a
 tool-heavy turn alone could exceed the allowance.
 
-**What it actually costs.** A tool-using turn is roughly 2.5–4k prompt tokens,
-because each LLM step re-sends the conversation plus tool results. On
-`gpt-4.1-nano` that is about **$0.0004 a turn** — a full workshop demo costs
-well under a cent, and the complete eval suite (18 questions judged by Ragas)
-under five.
+**What it actually costs.** A tool-using turn is 3–9k prompt tokens,
+because each LLM step re-sends the conversation plus the tool result — a
+2,000-character search result on an ingested repository is most of the
+upper end. On `gpt-4.1-nano` that is **$0.0004–0.001 a turn** (the measured
+turn `b099e9cd40ff` cost $0.000908) — a full workshop demo costs a few
+cents, and the complete eval suite (18 questions judged by Ragas) under five.
 
 **Checking the balance.** You cannot, with an application key: OpenAI's
 `/v1/organization/costs` returns 403 `Missing scopes: api.usage.read`. That is
@@ -218,7 +219,7 @@ construction.
 | Every CI job | **No** | The repository has **zero** Actions secrets — CI has no key to spend |
 | `evals/run_retrieval.py` | **No** | Uses the offline `hash-512` embedder and no LLM at all |
 | `ASSISTANT_LLM_PROVIDER=fake` | **No** | The whole tool loop runs offline |
-| **Chatting with `provider=openai`** | **Yes** | ~$0.0002 a turn on `gpt-4.1-nano` |
+| **Chatting with `provider=openai`** | **Yes** | $0.0004–0.001 a turn on `gpt-4.1-nano`, depending on tool-result size |
 | **`evals/run_ragas.py`** | **Yes** | Several LLM calls per question — the expensive one |
 | `evals/compare_embeddings.py` | Only if `ASSISTANT_EMBEDDING_API_KEY` is set | ~$0.0002 for the whole corpus |
 
