@@ -308,7 +308,7 @@ def test_the_learning_roadmap_covers_every_source_file() -> None:
     reader finishes it believing they have seen everything. Adding a module
     without slotting it into a session now fails the build.
     """
-    roadmap = (REPO_ROOT / "docs/project/learning-roadmap.md").read_text(encoding="utf-8")
+    roadmap = (REPO_ROOT / "docs/roadmap.md").read_text(encoding="utf-8")
     sources = sorted(
         path.name
         for path in (REPO_ROOT / "src/assistant").rglob("*.py")
@@ -330,7 +330,7 @@ def test_the_learning_roadmap_covers_every_source_file() -> None:
 
 
 def test_the_reading_roadmap_places_every_document() -> None:
-    """docs/README.md sequences every document — hold it to that.
+    """docs/roadmap.md sequences every document — hold it to that.
 
     The roadmap's promise is "read top to bottom and you have read every
     document". A new page that never gets slotted in breaks that silently: the
@@ -338,9 +338,9 @@ def test_the_reading_roadmap_places_every_document() -> None:
     contiguous, since a duplicated or skipped number makes the list unusable
     as a checklist.
     """
-    index = (REPO_ROOT / "docs/README.md").read_text(encoding="utf-8")
-    start = index.index("### The reading roadmap")
-    section = index[start : index.index("**Presenting it?**", start)]
+    roadmap = (REPO_ROOT / "docs/roadmap.md").read_text(encoding="utf-8")
+    start = roadmap.index("## 3. Every document, placed")
+    section = roadmap[start : roadmap.index("## 4. ", start)]
 
     unplaced: list[str] = []
     for path in sorted((REPO_ROOT / "docs").rglob("*.md")):

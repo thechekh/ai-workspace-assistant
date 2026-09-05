@@ -123,6 +123,7 @@ enforced — *tested* (fails the build, see §4) or *reviewed* (the checklist).
 | `handbook/` | all except 2 (chapters keep their operator's-tour shape) | the ones handbook chapters tend to miss are 3, 4, 10 and 11 |
 | `theory/` | 1, 3, 8, 9, 11, 14 | concepts are explained, not run: no captures, commands, demos or troubleshooting |
 | `project/` | 1, 4, 8, 9, 14 | decisions and records; this page follows them itself |
+| `docs/` root (`README.md`, `roadmap.md`) | 1, 4, 8, 9, 14 | the index and the reading path are records too: they are held to the `project/` rules |
 | `qanda/` | exempt | its question-then-answer format is the point of the page |
 
 Two mechanical conventions apply to every adopted page regardless of folder,

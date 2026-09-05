@@ -6,7 +6,7 @@ not explain any concept itself — that's each numbered chapter below — and
 it is not the project-specific "how we built it" side of the same topics,
 which is [docs/README.md](../README.md)'s by-topic table.
 
-Working through this alongside the code? [project/learning-roadmap.md](../project/learning-roadmap.md) sequences these chapters with the source files and a command to run for each.
+Working through this alongside the code? [roadmap.md](../roadmap.md) sequences these chapters with the handbook, the source files and a command to run for each.
 
 Self-contained explanations of every technology in this project, written for
 someone who has **never** worked with LLMs, RAG, agents, or MCP. Each chapter
@@ -71,7 +71,7 @@ answered by different chapters (09), but neither is left to memory.
 
 ## 3. Related
 
-- [project/learning-roadmap.md](../project/learning-roadmap.md) — these chapters paired with source files and a command to run for each
+- [roadmap.md](../roadmap.md) — these chapters paired with the handbook, the source files and a command to run for each
 - [docs/README.md](../README.md) — the full documentation index, including the by-topic table this course's project-specific counterpart lives in
 - [11 — Glossary](11-glossary.md) — every term from every chapter, one line each
 - [12 — Defense Q&A](12-defense-qa.md) — the hard questions, answered, once the chapters are read

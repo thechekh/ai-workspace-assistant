@@ -42,7 +42,7 @@ ADOPTED = [
     "theory/README.md",
     "project/tech-stack.md",
     "project/implementation-plan.md",
-    "project/learning-roadmap.md",
+    "roadmap.md",
     "project/workshop.md",
     "project/demo-runbook.md",
     "project/future-tools.md",
