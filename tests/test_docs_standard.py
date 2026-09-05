@@ -48,6 +48,16 @@ ADOPTED = [
     "project/future-tools.md",
     "project/description.md",
     "project/description-original.md",
+    "handbook/06-tools-mcp.md",
+    "handbook/07-observability.md",
+    "handbook/08-agents-memory-ws.md",
+    "handbook/09-testing-operations.md",
+    "handbook/01-project-overview.md",
+    "handbook/02-getting-started.md",
+    "handbook/03-technologies.md",
+    "handbook/04-llm-models-tokens.md",
+    "handbook/05-rag-qdrant.md",
+    "handbook/README.md",
 ]
 
 H2 = re.compile(r"^## (.+?)\s*$", re.MULTILINE)

@@ -1,8 +1,12 @@
 # Info — the complete operator's handbook
 
-Everything about this project in one place: what it is, how to start it, every
-technology, every URL, and how to watch it work (logs, metrics, traces, costs).
-Written to be read top-to-bottom once, then used as a reference.
+**What this handbook covers: everything about running this project, one page
+per subsystem — what it is, how to start it in any mode, every technology and
+every `.env` variable, and how to watch it work end to end.** It is not the
+concept explanations of what an LLM, embedding, agent or MCP server *is* —
+that is [theory/](../theory/README.md); this folder assumes those concepts
+and focuses on *this* project. Written to be read top-to-bottom once, then
+used as a reference.
 
 Two companion folders:
 - **[theory/](../theory/README.md)** — concept explanations *from zero* (what an
@@ -14,7 +18,7 @@ Two companion folders:
   [backend-comparison.md](../reference/backend-comparison.md),
   [workshop.md](../project/workshop.md).
 
-## The chapters
+## 1. The chapters
 
 | # | Chapter | What you'll be able to do after it |
 |---|---|---|
@@ -26,9 +30,9 @@ Two companion folders:
 | 06 | [Tools & MCP](06-tools-mcp.md) | List every tool the agent has, explain how a call executes, add a new one |
 | 07 | [Observability](07-observability.md) | Open every dashboard, follow one turn through logs → metrics → traces → audit |
 | 08 | [Agents, memory & WebSocket](08-agents-memory-ws.md) | Explain the 3 backends, the WS frame protocol, and rolling summarization |
-| 09 | [Testing & operations](09-testing-operations.md) | Run the 382-test suite and auth mode; fix the common failures |
+| 09 | [Testing & operations](09-testing-operations.md) | Run the 573-test suite and auth mode; fix the common failures |
 
-## Every localhost URL (quick reference)
+## 2. Every localhost URL (quick reference)
 
 Start commands are in [02-getting-started.md](02-getting-started.md); this is
 the short map. The **full page** — including how to browse the Qdrant
@@ -57,7 +61,7 @@ Ports without a UI: Redis `6379` (inspect with `docker exec -it
 bench_project-redis-1 redis-cli`), Qdrant gRPC `6334`, Jaeger OTLP ingest
 `4318` (where the app sends spans).
 
-## The 60-second mental model
+## 3. The 60-second mental model
 
 FastAPI serves a WebSocket chat. Each user message becomes an **agent turn**:
 an LLM (a deterministic fake by default, OpenAI's gpt-4.1-nano in the real profile) reasons in a
@@ -71,3 +75,11 @@ observable: structured logs with correlation IDs, Prometheus metrics, OTel
 spans to Jaeger, per-turn stats + cost in the UI, and a replayable audit
 trail. Three interchangeable agent runtimes (custom loop / Pydantic AI /
 LangGraph) implement the same contract, switchable per session.
+
+## 4. Related
+
+- [docs/README.md](../README.md) — the top-level index; this handbook is one of the five folders it points into
+- [theory/README.md](../theory/README.md) — the concepts this handbook assumes, explained from zero
+- [handbook/01 — Project overview](01-project-overview.md) — where the top-to-bottom read through this folder actually starts
+- [reference/tools.md](../reference/tools.md) — the full tool schemas behind chapter 6's inventory
+- [project/documentation-standard.md](../project/documentation-standard.md) — the fourteen rules (adopted 2026-09-04) every chapter in this folder is written to

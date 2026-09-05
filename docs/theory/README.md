@@ -62,7 +62,7 @@ MCP tools (06) enter the same flow: `github__list_pull_requests` and
 `code__search_code` sit in the same tool registry as `search_docs`, so the
 loop in (04) treats them identically.
 
-Every step in that path is traceable and tested — 382 tests, offline, $0
+Every step in that path is traceable and tested — 573 tests, offline, $0
 (2026-09-04, `uv run pytest -q`) — and the retrieval step is additionally
 *measured*: recall@5 = 1.00 on the golden set with the default
 hybrid+rerank configuration (2026-09-04, `uv run python

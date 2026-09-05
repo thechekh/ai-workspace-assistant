@@ -1,6 +1,13 @@
 # 02 — Getting started: every way to run it
 
-## Prerequisites
+**What this chapter covers: every way to bring the app up, from zero
+infrastructure to the full container stack, every `.env` variable, and how
+to fill the knowledge base.** It does not explain why any piece of
+infrastructure was chosen over an alternative — see
+[03 — Every technology](03-technologies.md) for that; this page is about
+running it, not justifying it.
+
+## 1. Prerequisites
 
 | Tool | Why | Check |
 |---|---|---|
@@ -16,7 +23,7 @@ cd frontend && npm install && npm run build && cd ..   # build the UI (served at
 cp .env.example .env                           # then edit (see reference below)
 ```
 
-## The four run modes
+## 2. The four run modes
 
 Each mode adds infrastructure; the app degrades gracefully when something is
 missing (the health dot tells you what's up — chapter 07).
@@ -46,7 +53,9 @@ uv run uvicorn assistant.main:app --reload
 
 Now RAG is real: docs questions retrieve from Qdrant with citations, sessions
 survive restarts, health dot goes green. Browse the vectors at
-http://localhost:6333/dashboard.
+http://localhost:6333/dashboard. The fixture corpus this ingests is exactly
+5 files splitting into 30 chunks (measured 2026-09-05 — see
+[05 — RAG & Qdrant §2](05-rag-qdrant.md) for the reproduction command).
 
 ### Mode C — real model (OpenAI, free)
 
@@ -60,8 +69,9 @@ http://localhost:6333/dashboard.
 Restart the server — that's it. Streaming becomes real inference, the stats
 line under each answer shows **real** token counts (no "(est)") and an
 indicative cost. Rate limits and model quirks are handled automatically
-(chapter 04). Daily budget exhausted? Switch to
-`ASSISTANT_LLM_MODEL=gpt-4o-mini` (separate quota).
+(chapter 04, which also has the full pricing table and what a demo actually
+costs). Daily budget exhausted? Switch to `ASSISTANT_LLM_MODEL=gpt-4o-mini`
+(separate quota).
 
 ### Mode D — observability stack (Jaeger + Prometheus + Grafana)
 
@@ -80,11 +90,30 @@ provisioned dashboard in Grafana (:3000, no login). Chapter 07 is the tour.
 docker compose --profile app up --build   # api + redis + qdrant
 ```
 
-## Filling the knowledge base
+![docker compose ps showing five containers up, and the deep-health JSON with every component ok](../images/localhost-stack.png)
+
+Line by line (captured 2026-09-05,
+[reference/localhost.md §5](../reference/localhost.md)):
+
+- **`docker compose ps`** — five containers `Up`, Redis and Qdrant
+  `(healthy)`.
+- **`"status": "ok"`** — every component `/api/health` checked answered;
+  this is what turns the header dot green.
+- **`"qdrant": … "points": 93`** — a live count from whatever had been
+  ingested at capture time, not the clean 30-chunk fixture corpus above.
+- **`"mcp": … "servers_connected": "2/2"`** and eleven tool names — this
+  particular capture had the *production* GitHub MCP server configured
+  (chapter 06); the bundled dev default here is 5 MCP tools (the `code`
+  server plus the mocked `github` one), and `/api/health` would list those
+  names instead.
+
+## 3. Filling the knowledge base
 
 It starts empty and stays empty until you put something in it. Nothing
 pre-loads it, and nothing re-indexes on a schedule — a document is embedded
-once, when it is uploaded, so there is no batch job to run.
+once, when it is uploaded, so there is no batch job to run (the taskiq
+scheduler that once did this was removed in full — chapter 03 §6 has the
+reasoning).
 
 Four ways in:
 
@@ -105,15 +134,22 @@ never overwrite each other's `README.md`. Public repos work with no token;
 set `ASSISTANT_GITHUB_TOKEN` (fine-grained, read-only) for private ones. It
 is the agent's **only** write capability — additive, and pinned by a test.
 
-## Frontend development
+Worked example, measured 2026-09-05, entirely offline (chunking needs no
+Qdrant): `uv run python -c "from pathlib import Path; from assistant.rag.ingest import load_chunks; print(len(load_chunks(Path('evals/corpus'))))"`
+prints `30` — the 5 Markdown files under
+[evals/corpus/](../../evals/corpus/) are what ingestion path 4 above would
+load, and the number [05 — RAG & Qdrant](05-rag-qdrant.md) evaluates against.
+
+## 4. Frontend development
 
 ```sh
 cd frontend
 npm run dev      # Vite on :5173, hot reload, proxies /chat + /api to :8000
 npm run build    # vue-tsc type check + production bundle -> frontend/dist
+npm run lint && npm run typecheck && npm run test:run   # what CI runs on the frontend job
 ```
 
-## `.env` reference — every variable
+## 5. `.env` reference — every variable
 
 All variables use the `ASSISTANT_` prefix and map 1:1 to
 [config.py](../../src/assistant/config.py). Unset = the shown default.
@@ -153,14 +189,56 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 | `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | *(unset)* | Also export spans to Langfuse (LLM view) |
 | `LANGFUSE_HOST` | `https://cloud.langfuse.com` | Langfuse endpoint; self-hosted instances override it |
 
-## Verify your setup (2 minutes)
+## 6. Verify your setup (2 minutes)
 
 1. `curl localhost:8000/healthz` → `{"status":"ok"}` (process is alive).
 2. `curl localhost:8000/api/health` → every component you expect is `"ok"`
-   (this is what the UI's header dot polls every 10 s).
+   (this is what the UI's header dot polls every 10 s). In Mode A, expect
+   `"qdrant": {"status": "error", "detail": "All connection attempts
+   failed"}` — that is the correct, expected shape of "degraded" with no
+   Qdrant running, not a bug (see Troubleshooting below).
 3. Open http://localhost:8000/ → send `ping` → tokens stream, a stats line
-   appears under the answer.
-4. `uv run pytest -q` → `382 passed` (fully offline, ~25 s).
+   appears under the answer. *That stats line is the same one every other
+   chapter in this handbook points back to.*
+4. `uv run pytest -q` → `573 passed` (fully offline, ~25 s).
 
-Then work through [the testing checklist](../reference/testing.md) — the feature-by-
-feature manual checklist for the mode you're in.
+## 7. Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `"qdrant": {"status": "error", "detail": "All connection attempts failed"}` in `/api/health` | Mode A has no Qdrant container running | expected in Mode A; `docker compose up -d` for Mode B, or ignore if you meant to run offline |
+| `ValueError: ASSISTANT_LLM_API_KEY is required for provider 'openai'` at startup | `.env` sets `ASSISTANT_LLM_PROVIDER=openai` without a key | set `ASSISTANT_LLM_API_KEY`, or switch back to `ASSISTANT_LLM_PROVIDER=fake` |
+| WebSocket closes immediately, reason `missing or invalid token` | `ASSISTANT_AUTH_TOKEN` is set but the page was opened without `?token=` | open `http://localhost:8000/?token=<t>` once; the UI persists it |
+| `401` `missing or invalid bearer token` from `curl .../api/documents` | `ASSISTANT_AUTH_TOKEN` is set; the request has no `Authorization: Bearer <t>` header | add the header, or unset the token for local dev |
+| `429`, `rate limit reached — too many messages. Try again in Ns…` | more than `ASSISTANT_RATE_LIMIT_TURNS_PER_MINUTE` turns in a minute (default 20) | wait, or raise `ASSISTANT_RATE_LIMIT_TURNS_PER_MINUTE` |
+| `400`, `no usable documents in the request. Skipped: […]` from `POST /api/documents` | uploaded a file whose suffix isn't `.md`/`.txt`/`.rst`/`.markdown`, or the bytes weren't UTF-8 text | convert or rename the file; the skip reason is in the same response |
+
+## 8. Reading it honestly
+
+- **Mode A's memory is genuinely gone on restart**, not just slow to load:
+  fakeredis backs the same `SessionStore` interface with a plain in-process
+  dict, so every session, rolling summary and audit row disappears with the
+  process. That is a property of choosing not to run Redis, not a bug.
+- **The rate limiter's identity is coarse when auth is off.** Without
+  `ASSISTANT_AUTH_TOKEN`, both limiters key on `request.client.host`
+  ([api/rate_limit.py](../../src/assistant/api/rate_limit.py)) — every
+  client behind the same proxy or NAT shares one bucket.
+- **`.env` is read once, at process start.** `Settings` is a plain
+  `pydantic-settings` model with no live reload
+  ([config.py](../../src/assistant/config.py)); editing `.env` while the
+  server is running changes nothing until it restarts, and the health dot
+  cannot tell you that your edit hasn't taken effect yet.
+- **Nothing checks that a later mode's assumptions match an earlier mode's
+  data.** Ingesting with one embedder, then switching
+  `ASSISTANT_EMBEDDING_PROVIDER` and asking a question without re-ingesting,
+  is a configuration mistake this chapter does not catch for you — chapter 05
+  explains what actually happens to the collection.
+
+## 9. Related
+
+- [01 — Project overview](01-project-overview.md) — the architecture these run modes bring up
+- [03 — Every technology](03-technologies.md) — why each piece of infrastructure here was chosen
+- [05 — RAG & Qdrant](05-rag-qdrant.md) — what happens inside "filling the knowledge base"
+- [reference/testing.md](../reference/testing.md) — the feature-by-feature manual checklist for the mode you're in
+- [reference/localhost.md](../reference/localhost.md) — every URL the full stack exposes, one page
+- [project/demo-runbook.md](../project/demo-runbook.md) — the demo-day sequence built on these modes

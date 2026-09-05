@@ -177,7 +177,7 @@ difference, in 98 lines.
 - **The offline fake never exercises real tool-choice reasoning.** Its
   routing is keyword heuristics (chapter 01); whether a real model picks the
   right tool from the description alone is only checked when a real
-  provider is configured, not by the 382-test default suite.
+  provider is configured, not by the 573-test default suite.
 
 ## 9. Related
 

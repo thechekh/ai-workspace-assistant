@@ -12,7 +12,7 @@ handbook explains how to run it, the theory course explains the concepts.
 ## Commands
 
 ```sh
-uv run pytest -q                    # 382 tests, offline, no keys, ~20s
+uv run pytest -q                    # 573 tests, offline, no keys, ~20s
 uv run pytest -m "not slow"         # skips real MCP subprocess spawns
 uv run ruff check . && uv run ruff format .
 uv run pyright
@@ -57,9 +57,9 @@ in `ADOPTED` there (add a page to the list when you bring it up to standard).
 
 - `retry-after: 0` is valid and means "retry now" — never test provider
   header values for truthiness.
-- llama models sometimes emit tool calls as plain text (`<function…>`) or
-  trip OpenAI's `tool_use_failed`; `llm/client.py` retries and salvages both.
-  Do not "simplify" that away.
+- Some OpenAI-compatible providers and models emit tool calls as plain text
+  (`<function…>`) or abort the stream with `tool_use_failed`;
+  `llm/client.py` retries and salvages both. Do not "simplify" that away.
 - `WebSocketDisconnect` subclasses `Exception`; catch it explicitly before
   any broad handler or routine disconnects pollute the error metrics.
 - Importing `assistant.main` must stay side-effect free — the app is built

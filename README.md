@@ -164,14 +164,17 @@ is just the `ASSISTANT_MCP_SERVERS` JSON in
 `.env` (see `.env.example`) — no code changes. Unreachable servers are
 skipped with a warning; the agent keeps running with the tools it has.
 
-## Using a real (free) model
+## Using a real model
 
 ```sh
-cp .env.example .env
+cp .env.production.example .env   # the real profile: OpenAI, real embeddings, hosted GitHub MCP, Jaeger
 # set in .env:
-#   ASSISTANT_LLM_PROVIDER=openai
-#   ASSISTANT_LLM_API_KEY=sk-...   # free key from platform.openai.com/api-keys
+#   ASSISTANT_LLM_API_KEY=sk-...   # platform.openai.com/api-keys; gpt-4.1-nano is the default model
 ```
+
+A demo turn with one tool call costs about $0.001 on `gpt-4.1-nano`
+(measured 2026-09-05, [backend-comparison.md](docs/reference/backend-comparison.md)).
+The `fake` provider remains the default for development and tests.
 
 ## Development
 

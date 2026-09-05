@@ -150,8 +150,10 @@ the existing link, coverage and consistency tests, one file per concern.
 inside the test file. A page is added to the list when it has been brought
 up to the standard, and it can never fall back — that is the whole
 mechanism. The image test runs across every page, because an unlabeled or
-unused image is wrong anywhere. Adopted today: `reference/ragas.md`,
-`reference/logfire-langfuse.md`, and this page.
+unused image is wrong anywhere. The `ADOPTED` list in the test file is the
+authoritative record of which pages are held to the standard; on
+2026-09-05 it covered every page in `reference/`, `theory/`, `project/`
+and `handbook/` — 36 pages, with `qanda/` exempt.
 
 **The review checklist** — the eight rules no test can judge, to read before
 committing a page: 3 worked example on our data · 6 file table + run
@@ -173,11 +175,15 @@ for reasons · 9 losing alternatives named · 10 the negative case shown ·
    tests/test_docs_consistency.py -q`, fix what fails.
 5. Commit the page and the ratchet change together.
 
-Order of work, furthest from the standard first:
-[reference/tools.md](../reference/tools.md) and
-[reference/security.md](../reference/security.md) (older reference pages
-without captures or a demo script), then the theory chapters that quote
-numbers without a date, then the handbook chapters.
+The order the first pass took, furthest from the standard first: the older
+reference pages ([tools.md](../reference/tools.md) and
+[security.md](../reference/security.md) had no captures and no demo
+script), then the theory chapters that quoted numbers without a date, then
+the project records, then the handbook chapters. Reference pages were
+rewritten by hand with measurements and captures from real runs; theory,
+project and handbook pages were brought up by coding agents working from
+this page, each agent's output audited with the snippet in §4 before the
+page was adopted.
 
 Known debt for that pass: no browser capture of the current UI exists. The
 last UI screenshot predated the Groq and Re-index removals and was deleted on

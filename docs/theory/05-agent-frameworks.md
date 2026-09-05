@@ -39,7 +39,7 @@ Every backend receives the same tools, the same history, and must emit the
 same event stream. Consequences:
 
 - The **same WebSocket test suite runs ×3** — identical assertions pass on
-  every runtime (the 382-test suite includes the WS suite parametrized ×3).
+  every runtime (the 573-test suite includes the WS suite parametrized ×3).
 - The UI **switches runtimes per session** with a dropdown — same question,
   three frameworks, live.
 - The choice of framework stays **reversible** — an architecture property,

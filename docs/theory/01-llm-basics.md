@@ -134,7 +134,7 @@ Why this is good engineering, not a shortcut:
   work?"** (sessions, streaming, tool loop, retrieval — testable
   deterministically) from **"is the model smart?"** (a model-quality
   question you evaluate separately).
-- All **382 tests** run in seconds, offline, at $0 — no flaky network, no
+- All **573 tests** run in seconds, offline, at $0 — no flaky network, no
   burnt quota, no nondeterministic assertions
   (`uv run pytest -q -p no:cacheprovider`, 2026-09-04).
 - The demo works on a train. With an OpenAI key it becomes a real model with
@@ -171,7 +171,7 @@ prompt instructing the model to say so when the docs don't cover something.
 
 ## 10. Reading it honestly
 
-- **The fake provider proves plumbing, not model quality.** All 382 tests
+- **The fake provider proves plumbing, not model quality.** All 573 tests
   passing offline says the tool loop, streaming and memory work; it says
   nothing about whether a real model reasons well. That question is
   answered separately, on demand, and only when a key exists —

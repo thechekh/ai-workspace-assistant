@@ -166,7 +166,7 @@ empty window the assistant nonetheless remembered.
   rather than hiding it (§4).
 - **All of the above is pinned by tests, not just read from the code.**
   Session resume, the cancel path and the invalid-frame handling in §2–§4
-  are each one assertion inside the 382-test offline suite (2026-09-04,
+  are each one assertion inside the 573-test offline suite (2026-09-04,
   `uv run pytest -q`) — the number this whole protocol has to keep passing
   against every time it changes.
 
