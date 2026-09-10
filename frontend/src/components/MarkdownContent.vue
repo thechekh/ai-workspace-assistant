@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import "highlight.js/styles/github-dark.css";
 
-import { onBeforeUnmount, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 import { copyToClipboard } from "../lib/clipboard";
 import { renderMarkdown } from "../lib/markdown";
 
 const props = defineProps<{ source: string; streaming?: boolean }>();
+// Parsing is deferred to an animation frame while streaming, so the bubble
+// grows *after* the transcript said it changed. Without telling anyone, the
+// chat window autoscrolls to a height the answer then exceeds — the last
+// couple of lines and the stats line end up below the fold.
+const emit = defineEmits<{ rendered: [] }>();
 
 // markdown-it and highlight.js run over the whole answer on every parse, and
 // tokens can arrive faster than frames are painted. While streaming, parses
@@ -18,6 +23,7 @@ let frame: number | null = null;
 function render(): void {
   frame = null;
   html.value = renderMarkdown(props.source);
+  void nextTick(() => emit("rendered"));
 }
 
 watch([() => props.source, () => props.streaming], ([, streaming]) => {

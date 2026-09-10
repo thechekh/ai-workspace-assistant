@@ -7,6 +7,9 @@ import type { AssistantItem, AuditEvent, TurnEvent, UserItem } from "../types";
 import MarkdownContent from "./MarkdownContent.vue";
 
 const props = defineProps<{ item: UserItem | AssistantItem }>();
+/** Relayed from the markdown body: it renders a frame late, so the bubble's
+ *  final height is only known here. */
+const emit = defineEmits<{ rendered: [] }>();
 const chat = useChatStore();
 
 // "Explain this turn": lazily fetch the audit timeline on first expand.
@@ -80,7 +83,11 @@ function describeEvent(event: AuditEvent): string {
     <div class="avatar">{{ item.kind === "user" ? "You" : "AI" }}</div>
     <div class="bubble" :title="receivedAt(item.at)">
       <template v-if="item.kind === 'assistant'">
-        <MarkdownContent :source="item.text" :streaming="item.streaming" />
+        <MarkdownContent
+          :source="item.text"
+          :streaming="item.streaming"
+          @rendered="emit('rendered')"
+        />
         <span v-if="item.streaming" class="cursor">▍</span>
         <!-- Visible in both modes: an answer cut short must never read as a
              complete one, whether or not the dev stats line is showing. -->

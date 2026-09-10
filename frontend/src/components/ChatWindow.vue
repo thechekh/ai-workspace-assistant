@@ -39,9 +39,15 @@ const tail = computed(() => {
   return `${items.length}:${last.id}:${chars}`;
 });
 
+/** Stay at the bottom when the content grew under us — never steal the view
+ *  back from a reader who has scrolled up. */
+function followIfAtBottom(): void {
+  if (following.value) scrollToBottom();
+}
+
 watch(tail, async () => {
   await nextTick();
-  if (following.value) scrollToBottom();
+  followIfAtBottom();
 });
 
 // A different conversation always opens at its end.
@@ -81,7 +87,7 @@ watch(
           retry
         </button>
       </div>
-      <ChatMessage v-else :item="item" />
+      <ChatMessage v-else :item="item" @rendered="followIfAtBottom" />
     </template>
     <button v-if="!following" class="jump-latest" type="button" @click="scrollToBottom">
       ↓ jump to latest

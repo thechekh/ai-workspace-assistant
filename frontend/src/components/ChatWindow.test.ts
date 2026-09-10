@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useChatStore } from "../stores/chat";
 import { FakeWebSocket } from "../test/fake-socket";
+import ChatMessage from "./ChatMessage.vue";
 import ChatWindow from "./ChatWindow.vue";
 
 let wrapper: VueWrapper | null = null;
@@ -117,6 +118,34 @@ describe("ChatWindow", () => {
     fakeGeometry(scroller, 670);
     await wrapper.find("main.chat").trigger("scroll");
     expect(wrapper.find(".jump-latest").exists()).toBe(false);
+  });
+
+  it("re-follows when the markdown body finishes rendering a frame late", async () => {
+    // The bubble parses its markdown on an animation frame, so it grows after
+    // the transcript said it changed. Without this the view autoscrolled to a
+    // height the answer then exceeded, leaving the last lines — and the stats
+    // line — just below the fold. Seen while retaking the docs screenshots.
+    const { wrapper, chat, socket } = mountWindow();
+    const scroller = wrapper.find("main.chat").element;
+    const scrollTo = vi.fn();
+    Object.defineProperty(scroller, "scrollTo", { value: scrollTo, configurable: true });
+
+    chat.sendMessage("hello");
+    socket.deliver({ type: "final", content: "# Title\n\nbody" });
+    await flushPromises();
+    scrollTo.mockClear();
+
+    wrapper.findComponent(ChatMessage).vm.$emit("rendered");
+    await flushPromises();
+    expect(scrollTo).toHaveBeenCalled();
+
+    // ...but a reader who scrolled up keeps their place.
+    fakeGeometry(scroller, 100);
+    await wrapper.find("main.chat").trigger("scroll");
+    scrollTo.mockClear();
+    wrapper.findComponent(ChatMessage).vm.$emit("rendered");
+    await flushPromises();
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 
   it("offers retry on the latest error row, resending the last question", async () => {
