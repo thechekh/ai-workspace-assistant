@@ -5,7 +5,7 @@ what you should see — from a laptop with nothing installed to the full
 observability stack, plus what the automated suite already covers so you do
 not repeat it.** The suite itself and the test-file map are in
 [handbook/09](../handbook/09-testing-operations.md); every tool's exact
-behaviour is in [tools.md](tools.md). Checked against the running app on
+behavior is in [tools.md](tools.md). Checked against the running app on
 2026-09-05.
 
 ## 1. What the checklist is
@@ -85,7 +85,7 @@ once per shell, then the same `uv run` command.
 
 | Run | Wall clock | Cost |
 |---|---|---|
-| the suite, `uv run pytest -q` (2026-09-05) | 24.5 s, 392 passed and 1 skipped | nothing |
+| the suite, `uv run pytest -q` (2026-09-10) | 28.2 s, 621 passed, nothing skipped | nothing |
 | Tier A startup | ~3 s | nothing |
 | Tier B, `docker compose up -d` from a warm image cache | ~10 s until Redis and Qdrant report healthy | nothing |
 | one Tier C turn with a tool call | 4–5 s | $0.001–0.002 |
@@ -93,13 +93,15 @@ once per shell, then the same `uv run` command.
 
 ## 5. How to see it
 
-![The suite tail and the Tier A deep-health JSON: 392 passed, and a degraded status whose only error is the absent Qdrant](../images/testing-suite-and-health.png)
+![The suite tail and the Tier A deep-health JSON: 621 passed, and a degraded status whose only error is the absent Qdrant](../images/testing-suite-and-health.png)
 
 Line by line:
 
-- **`392 passed, 1 skipped in 24.50s`** — the whole suite, offline: no
-  network, no Docker, no keys. The skip is a documentation test that
-  applies only to pages with a troubleshooting section.
+- **`621 passed in 28.24s`** — the whole suite, offline: no network, no
+  Docker, no keys, and nothing skipped. "Offline" is enforced rather than
+  assumed: a fixture in `tests/conftest.py` blocks any connect to a
+  non-loopback address, so a test that loses its mock fails instead of
+  quietly reaching a provider.
 - **`"status": "degraded"`** — Tier A health. Degraded is the *expected*
   state without Qdrant; it is what the amber header dot means.
 - **`"redis": {"status": "ok"}`** — fakeredis answers like Redis; the
@@ -163,7 +165,7 @@ Line by line:
 - [ ] **Health dot**: amber — hover: `redis: ok`, `qdrant: error`,
       `mcp: ok`. `curl localhost:8000/api/health` shows the same JSON.
 - [ ] **Backend switcher**: custom → pydantic_ai → langgraph, one message on
-      each → same behaviour, the stats-line tooltip names the new backend, the
+      each → same behavior, the stats-line tooltip names the new backend, the
       session survives the switch.
 - [ ] **Session resume**: reload → same session id, history intact (fakeredis
       keeps it until the *server* restarts). **New session** clears.
@@ -295,7 +297,7 @@ only:
 | the socket closes with code `1008` | auth is on and the page was opened without `?token=` | open `/?token=<secret>` once |
 | chat: *"Model not available — check ASSISTANT_LLM_MODEL. Provider says: …"* | a model name typo or a model your key cannot use | fix `ASSISTANT_LLM_MODEL`, restart |
 | chat: *"LLM authentication failed"* | bad or missing `ASSISTANT_LLM_API_KEY` | fix the key, restart |
-| an `error` frame: `rate limit reached — too many chat turns. Try again in 60s …` | the app's own per-session limit (20 turns a minute) | wait, or raise `ASSISTANT_RATE_LIMIT_TURNS_PER_MINUTE` |
+| an `error` frame: `rate limit reached — too many chat turns. Try again in 60s …` | the app's own per-caller limit (20 turns a minute) | wait, or raise `ASSISTANT_RATE_LIMIT_TURNS_PER_MINUTE` |
 | health dot amber, `redis: error` | Docker Desktop died (it does, on this machine) | start Docker Desktop, `docker compose up -d`, restart `uvicorn` |
 | the UI shows a button the docs do not mention | the served bundle is stale | `cd frontend && npm run build`, restart |
 

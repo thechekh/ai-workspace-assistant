@@ -22,12 +22,12 @@ recur below where each layer produced them.
 **The 10-minute version.** If you only have ten minutes before you present,
 read these six:
 
-1. [`api/ws.py` → `_handle_turn`](../../src/assistant/api/ws.py#L173) — the conductor
-2. [`agent/backends/custom.py` → `CustomAgent.run`](../../src/assistant/agent/backends/custom.py#L53) — the agent loop, 45 lines
+1. [`api/ws.py` → `_handle_turn`](../../src/assistant/api/ws.py#L213) — the conductor
+2. [`agent/backends/custom.py` → `CustomAgent.run`](../../src/assistant/agent/backends/custom.py#L55) — the agent loop, 45 lines
 3. [`agent/tools/base.py` → `Tool.run`](../../src/assistant/agent/tools/base.py#L52) — the one seam every tool call passes through
-4. [`rag/retriever.py` → `search`](../../src/assistant/rag/retriever.py#L43) — retrieve → rerank → gate
-5. [`llm/client.py` → `stream_step`](../../src/assistant/llm/client.py#L334) — the provider hardening
-6. [`telemetry.py` → `InstrumentedLLM`](../../src/assistant/telemetry.py#L103) — how every number gets measured
+4. [`rag/retriever.py` → `search`](../../src/assistant/rag/retriever.py#L48) — retrieve → rerank → gate
+5. [`llm/client.py` → `stream_step`](../../src/assistant/llm/client.py#L335) — the provider hardening
+6. [`telemetry.py` → `InstrumentedLLM`](../../src/assistant/telemetry.py#L111) — how every number gets measured
 
 Line numbers are checked by a test that fails when an anchor points at a
 blank line, but they still drift as code moves; the symbol name in each
@@ -37,19 +37,19 @@ heading always finds the spot.
 
 ### Step 0 — The app boots
 
-**[`main.py` → `create_app`](../../src/assistant/main.py#L174)** and
-**[`build_runtime`](../../src/assistant/main.py#L93)**
+**[`main.py` → `create_app`](../../src/assistant/main.py#L218)** and
+**[`build_runtime`](../../src/assistant/main.py#L123)**
 
 `create_app` is a factory, not a module-level app. Everything a request
 needs is assembled once in `build_runtime` into a
-[`Runtime` dataclass](../../src/assistant/main.py#L53) — Redis, the LLM
+[`Runtime` dataclass](../../src/assistant/main.py#L69) — Redis, the LLM
 client, the session store, memory, the three agent backends, the HTTP
 client, Qdrant, the MCP registry — and released in order by
 `Runtime.aclose`. Two deliberate details: the keyword overrides
 (`redis_client=`, `llm=`, `retriever=`) let tests substitute whole
 collaborators — fakeredis, `FakeLLM`, in-memory Qdrant — without the factory
 growing `if x is None` branches; and
-[`__getattr__`](../../src/assistant/main.py#L241) builds the app lazily, so
+[`__getattr__`](../../src/assistant/main.py#L286) builds the app lazily, so
 `uvicorn assistant.main:app` still works while *importing* the module no
 longer reads a developer's `.env`, reconfigures logging or installs a
 tracer. That was a real bug: the suite was picking up local `.env` files.
@@ -61,7 +61,7 @@ imports the module. Lazy construction is what lets the suite run with no
 
 ### Step 1 — A browser connects
 
-**[`api/ws.py` → `chat_endpoint`](../../src/assistant/api/ws.py#L40)**
+**[`api/ws.py` → `chat_endpoint`](../../src/assistant/api/ws.py#L53)**
 
 The connection is accepted, then optionally authenticated: browsers cannot
 set WebSocket headers, so the token arrives as `?token=` and is compared
@@ -80,7 +80,7 @@ acceptable, and [security.md](security.md) lists it.
 
 ### Step 2 — The message arrives, and the loop stays free
 
-**[`chat_endpoint`'s receive loop](../../src/assistant/api/ws.py#L79)**
+**[`chat_endpoint`'s receive loop](../../src/assistant/api/ws.py#L102)**
 
 ```
 raw = await websocket.receive_text()
@@ -93,7 +93,7 @@ incoming = TypeAdapter(ClientMessage).validate_json(raw)
 lines down: the turn is started as an **`asyncio.Task`**, not awaited
 inline. A loop that awaits the answer cannot read the next frame, and
 reading the next frame is the only way a `cancel` can arrive mid-stream. A
-[done-callback](../../src/assistant/api/ws.py#L163) retrieves the task's
+[done-callback](../../src/assistant/api/ws.py#L156) retrieves the task's
 exception so a failure cannot vanish into asyncio's "Task exception was
 never retrieved" at garbage-collection time.
 
@@ -103,8 +103,8 @@ frame needs a channel back to the server, which is what a WebSocket is.
 
 ### Step 3 — The budget guard
 
-**[`_within_rate_limit`](../../src/assistant/api/ws.py#L142)** →
-**[`RateLimiter.check`](../../src/assistant/api/rate_limit.py#L49)**
+**[`_within_rate_limit`](../../src/assistant/api/ws.py#L168)** →
+**[`RateLimiter.check`](../../src/assistant/api/rate_limit.py#L69)**
 
 Checked *before* the turn starts, so a runaway client costs one Redis
 round trip instead of an LLM call. A sliding-window log in a sorted set,
@@ -119,7 +119,7 @@ stuck client; the provider's 429 is handled separately in step 7.
 
 ### Step 4 — The conductor
 
-**[`_handle_turn`](../../src/assistant/api/ws.py#L173)**
+**[`_handle_turn`](../../src/assistant/api/ws.py#L213)**
 
 Owns the socket, the `agent.turn` span, error mapping and persistence. The
 *accounting* lives elsewhere, in
@@ -151,7 +151,7 @@ When the un-summarized tail exceeds `history_char_budget` (8,000
 characters), everything but the last `history_keep_recent` (6) messages is
 folded into a persisted summary, so each message is summarized at most
 once. The user message is appended to
-[`SessionStore`](../../src/assistant/memory/session.py#L48) *before* the
+[`SessionStore`](../../src/assistant/memory/session.py#L31) *before* the
 agent runs, in the same pipeline that updates the recency index behind the
 Chats panel. This turn's prompt was 8,380 tokens across both steps — the
 system prompt, the tool schemas, the question, and after step 8 the tool
@@ -163,7 +163,7 @@ identically on all three backends.
 
 ### Step 6 — The agent loop
 
-**[`CustomAgent.run`](../../src/assistant/agent/backends/custom.py#L53)**
+**[`CustomAgent.run`](../../src/assistant/agent/backends/custom.py#L55)**
 
 45 lines, no framework, and worth reading in full because it *is* the ReAct
 pattern: stream an LLM step; text deltas become `TokenEvent`s forwarded to
@@ -177,14 +177,14 @@ round twice: step one produced a `search_docs` call, step two the answer.
 this is the mechanism the frameworks wrap, and 45 readable lines you can
 debug beat a black box for a system you have to defend. Both frameworks are
 *also* implemented here against the same
-[`AgentBackend` protocol](../../src/assistant/agent/base.py#L68);
+[`AgentBackend` protocol](../../src/assistant/agent/base.py#L78);
 [backend-comparison.md](backend-comparison.md) measured the same question
 on all three at about $0.0009 each.
 
 ### Step 7 — The LLM call, and the hardening around it
 
-**[`InstrumentedLLM.stream_step`](../../src/assistant/telemetry.py#L103)**
-wraps **[`OpenAICompatibleLLM.stream_step`](../../src/assistant/llm/client.py#L334)**
+**[`InstrumentedLLM.stream_step`](../../src/assistant/telemetry.py#L111)**
+wraps **[`OpenAICompatibleLLM.stream_step`](../../src/assistant/llm/client.py#L335)**
 
 Every provider here speaks the OpenAI-compatible API, so one client covers
 `openai`, `ollama` and `gemini` and the provider is a config value. The
@@ -196,17 +196,17 @@ even when the turn is abandoned mid-stream. In the log this step is the
 and again at `11:51:50.901` for the answer.
 
 Inside the client, three pieces of hardening that all came from real
-failures: [`_create_stream`](../../src/assistant/llm/client.py#L404) — 429
+failures: [`_create_stream`](../../src/assistant/llm/client.py#L407) — 429
 backoff honouring `Retry-After` (`retry-after: 0` is valid and means "retry
 now", so it is tested against `None`, never truthiness) and a retry without
 `stream_options` for providers that reject it; a `tool_use_failed` retry
 and salvage — some OpenAI-compatible providers abort the stream on a
 malformed tool call, so the step is retried twice and then the model's
 attempt is recovered from the `failed_generation` payload; and
-[`_LeakedTextBuffer`](../../src/assistant/llm/client.py#L227) — some models
+[`_LeakedTextBuffer`](../../src/assistant/llm/client.py#L228) — some models
 print a tool call as prose (`<function=name>{...}`), so leading text is
 withheld only while it could still be that markup, and
-[`parse_leaked_tool_calls`](../../src/assistant/llm/client.py#L132)
+[`parse_leaked_tool_calls`](../../src/assistant/llm/client.py#L133)
 recovers all four opener variants seen in the wild.
 
 **If asked — "what breaks with real models that didn't with fakes?"**
@@ -239,22 +239,22 @@ is `eval`'d.
 
 ### Step 9 — Retrieval
 
-**[`make_search_docs`](../../src/assistant/agent/tools/search_docs.py#L100)** →
-**[`Retriever.search`](../../src/assistant/rag/retriever.py#L43)**
+**[`make_search_docs`](../../src/assistant/agent/tools/search_docs.py#L92)** →
+**[`Retriever.search`](../../src/assistant/rag/retriever.py#L48)**
 
 The pipeline, in order, with this turn's timings:
 
 1. **Embed the query** — in the real profile `text-embedding-3-small`, the
    `POST …/v1/embeddings` at `11:51:49.605`, most of the retrieval's second;
-   offline, [`HashEmbedder`](../../src/assistant/rag/embeddings.py#L32) does
+   offline, [`HashEmbedder`](../../src/assistant/rag/embeddings.py#L39) does
    signed feature hashing into 512 dimensions, free and deterministic.
-   [`build_embedder`](../../src/assistant/rag/embeddings.py#L98) chooses from
+   [`build_embedder`](../../src/assistant/rag/embeddings.py#L113) chooses from
    config.
 2. **Sparse-encode it** ([`sparse.py`](../../src/assistant/rag/sparse.py)),
    with a tokenizer that splits `completedPercentage` into its words so
    identifiers match literally.
 3. **Query Qdrant once** —
-   [`VectorStore.search`](../../src/assistant/rag/store.py#L128) issues dense
+   [`VectorStore.search`](../../src/assistant/rag/store.py#L127) issues dense
    and sparse prefetches and fuses them server-side with RRF: the
    `POST …/points/query` at `11:51:49.627`, 22 ms later answered.
 4. **Rerank** — [`LexicalReranker`](../../src/assistant/rag/rerank.py#L51)
@@ -267,9 +267,9 @@ The pipeline, in order, with this turn's timings:
    top source `cassidoo/todometer/RELEASE-DOCS.md`.
 
 What is *in* the index got there through
-[`chunk_markdown`](../../src/assistant/rag/chunking.py#L73) — heading-aware,
+[`chunk_markdown`](../../src/assistant/rag/chunking.py#L80) — heading-aware,
 the breadcrumb prefixed to the embedded text — and
-[`ingest_chunks`](../../src/assistant/rag/ingest.py#L38), which deletes a
+[`ingest_chunks`](../../src/assistant/rag/ingest.py#L41), which deletes a
 source before re-adding it: deterministic ids alone were not enough, because
 shortening a document left orphaned chunks that stayed searchable.
 
@@ -303,7 +303,7 @@ before deciding to call a tool.
 `summary()` produces the `turn` frame — `llm_steps=2`, `tool_calls=['search_docs']`,
 `prompt_tokens=8380`, `completion_tokens=175`, `cost_usd=0.000908`,
 `duration_ms=4455` — and `record()` adds the event timeline, stored by
-[`append_turn`](../../src/assistant/memory/session.py#L120) and capped at 50
+[`append_turn`](../../src/assistant/memory/session.py#L126) and capped at 50
 turns per session. `GET /api/sessions/{id}/turns/{turn_id}` serves it back;
 that is what the *details* panel renders. The same numbers become the
 `turn.summary` log line and the Prometheus counters. Cancelled and failed
@@ -422,6 +422,8 @@ Metrics are always on and scraped from `/metrics`:
 Line by line — the *AI Workspace Assistant* dashboard, last 15 minutes,
 captured 2026-09-05 after three turns:
 
+- **Four stat tiles in the capture, five on the dashboard today** — a
+  *Cost (USD, indicative)* tile was added on 2026-09-07, after this capture.
 - **Turns 3 · Tokens 40630 · Tool calls 5 · Errors 0** — the stat tiles are
   `increase()` over the window: three turns, five tool calls between them
   (one turn used two tools), no user-visible failure.

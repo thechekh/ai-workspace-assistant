@@ -210,7 +210,7 @@ caused it — the same discipline as the retrieval trend.
 
 The scoring itself needs a real model, so it lives outside the suite — but
 everything around it is where the bugs would be, and that runs in the normal
-573-test suite with no key and no Ragas installed: the dataset matches
+621-test suite with no key and no Ragas installed: the dataset matches
 Ragas' field contract exactly (`user_input` / `retrieved_contexts` /
 `response`, asserted as literal strings so a rename fails here instead of
 producing an empty score two hundred calls later), unanswerable questions are
@@ -278,7 +278,7 @@ measured on.
 
 ## 8. Reading the number honestly
 
-LLM-as-judge has known failure modes, and a defence should name them before
+LLM-as-judge has known failure modes, and a defense should name them before
 someone else does:
 
 - **Self-preference.** The same model answers and judges here. That is the
@@ -320,5 +320,5 @@ reading the demo cover that side.
 - [metrics.md](metrics.md) — every quality number, what each one hides, and the measured retrieval table
 - [handbook/09 — Testing & operations](../handbook/09-testing-operations.md) — where this sits among the test tiers
 - [theory/09 — Observability & evals](../theory/09-observability-and-evals.md) — the concepts
-- [qanda/README.md](../qanda/README.md) — the eval questions in the defence bank (Part 1, questions 1 and 2)
+- [qanda/README.md](../qanda/README.md) — the eval questions in the defense bank (Part 1, questions 1 and 2)
 - [tests/test_ragas_harness.py](../../tests/test_ragas_harness.py) — the offline tests

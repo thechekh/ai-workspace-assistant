@@ -11,7 +11,7 @@ documentation; what the documentation *covers* is the index,
 
 Three facts about this repository make it worth writing the rules down:
 
-- **The docs are the workshop handbook and the defence material.** A page
+- **The docs are the workshop handbook and the defense material.** A page
   that explains a mechanism without showing it, or quotes a number without
   saying where it came from, is a page someone will be caught out on.
 - **The docs are tested.** Links, coverage of every setting and tool, and
@@ -97,7 +97,7 @@ enforced — *tested* (fails the build, see §4) or *reviewed* (the checklist).
 
 11. **Name the limitations before someone else does.** A "reading it
     honestly" section: known failure modes, what the thing does *not*
-    measure or do, the sample-size caveat. This is the section a defence is
+    measure or do, the sample-size caveat. This is the section a defense is
     judged on. — ragas.md §8. *Reviewed.*
 
 12. **Troubleshooting rows quote the real message.** Only failures that were

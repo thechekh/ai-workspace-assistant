@@ -202,7 +202,7 @@ tree rather than a fixture copy of it.
   handler -> str)` (prefix failures with `error:`), append it in
   `native_tools` in `build_runtime()`. Telemetry, guards, and all three backends
   come free.
-- **MCP**: write `@mcp.tool()` functions on a `FastMCP` server (docstring =
+- **MCP**: write `@mcp.tool()` functions on an `MCPServer` (docstring =
   description, type hints = schema — see
   [code_search.py](../../src/assistant/mcp_servers/code_search.py)), add the
   server to `ASSISTANT_MCP_SERVERS`. Or point at any existing MCP server.
@@ -281,7 +281,7 @@ it, and the answer quotes it. Three LLM steps, $0.0015, about five seconds
   model stopped searching ingested repositories until the sentence was
   removed (measured 2026-09-04,
   [reference/tools.md §8](../reference/tools.md)). The description is a
-  prompt; treat edits to it as behaviour changes and test them with a real
+  prompt; treat edits to it as behavior changes and test them with a real
   model, not just offline.
 - **The duplicate guard is exact-match only.** A retry with a rephrased
   query is a new call, by design — the retry contract asks for different

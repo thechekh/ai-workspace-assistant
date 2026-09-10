@@ -55,6 +55,21 @@ SDK use its own default." Streaming, tool calls, and usage reporting ride the
 same code path everywhere.
 *Where:* [llm/client.py](../../src/assistant/llm/client.py) (`PROVIDER_BASE_URLS`).
 
+### `httpx` and `httpx2` — two HTTP clients, on purpose
+Our own outbound calls (`fetch_url`, the GitHub reads, the Voyage embedder)
+use **httpx**. The OpenAI SDK moved its transport to **httpx2** in 3.0 and
+the MCP SDK did the same in 2.0, and the two libraries' types are not
+interchangeable — the timeout handed to `AsyncOpenAI` and the client handed
+to `streamable_http_client` must be httpx2's, or the call fails a type check
+at the boundary. Staying on httpx for our own code is what keeps `respx`
+usable for mocking it; httpx2 gets an `httpx2.MockTransport` in the tests
+that need it. Both are declared in `pyproject.toml` rather than relied on
+transitively, because both are imported directly.
+*Where:* [llm/client.py](../../src/assistant/llm/client.py) and
+[mcp/registry.py](../../src/assistant/mcp/registry.py) (httpx2);
+[agent/tools/fetch.py](../../src/assistant/agent/tools/fetch.py) and
+[rag/repo.py](../../src/assistant/rag/repo.py) (httpx).
+
 ### Redis (redis-py asyncio) / fakeredis
 Session transcripts, the rolling summary, and the per-turn audit trail — all
 keyed by `session_id` with a 24 h TTL. Chosen over in-process dicts (lost on

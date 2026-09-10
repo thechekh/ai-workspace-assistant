@@ -12,18 +12,18 @@ handbook explains how to run it, the theory course explains the concepts.
 ## Commands
 
 ```sh
-uv run pytest -q                    # 573 tests, offline, no keys, ~20s
+uv run pytest -q                    # 621 tests, offline, no keys, ~20s
 uv run pytest -m "not slow"         # skips real MCP subprocess spawns
 uv run ruff check . && uv run ruff format .
 uv run pyright
 uv run uvicorn assistant.main:app --reload
-cd frontend && npm run lint && npm run typecheck && npm run test:run
+cd frontend && npm run lint && npm run typecheck && npm run test:coverage
 ```
 
 Everything runs with `ASSISTANT_LLM_PROVIDER=fake` and
 `ASSISTANT_REDIS_URL=fakeredis://` — no network, no containers, no cost.
 Prefer that for development; use a real provider only when evaluating model
-behaviour.
+behavior.
 
 ## Invariants worth preserving
 
@@ -31,7 +31,7 @@ behaviour.
   a change that will not be tested.
 - **One seam per concern.** `Tool.run` owns tool telemetry and guards;
   `InstrumentedLLM` owns LLM telemetry; `llm/errors.py` owns provider-error
-  classification. Add behaviour there, not in each call site.
+  classification. Add behavior there, not in each call site.
 - **Three backends, one contract.** Anything added to one agent runtime must
   hold for all three — `tests/test_fake_parity.py` and the ×3-parametrized WS
   suite exist because a hand-copied fake silently drifted once.
@@ -64,3 +64,15 @@ in `ADOPTED` there (add a page to the list when you bring it up to standard).
   any broad handler or routine disconnects pollute the error metrics.
 - Importing `assistant.main` must stay side-effect free — the app is built
   lazily via module `__getattr__` so tests do not read a developer's `.env`.
+- **Two HTTP clients, deliberately.** The OpenAI SDK (3.0) and the MCP SDK
+  (2.0) moved to `httpx2`; our own outbound calls stay on `httpx`, where
+  `respx` can mock them. The types are not interchangeable — the timeout
+  handed to `AsyncOpenAI` and the client handed to `streamable_http_client`
+  must be httpx2's. Mock httpx2 with `httpx2.MockTransport`, not respx.
+- A test that loses its mock used to reach the real provider silently. It
+  cannot now: an autouse fixture in `tests/conftest.py` refuses any connect
+  to a non-loopback address. If you see that error, fix the mock — do not
+  weaken the guard.
+- MCP SDK v2 renamed the server class back to `MCPServer`
+  (`mcp.server.mcpserver`) and its result fields to snake_case
+  (`is_error`, `input_schema`); the camelCase aliases still work but warn.

@@ -14,7 +14,7 @@ This is a **local, internal-network tool** with real structural controls
 and deliberately unbuilt perimeter controls. Structural: an allowlisted tool
 surface that is read-only except for one additive write, server-side
 execution of everything the model asks for, a path jail, an outbound-URL
-guard, input bounds, per-session rate limits, and dependency scanning on
+guard, input bounds, per-caller rate limits, and dependency scanning on
 every push. Not built, on purpose: SSO, per-user isolation, content
 sanitisation of ingested documents — the things a production deployment
 adds at the gateway, listed with their reasons in §8.
@@ -62,9 +62,13 @@ narrower request, so the worst case is bounded for native and MCP tools
 alike. The incident that motivated it is in [tools.md §6](tools.md).
 
 **Rate limiting: a budget guard, not access control.** Two sliding windows
-in Redis — per session for chat turns (`ASSISTANT_RATE_LIMIT_TURNS_PER_MINUTE`,
-default 20) and per caller for indexing writes
-(`ASSISTANT_RATE_LIMIT_UPLOADS_PER_HOUR`, default 50). The check runs
+in Redis, both keyed by the caller (the bearer token when auth is on, the
+peer address otherwise) — for chat turns (`ASSISTANT_RATE_LIMIT_TURNS_PER_MINUTE`,
+default 20) and for indexing writes
+(`ASSISTANT_RATE_LIMIT_UPLOADS_PER_HOUR`, default 50). Turns used to be
+keyed by the session id, which a client could rotate to sidestep the
+budget; a session id is now only ever resumed when it is one the server
+minted. The check runs
 *before* any LLM call, so a stuck client is refused for the price of one
 Redis round trip. A sliding log rather than `INCR`+`EXPIRE`, because a fixed
 window lets a burst across its boundary through at twice the limit; in
@@ -97,10 +101,12 @@ keep the token's own scopes read-only regardless.
 **Authentication.** Optional bearer token (`ASSISTANT_AUTH_TOKEN`). When
 set, mutating and read-sensitive routes need `Authorization: Bearer` and the
 chat WebSocket needs `?token=`, since browsers cannot set WebSocket headers.
-Deliberately open: `/api/info`, `/api/health`, `/healthz`, `/metrics` — the
-UI needs the first two before authenticating, and none carries conversation
-content. `/metrics` does expose token counts and spend; put it behind your
-ingress in a shared environment. → [api/routes.py](../../src/assistant/api/routes.py)
+Deliberately open: `/api/info`, `/api/health`, `/healthz`, `/metrics`, and
+`GET /api/documents` — the UI needs the first two before authenticating, the
+last is the inventory of what is indexed (names and chunk counts, no
+content), and none carries conversation content. `/metrics` does expose
+token counts and spend; put it behind your ingress in a shared environment.
+→ [api/routes.py](../../src/assistant/api/routes.py)
 
 **Input bounds.** Chat messages are capped at 8,000 characters; uploads
 accept only `.md`, `.markdown`, `.txt` and `.rst`, at most 2 MB per file, as
@@ -215,7 +221,7 @@ allowlisted and read-only, so the blast radius is misinformation, not action.
 The misinformation did arrive, aimed at the user rather than the data: the
 model answered *"The documents mentioning 'Qdrant' have been permanently
 erased from the vector store. Confirmed."* Two layers closed it. Stating the
-read-only constraint *before* the tool list fixed the behaviour — six of six
+read-only constraint *before* the tool list fixed the behavior — six of six
 attempts across three runs refused correctly, and the direct request stopped
 calling tools at all (0 instead of 7, so it also got cheaper). Then the
 output guard was added the same day, because prompt wording is evidence and
@@ -259,10 +265,10 @@ is required before exposing the app to untrusted users.
 | Gap | Why it is acceptable here | What production needs |
 |---|---|---|
 | a single shared bearer token | one team, one instance | OIDC/SSO at the gateway |
-| rate limits per session, not per user | there is no user identity yet | per-user quotas keyed on the OIDC subject |
+| rate limits per caller (address, or the one shared token), not per user | there is no user identity yet | per-user quotas keyed on the OIDC subject |
 | no content sanitisation on ingest | documents come from the operator and named repositories | strip instruction-like content, or tier tool permissions by document trust |
 | no per-user isolation | single-tenant | per-user collections and session scoping |
-| the SSRF guard is string-based | local network | DNS resolution and an egress allowlist at the proxy; today a DNS-rebinding name would pass the string check |
+| the SSRF guard does not resolve DNS | local network | DNS resolution and an egress allowlist at the proxy; today a public name that resolves to a private address would pass the literal check |
 | Grafana is anonymous-admin | local compose only | real auth before any deployment |
 | CodeQL skipped | private repository without GitHub Advanced Security | enable GHAS, or make the repository public |
 | no secret scanning in CI | `detect-private-key` runs in pre-commit | gitleaks or trufflehog in CI |

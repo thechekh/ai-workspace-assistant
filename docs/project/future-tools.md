@@ -155,7 +155,7 @@ Sonnet ≈ $0.015 and Haiku ≈ $0.008 per turn versus $0.0008 on nano.
 **Purpose:** serve this project's own tools to the whole department's
 editors (Cursor, Claude Code).
 **Why not:** the mechanism is already proven in both directions — our servers
-are FastMCP (HTTP is a transport flag away) and our client consumes GitHub's
+are MCP SDK servers (HTTP is a transport flag away) and our client consumes GitHub's
 hosted streamable-HTTP server in production. What is missing is a *reason*:
 the useful tool to serve would be `search_docs`, and exposing the knowledge
 base over unauthenticated HTTP contradicts the security posture. "We can,

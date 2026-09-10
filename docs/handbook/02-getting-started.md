@@ -188,9 +188,9 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 | `HISTORY_KEEP_RECENT` | `6` | Messages always kept verbatim |
 | `SESSION_TTL_SECONDS` | `86400` | How long transcript, summary and audit trail live in Redis |
 | `RATE_LIMIT_ENABLED` | `true` | Master switch for both limiters below |
-| `RATE_LIMIT_TURNS_PER_MINUTE` | `20` | Chat turns per session; `0` disables just this bucket |
+| `RATE_LIMIT_TURNS_PER_MINUTE` | `20` | Chat turns per caller (bearer token, else peer address); `0` disables just this bucket |
 | `RATE_LIMIT_UPLOADS_PER_HOUR` | `50` | Indexing requests per caller (`POST /api/documents`) |
-| `SYSTEM_PROMPT` | *(see config.py)* | Steers tool choice and the honesty rules — override to change persona/behaviour |
+| `SYSTEM_PROMPT` | *(see config.py)* | Steers tool choice and the honesty rules — override to change persona/behavior |
 | `DEBUG` | `true` | Also serves the minimal WS console at `/dev` |
 | `GITHUB_TOKEN` | *(unset)* | For the `ingest_repo` tool: unset = public repos only (60 req/h); a read-only PAT unlocks private repos |
 | `MCP_ENABLED` | `true` | Master switch for MCP tool servers |
@@ -216,7 +216,7 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 3. Open http://localhost:8000/ → send `ping` → tokens stream, a stats line
    appears under the answer. *That stats line is the same one every other
    chapter in this handbook points back to.*
-4. `uv run pytest -q` → `573 passed` (fully offline, ~25 s).
+4. `uv run pytest -q` → `621 passed` (fully offline, ~25 s).
 
 ## 7. Troubleshooting
 

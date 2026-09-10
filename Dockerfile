@@ -1,6 +1,6 @@
 # Multi-stage build: Vue SPA -> Python runtime (served by FastAPI).
-# The same image runs the api, the taskiq worker, and the scheduler —
-# compose picks the command per service.
+# One image, one process: the API serves the built SPA itself. There is no
+# worker or scheduler to run — documents are embedded once, at upload.
 
 # --- frontend build -----------------------------------------------------
 FROM node:22-alpine AS frontend

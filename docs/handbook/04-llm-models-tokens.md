@@ -29,7 +29,7 @@ SDK use its own default," which is exactly what makes adding a fourth
 OpenAI-compatible provider a one-line change.
 
 **The two modes you will actually use.** `fake` for everything you can test
-without spending — the full tool loop, RAG, streaming, cancellation, all 573
+without spending — the full tool loop, RAG, streaming, cancellation, all 621
 tests — and `openai` when you want real answers. Switching is two lines in
 `.env`; no code changes, because the provider is a config value.
 
@@ -82,7 +82,7 @@ live failure rather than anticipated:
    brace-matched JSON so nested arguments work); if it turns out to be prose,
    it's flushed as text. The chat never sees raw markup.
 
-Every layer above is pinned offline: the retry and salvage behaviour in
+Every layer above is pinned offline: the retry and salvage behavior in
 [tests/test_llm_errors.py](../../tests/test_llm_errors.py), and the leaked-
 markup edge cases in
 [tests/test_review_regressions.py](../../tests/test_review_regressions.py)

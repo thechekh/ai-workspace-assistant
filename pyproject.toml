@@ -10,13 +10,18 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "redis>=5.2",
-    "openai>=1.55",
+    # 3.0 moved the SDK's own transport to httpx2, which is why respx (which
+    # patches httpx 0.x) cannot intercept it — see tests/conftest.py.
+    "openai>=3.0",
     "qdrant-client>=1.12",
-    "mcp>=1.29",  # 1.29 renamed MCPServer -> FastMCP and reverted to camelCase
+    # 2.0 renamed the server class back: FastMCP -> MCPServer, under
+    # mcp.server.mcpserver. The client half (ClientSession, stdio_client,
+    # streamable_http_client) is unchanged.
+    "mcp>=2.2",
     "pydantic-ai>=2.27",  # 2.x moved FunctionToolResultEvent.result -> .part
     "langgraph>=0.6",
     "langchain-core>=0.3",  # imported directly by the LangGraph backend adapter
-    "logfire[fastapi,httpx]>=3.0",
+    "logfire[fastapi,httpx]>=5.0",
     "opentelemetry-api>=1.27",  # telemetry.py imports the tracer API directly
     "opentelemetry-sdk>=1.27",  # observability.py builds the provider directly
     "opentelemetry-exporter-otlp-proto-http>=1.27",
@@ -24,6 +29,12 @@ dependencies = [
     "prometheus-client>=0.20",
     "fakeredis>=2.26",  # ASSISTANT_REDIS_URL=fakeredis:// is a documented runtime mode
     "httpx>=0.27",  # fetch_url tool + Voyage embedder (was only a transitive dep)
+    # Two HTTP clients on purpose, not by accident: the OpenAI SDK (3.0) and
+    # the MCP SDK (2.0) both moved to httpx2, and their types are not
+    # interchangeable with httpx's, so the timeout we hand OpenAI and the
+    # client we hand MCP must be httpx2's. Our own outbound calls stay on
+    # httpx, where `respx` can still mock them.
+    "httpx2>=2.12",
     "python-multipart>=0.0.9",  # multipart uploads for POST /api/documents
 ]
 
@@ -45,7 +56,10 @@ evals = [
 
 dev = [
     "ruff>=0.8",
-    "pyright>=1.1.390",
+    # Pinned, not floated: pyright-python downloads whatever npm version the
+    # range allows and warns on stderr when a newer one exists, so a floating
+    # pin makes CI output noisy and the type check non-reproducible.
+    "pyright==1.1.413",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
@@ -78,7 +92,14 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 # S = bandit (this app fetches URLs and spawns subprocesses), PT = pytest
 # style, LOG/G = logging correctness (we use structlog), T20 = stray prints.
-select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC", "S", "PT", "LOG", "G", "T20"]
+# The second row is cheap hygiene that was measured at zero or a handful of
+# hits before being turned on: comprehension/perf refactors, implicit string
+# concatenation, blind excepts (each remaining one carries its reason),
+# unused arguments, leftover debugger calls and commented-out code.
+select = [
+    "E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC", "S", "PT", "LOG", "G", "T20",
+    "FURB", "PERF", "ISC", "BLE", "ARG", "C4", "RET", "PIE", "FLY", "T10", "DTZ", "ERA",
+]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's dependency markers are *meant* to be called in argument defaults;
@@ -93,8 +114,10 @@ extend-immutable-calls = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests: asserts are the point, and hardcoded dummy credentials are fine.
-"tests/**" = ["S101", "S105", "S106", "S311"]
+# Tests: asserts are the point, hardcoded dummy credentials are fine, fakes
+# implement protocol signatures whose arguments they ignore, and a plain
+# append loop reads better than a comprehension in a test.
+"tests/**" = ["S101", "S105", "S106", "S311", "ARG", "PERF401"]
 # CLIs report results to the console by design.
 "evals/**" = ["T201", "S101"]
 "src/assistant/rag/ingest.py" = ["T201"]
@@ -118,6 +141,9 @@ filterwarnings = [
     # langgraph/pydantic-ai still emit these from their own internals.
     "default::DeprecationWarning",
     "default::PendingDeprecationWarning",
+    # mcp's FastMCP settings model declares a forward reference pydantic-settings
+    # cannot resolve; importing the bundled servers in-process trips it.
+    "ignore:Field 'lifespan' has an incomplete definition:pydantic_settings.exceptions.IncompleteFieldDefinitionWarning",
 ]
 markers = ["slow: spawns real subprocesses (MCP stdio servers)"]
 
@@ -128,10 +154,12 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 # Ratchet: measured at 82.7% — raise as coverage improves, never lower it.
-# Raised as coverage grew (82 -> 84 at a measured 84.7). Kept a point
-# below the real number so an unrelated refactor does not fail the build,
-# but close enough that deleting tests does.
-fail_under = 84
+# Raised as coverage grew (82 -> 84 at a measured 84.7, -> 90 at a measured
+# 92.3 on 2026-09-07, when the MCP servers, the hosted embedders and the
+# exporter wiring got in-process tests). Kept a couple of points below the
+# real number so an unrelated refactor does not fail the build, but close
+# enough that deleting tests does.
+fail_under = 90
 exclude_also = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",

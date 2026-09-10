@@ -17,7 +17,7 @@ uv sync
 # 2. Build the frontend once (for the UI at /)
 cd frontend && npm install && npm run build && cd ..
 
-# 3. Start infrastructure (Redis for sessions; Qdrant used from Phase 2)
+# 3. Start infrastructure (Redis for sessions, Qdrant for the knowledge base)
 docker compose up -d
 #    No Docker? Skip this and set ASSISTANT_REDIS_URL=fakeredis:// in .env
 #    (in-memory sessions — zero setup, lost on restart)
@@ -149,8 +149,9 @@ fully inert: no SDK imports, no network, no-op tracer.
 
 ## MCP tools
 
-The agent's tools come from MCP servers (plus the native `search_docs`).
-Two bundled stdio servers start automatically — **no credentials needed**:
+Four tools are native (`search_docs`, `fetch_url`, `repo_read_file` and the
+one write, `ingest_repo`); the rest come from MCP servers. Two bundled stdio
+servers start automatically — **no credentials needed**:
 
 - `code` — regex code search + file reading over this repository
   (`search code for class CustomAgent`)
@@ -218,10 +219,12 @@ src/assistant/
 ├── rag/               # chunking, embedders, Qdrant store, retriever, ingest CLI
 └── static/dev.html    # minimal WS dev console
 docs/                  # ALL documentation (see docs/README.md)
+├── roadmap.md         #   the step-by-step reading order: every page and every source file
 ├── handbook/          #   operating this project — 9 chapters
 ├── theory/            #   every concept from zero — 12 chapters
-├── reference/         #   tools, testing checklist, backend comparison, security
-└── project/           #   roadmap/TODO, tech decisions, build history, workshop
+├── reference/         #   tools, testing, metrics, Ragas, observability lenses, security, the code walkthrough
+├── project/           #   the brief, tech decisions, build history, workshop, the documentation standard
+└── qanda/             #   69 hard questions, each with its grounded answer
 evals/                 # golden question set, retrieval metrics runner, and
 └── corpus/            #   the fixture those questions are measured on
 frontend/              # Vue 3 + Vite + TS SPA (Pinia, @vueuse/core, markdown-it)

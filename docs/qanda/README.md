@@ -55,7 +55,7 @@ The contrast worth articulating: **classic RAG** retrieves unconditionally befor
 **Answer — POC reality.** Correct, with one difference: there is no Qdrant
 `score_threshold`. The equivalent job is done *after* search by a
 **deterministic relevance gate** —
-[retriever.py:65-73](../../src/assistant/rag/retriever.py#L65-L73) drops
+[retriever.py:70-78](../../src/assistant/rag/retriever.py#L70-L78) drops
 candidates with zero query-token overlap, so `search_docs` honestly returns
 "nothing relevant" instead of top-k-no-matter-what. Same effect, testable
 offline, no tuned float.
@@ -88,7 +88,7 @@ Three layers (Guide §9):
 | **Behavior** | system-prompt rules: cite sources, treat tool results as untrusted data, admit "nothing found" |
 
 **Answer — POC reality.** The table's three layers exist here as: WS
-`?token=` auth + per-session sliding-window rate limits + 8k message cap
+`?token=` auth + per-caller sliding-window rate limits + 8k message cap
 (input); read-only tools + 20k result cap + 60s tool timeout +
 `max_iterations=6` + duplicate-call guard (tool); citation rules + "never
 claim an action you have no tool for" + the deterministic
@@ -553,7 +553,7 @@ user's words.
 **Answer.** Three rails: the **CI eval gate** — recall@5 / MRR floors on the
 golden set fail the build on retrieval regressions
 ([test_eval_gate.py](../../tests/test_eval_gate.py), with
-[history.jsonl](../../evals/history.jsonl) as the trend record); the **573
+[history.jsonl](../../evals/history.jsonl) as the trend record); the **621
 offline tests**, which include behavioral pins (the fake-parity suite keeps
 three backends identical, regression tests pin found bugs); and for
 prompt/description changes, **trajectory comparison** over the per-turn audit
@@ -685,7 +685,7 @@ and picks tools by keyword heuristics (PR words → GitHub tool, "search code
 for X" → code tool, a URL → `fetch_url`, a question → `search_docs`);
 `fakeredis://` replaces Redis in-process; Qdrant runs `:memory:`. Tests use
 `HermeticSettings` (`env_file=None`) so a developer's real keys can never
-leak into a run. Result: **573 tests** in ~20 s, offline, $0 — including
+leak into a run. Result: **621 tests** in ~20 s, offline, $0 — including
 provider quirks reproduced with scripted fakes (429s, `tool_use_failed`,
 leaked markup) and the ×3-backend parity suite. Real-model behavior is
 checked separately, by hand, on the runbook's script — never in CI.
@@ -823,7 +823,7 @@ the order of ten thousand demo turns.** Tests and CI never call a provider.
 **62. What does the rate limiter protect, and why a sliding window instead of `INCR`+`EXPIRE`?**
 
 **Answer.** It is a **budget guard, not access control**: it stops one stuck
-client draining the day's LLM quota — 20 turns/minute per session, 50
+client draining the day's LLM quota — 20 turns/minute per caller, 50
 indexing writes/hour per caller, refused *before* any LLM call. A sorted set
 per bucket scored by timestamp; one Redis pipeline drops expired entries,
 adds the request, counts, and refreshes the key's TTL
@@ -950,4 +950,4 @@ GitHub server), **56** (what happens on a delete request) and **64** (the
 "meter percentage" debugging story). **69** is the closer to have ready.
 
 For rapid-fire project-specific drilling after this list, continue with
-[the defence Q&A](../theory/12-defense-qa.md).
+[the defense Q&A](../theory/12-defense-qa.md).

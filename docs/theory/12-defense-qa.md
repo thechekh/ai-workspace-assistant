@@ -1,7 +1,7 @@
 # 12 — Defense Q&A
 
 **What this page answers: the hard questions a reviewer is likely to ask,
-grouped by area, each as a decision → reason → evidence a defence can stand
+grouped by area, each as a decision → reason → evidence a defense can stand
 on.** It is not the concept explanations the answers assume — those are the
 numbered chapters from [01 — LLM basics](01-llm-basics.md) through
 [10 — Infrastructure](10-infrastructure.md).
@@ -18,10 +18,10 @@ which of these are re-runnable on demand and which can drift)*
 
 | Claim | Value | How to prove it |
 |---|---|---|
-| Tests | 573 backend tests + 35 frontend tests | `uv run pytest -q`, `npm run test:run` |
-| Coverage | ~86%, with an 84% floor enforced in CI | `uv run pytest --cov` |
+| Tests | 621 backend tests + 91 frontend tests | `uv run pytest -q`, `npm run test:run` |
+| Coverage | ~92%, with a 90% floor enforced in CI (2026-09-07) | `uv run pytest --cov` |
 | Retrieval quality | recall@1 **0.83**, recall@5 **1.00**, MRR **0.92** | `uv run python evals/run_retrieval.py --memory` |
-| Agent backends | 98 / 286 / 278 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
+| Agent backends | 103 / 361 / 297 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
 | Real-model cost | ~$0.012 for a full 8-case acceptance run | the stats line under every answer |
 | Suite runtime | ~25 s, fully offline | no network, no Docker |
 
@@ -32,7 +32,7 @@ which of these are re-runnable on demand and which can drift)*
 **Q: Why implement the agent three times? Isn't once enough?**
 Because "which framework?" was a real open question and we wanted an
 evidence-based answer, not a blog-post opinion. The marginal cost was low —
-98/286/278 lines; everything else (tools, memory, telemetry, protocol) is
+103/361/297 lines; everything else (tools, memory, telemetry, protocol) is
 shared — and the payoff is [backend-comparison.md](../reference/backend-comparison.md)
 with measured numbers, plus the choice stays reversible via one config value.
 The comparison *is* a deliverable, not a detour.
@@ -58,7 +58,7 @@ the test exists; say so.
 
 **Q: What breaks first in production?**
 Honest list: (1) a single shared bearer token → replace with OIDC at the
-gateway; (2) rate limits are per session, not per user — they need the same
+gateway; (2) rate limits are per caller, not per user — they need the same
 OIDC identity; (3) LangGraph's in-process checkpointer → needs a
 Redis/Postgres saver to be durable; (4) single-instance Redis and Qdrant with
 no failover. None are architectural — the stateful parts (Redis, Qdrant)
@@ -134,7 +134,7 @@ failures against OpenAI, not speculation:
 **Q: Why RAG and not fine-tuning?**
 Facts change weekly; re-ingest is seconds and free, retraining is neither.
 RAG cites sources, so answers are auditable; fine-tuned knowledge is opaque.
-Fine-tuning is the tool for style and behaviour, not for living
+Fine-tuning is the tool for style and behavior, not for living
 documentation.
 
 **Q: Walk me through the pipeline.**
@@ -321,7 +321,7 @@ accounts.
 Remove the nondeterminism from every layer except the one under evaluation:
 scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-**573 tests in ~23 seconds, fully offline** — no network, no containers, no
+**621 tests in ~23 seconds, fully offline** — no network, no containers, no
 keys. Model *quality* is deliberately out of unit scope; that's what the
 eval harness is for.
 
@@ -393,7 +393,7 @@ the tokens really were spent so the cost is still recorded, and the metric
 histogram — a stopped turn measures the user's patience, not the system's.
 
 **Q: What stops one client burning your whole quota?**
-A sliding-window rate limiter in Redis: 20 chat turns per minute per session,
+A sliding-window rate limiter in Redis: 20 chat turns per minute per caller,
 50 indexing writes per hour per caller, both configurable, both checked
 *before* any LLM call. A sliding log rather than `INCR`+`EXPIRE`, because a
 fixed window lets a burst across the boundary through at double the limit; in
@@ -404,7 +404,7 @@ the same limiter keyed on the subject instead of the session.
 
 **Q: What would you do next, with more time?**
 In order: a real-model eval pass plus the embedding comparison rows, OIDC
-(which also upgrades the rate limits from per-session to per-user), long-term
+(which also upgrades the rate limits from per-caller to per-user), long-term
 memory as a facts store in Qdrant, and a Redis checkpointer to make LangGraph
 runs durable — at which point its checkpointing becomes a genuine
 differentiator rather than a demo.
@@ -413,7 +413,7 @@ differentiator rather than a demo.
 
 ## 8. Questions to ask *back*
 
-Defence goes better when it's a conversation:
+Defense goes better when it's a conversation:
 
 - "Which part would you want to see running first — the RAG demo, the MCP
   tool call, or the trace waterfall?"

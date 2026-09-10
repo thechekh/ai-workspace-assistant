@@ -155,6 +155,9 @@ one of the two always shows down, that's expected).
 Line by line — the *AI Workspace Assistant* dashboard, last 15 minutes,
 captured 2026-09-05 after three turns:
 
+- **Four stat tiles in the capture, five on the dashboard today** — a
+  *Cost (USD, indicative)* tile reading `assistant_cost_usd_total` was added
+  on 2026-09-07, after this capture was taken; the four below are unchanged.
 - **Turns 3 · Tokens 40630 · Tool calls 5 · Errors 0** — the stat tiles are
   `increase()` over the window: three turns, five tool calls between them
   (one turn used two tools), no user-visible failure.

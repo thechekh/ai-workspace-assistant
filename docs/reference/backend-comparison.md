@@ -19,7 +19,7 @@ everything below differs *only* because of the framework.
 
 | | custom loop | Pydantic AI | LangGraph |
 |---|---:|---:|---:|
-| Backend file, lines (`wc -l`, docstrings included) | **98** | **286** | **278** |
+| Backend file, lines (`wc -l`, docstrings included) | **103** | **361** | **297** |
 | Inherits the shared provider hardening in `llm/client.py` | yes | **no — re-implemented** | yes, through the adapter |
 | Of which framework-adapter code | 0 | ~45 (`FunctionModel` fake) + ~25 (model builder) | ~95 (`BaseChatModel` adapter) + ~35 (message conversion) |
 | Extra runtime dependencies | none | `pydantic-ai` and its provider SDKs | `langgraph`, `langchain-core` |
@@ -52,7 +52,8 @@ costs the most (§6).
 
 **langgraph** ([backends/langgraph.py](../../src/assistant/agent/backends/langgraph.py))
 — a two-node graph (model, tools) compiled with an `InMemorySaver`
-checkpointer and a fresh thread per turn; `graph.astream(stream_mode=["messages", "updates"])`
+checkpointer and a fresh thread per turn, deleted when the turn ends;
+`graph.astream(stream_mode=["messages", "updates"])`
 multiplexes token chunks and node outputs. LangChain expects a
 `BaseChatModel`, so a 95-line adapter wraps our LLM protocol — and once it
 existed, every fake and scripted LLM the suite already had ran on LangGraph
@@ -165,7 +166,7 @@ showed ~5,000 input tokens per call on the Pydantic AI backend while the
 app's own stats line said 0 prompt tokens and a cost of $0.000016. The
 backend now reports the run's usage into the shared turn stats
 (`record_external_usage`), and the capture in §5 is the result: three
-backends, comparable on cost as well as behaviour.
+backends, comparable on cost as well as behavior.
 [logfire-langfuse.md §6](logfire-langfuse.md) has the account.
 
 ## 7. Showing it live

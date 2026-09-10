@@ -29,7 +29,7 @@ repos:
   # Generic guards. Pinned by rev, unlike the local hooks above (these tools
   # are not project dependencies, so there is nothing to drift against).
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
         # Compose uses YAML merge keys (<<: *app-env), which the strict

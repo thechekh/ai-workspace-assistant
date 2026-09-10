@@ -57,13 +57,19 @@ explains each stage and [metrics.md](metrics.md) measures them.
 |---|---|
 | Parameters | `url` *(string, required)* — absolute http(s) URL |
 | Returns | readable text of the page, HTML stripped, capped at 8,000 characters. `github.com/{owner}/{repo}` and `github.com/{owner}` are answered from the GitHub API instead: description, language, stars, topics and the README's first 6,000 characters, or the account and its public repositories |
-| Errors | `error: only http(s) URLs are supported` · `error: refusing to fetch private or loopback addresses` · `error: GET <url> returned HTTP <status>` · `error: could not fetch <url>: <why>` |
-| Implementation | [tools/fetch.py](../../src/assistant/agent/tools/fetch.py) — httpx, 15 s timeout, redirects followed and re-checked |
+| Errors | `error: only http(s) URLs are supported` · `error: refusing to fetch private or loopback addresses` · `error: <url> is image/png, not a text page` · `error: GET <url> returned HTTP <status>` · `error: could not fetch <url>: <why>` |
+| Implementation | [tools/fetch.py](../../src/assistant/agent/tools/fetch.py) — httpx, 15 s timeout, redirects followed and re-checked, body streamed and cut at 1 MB |
 
-The loopback and private-range refusal is a string match on the host — a
-dev-grade SSRF guard, examined in [security.md](security.md). GitHub API
-calls are unauthenticated (60 per hour per IP); on a rate limit the tool
-falls back to fetching the HTML page.
+The loopback and private-range refusal judges address literals with the
+standard library's `ipaddress` (loopback, RFC 1918, link-local, carrier-grade
+NAT, IPv4-mapped IPv6, decimal and hex spellings of an address) and refuses
+`localhost` and its subdomains by name; it does not resolve DNS — a
+dev-grade SSRF guard, examined in [security.md](security.md). The body is
+read in chunks and abandoned after 1 MB, and non-text content types are
+refused before a byte is read. GitHub API calls carry
+`ASSISTANT_GITHUB_TOKEN` when one is configured, like the repo tools;
+without it they are unauthenticated (60 per hour per IP), and on a rate
+limit the tool falls back to fetching the HTML page.
 
 ### `ingest_repo` — the one write
 
@@ -214,7 +220,7 @@ What one turn does with the registry, in order:
 an instruction to the model, a JSON schema, an async handler returning a
 string with failures prefixed `error:` — and append it to `native_tools` in
 `build_runtime`. Telemetry and guards come free. MCP: write a server with
-`FastMCP` and `@mcp.tool()` functions (docstrings become descriptions, type
+`MCPServer` and `@mcp.tool()` functions (docstrings become descriptions, type
 hints the schema) and add it to `ASSISTANT_MCP_SERVERS`, or point that
 setting at any third-party server; its tools appear as `<name>__<tool>`.
 
@@ -357,7 +363,7 @@ it, and the answer quotes it. Three LLM steps, $0.0015, about five seconds.
 - **Descriptions steer, and a sentence can misroute a tool.** `search_docs`'
   description once said it "knows nothing about GitHub repositories", and the
   model stopped searching ingested repositories until the sentence was
-  removed. The description is a prompt; treat edits to it as behaviour
+  removed. The description is a prompt; treat edits to it as behavior
   changes and test them with a real model.
 - **The duplicate guard is exact-match only.** A retry with a rephrased
   query is a new call, by design — the retry contract asks for different

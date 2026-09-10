@@ -2,7 +2,7 @@
 
 **The index of every document in this project: which folder answers which
 kind of question, where to start for a given need, the topics to prepare
-for a defence, and the reading order that covers all 45 pages.** Every
+for a defense, and the reading order that covers all 45 pages.** Every
 document lives under `docs/`, and every page follows
 [the documentation standard](project/documentation-standard.md). Five
 folders, five jobs:
@@ -35,12 +35,12 @@ follow-one-message-through-five-layers drill.
 **I'm testing it by hand** → [reference/testing.md](reference/testing.md) —
 a tiered checklist (zero-infra → Docker → real model → observability).
 
-**I need exact tool behaviour** → [reference/tools.md](reference/tools.md) —
+**I need exact tool behavior** → [reference/tools.md](reference/tools.md) —
 every tool's purpose, parameters, return shape, errors, and implementation.
 
 **I'm starting from zero and want to learn the whole thing** →
 [roadmap.md](roadmap.md) — twelve sessions,
-~13 hours, covering all 38 source files: what to read, what to *run*, and a
+~13 hours, covering all 39 source files: what to read, what to *run*, and a
 self-check for each. Start here if you have more than an evening.
 
 **I have to defend this project line by line** →
@@ -70,7 +70,7 @@ example, and which of them the tests enforce.
 Each row is *concept first, then how this project does it, then the hard
 questions*. Read across.
 
-| Topic | Concept, from zero | How it works here | Depth / defence |
+| Topic | Concept, from zero | How it works here | Depth / defense |
 |---|---|---|---|
 | **Purpose & scope** | — | [project/description.md](project/description.md) (the brief), [handbook/01](handbook/01-project-overview.md) | [theory/12 §Architecture](theory/12-defense-qa.md) |
 | **Stack & technologies** | [theory/10](theory/10-infrastructure.md) | [handbook/03](handbook/03-technologies.md) — what, why, where | [project/tech-stack.md](project/tech-stack.md) — the decisions |
@@ -99,7 +99,7 @@ order, and a test fails the build if a page is ever left out of it.
 
 **The short path.** No time for all of it? Rows **1 → 5 → 6 → 34 → 40** of that
 table — what it is, the architecture, how to run it, the code walkthrough,
-and the defence Q&A — is about two hours and covers most of what you will
+and the defense Q&A — is about two hours and covers most of what you will
 be asked.
 
 **Presenting it?** [project/workshop.md](project/workshop.md) has the slide

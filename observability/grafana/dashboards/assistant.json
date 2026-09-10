@@ -2,50 +2,111 @@
   "title": "AI Workspace Assistant",
   "uid": "assistant",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "refresh": "5s",
   "timezone": "browser",
-  "time": { "from": "now-15m", "to": "now" },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
   "panels": [
     {
       "id": 1,
       "type": "stat",
       "title": "Turns",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
-      "targets": [{ "refId": "A", "expr": "sum(assistant_turns_total)" }]
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(assistant_turns_total)"
+        }
+      ]
     },
     {
       "id": 2,
       "type": "stat",
       "title": "Tokens (prompt + completion)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
-      "targets": [{ "refId": "A", "expr": "sum(assistant_tokens_total)" }]
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 5,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(assistant_tokens_total)"
+        }
+      ]
     },
     {
       "id": 3,
       "type": "stat",
       "title": "Tool calls",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
-      "targets": [{ "refId": "A", "expr": "sum(assistant_tool_calls_total)" }]
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(assistant_tool_calls_total)"
+        }
+      ]
     },
     {
       "id": 4,
       "type": "stat",
       "title": "Errors",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
-      "targets": [{ "refId": "A", "expr": "sum(assistant_errors_total) or vector(0)" }],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(assistant_errors_total) or vector(0)"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
           }
         },
@@ -53,11 +114,47 @@
       }
     },
     {
+      "id": 13,
+      "type": "stat",
+      "title": "Cost (USD, indicative)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(assistant_cost_usd_total) or vector(0)"
+        }
+      ]
+    },
+    {
       "id": 5,
       "type": "timeseries",
       "title": "Turn rate by backend",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
       "targets": [
         {
           "refId": "A",
@@ -65,14 +162,27 @@
           "legendFormat": "{{backend}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 6,
       "type": "timeseries",
       "title": "Turn duration p50 / p95 by backend",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
       "targets": [
         {
           "refId": "A",
@@ -85,14 +195,27 @@
           "legendFormat": "{{backend}} p95"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 7,
       "type": "timeseries",
       "title": "LLM step duration p95 by provider",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
       "targets": [
         {
           "refId": "A",
@@ -100,14 +223,27 @@
           "legendFormat": "{{provider}} p95"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 8,
       "type": "timeseries",
       "title": "Tokens per minute",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
       "targets": [
         {
           "refId": "A",
@@ -120,8 +256,16 @@
       "id": 9,
       "type": "timeseries",
       "title": "Tool calls by tool / status",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
       "targets": [
         {
           "refId": "A",
@@ -129,14 +273,27 @@
           "legendFormat": "{{tool}} ({{status}})"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 10,
       "type": "timeseries",
       "title": "Tool duration p95",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
       "targets": [
         {
           "refId": "A",
@@ -144,14 +301,27 @@
           "legendFormat": "{{tool}} p95"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 11,
       "type": "timeseries",
       "title": "RAG retrieval p95 by mode",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
       "targets": [
         {
           "refId": "A",
@@ -159,14 +329,27 @@
           "legendFormat": "{{mode}} p95"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 12,
       "type": "timeseries",
       "title": "Errors by kind",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
       "targets": [
         {
           "refId": "A",
@@ -174,7 +357,12 @@
           "legendFormat": "{{kind}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     }
   ]
 }

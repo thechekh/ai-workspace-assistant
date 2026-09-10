@@ -83,7 +83,19 @@ jobs:
       # assertion green while making answers worse. This runs the 18-question
       # golden set (in-process Qdrant, no services) and fails if any metric
       # drops below evals/baseline.json.
-      - run: uv run python evals/run_retrieval.py --memory --check
+      #
+      # On main the run is also recorded and the trend printed, so the job log
+      # carries the measurement for that commit — `--trend` used to show only
+      # the handful of runs someone remembered to record by hand. Deliberately
+      # not committed back: a bot pushing to main is a bigger failure mode than
+      # a sparse history, and `evals/history.jsonl` stays a file a human
+      # appends when a number is worth keeping.
+      - if: github.ref != 'refs/heads/main'
+        run: uv run python evals/run_retrieval.py --memory --check
+      - if: github.ref == 'refs/heads/main'
+        run: |
+          uv run python evals/run_retrieval.py --memory --check --record
+          uv run python evals/run_retrieval.py --trend
 
   frontend:
     name: frontend
@@ -102,7 +114,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm run test:run
+      # With coverage, so the frontend has the same kind of floor the backend
+      # enforces: the thresholds live in vitest.config.ts and only go up.
+      - run: npm run test:coverage
       - run: npm run build
 
   docker:

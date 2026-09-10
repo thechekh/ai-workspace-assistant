@@ -28,7 +28,7 @@ Nothing else makes sense until you have seen it work.
 
 **Read:** the repository [README](../README.md) (what it is, headline
 numbers) → the [documentation index](README.md) (how the pages are
-organised) → [project/description.md](project/description.md) (the brief,
+organized) → [project/description.md](project/description.md) (the brief,
 as received — what was asked for) → [handbook/01 — Project overview](handbook/01-project-overview.md)
 (the architecture and one message end to end).
 
@@ -68,9 +68,9 @@ Before any detail: how the pieces are assembled.
 
 | Read | Lines |
 |---|---|
-| [`config.py`](../src/assistant/config.py) | 175 |
-| [`main.py`](../src/assistant/main.py) | 253 |
-| [`agent/base.py`](../src/assistant/agent/base.py) | 76 |
+| [`config.py`](../src/assistant/config.py) | 178 |
+| [`main.py`](../src/assistant/main.py) | 298 |
+| [`agent/base.py`](../src/assistant/agent/base.py) | 90 |
 | [`agent/registry.py`](../src/assistant/agent/registry.py) | 28 |
 
 **Read:** [handbook/03 — Technologies](handbook/03-technologies.md) — every
@@ -91,8 +91,8 @@ curl -s localhost:8000/api/info | python -m json.tool
 
 | Read | Lines |
 |---|---|
-| [`api/schemas.py`](../src/assistant/api/schemas.py) | 165 |
-| [`api/ws.py`](../src/assistant/api/ws.py) | 306 |
+| [`api/schemas.py`](../src/assistant/api/schemas.py) | 188 |
+| [`api/ws.py`](../src/assistant/api/ws.py) | 357 |
 | [`api/turn_recorder.py`](../src/assistant/api/turn_recorder.py) | 124 |
 
 **Read:** [theory/README](theory/README.md) (the course map, and the
@@ -122,10 +122,10 @@ line says afterwards.
 
 | Read | Lines |
 |---|---|
-| [`llm/client.py`](../src/assistant/llm/client.py) | 482 — the biggest file; take it in three passes |
-| [`llm/errors.py`](../src/assistant/llm/errors.py) | 75 |
+| [`llm/client.py`](../src/assistant/llm/client.py) | 499 — the biggest file; take it in three passes |
+| [`llm/errors.py`](../src/assistant/llm/errors.py) | 77 |
 | [`llm/fake.py`](../src/assistant/llm/fake.py) | 93 |
-| [`telemetry.py`](../src/assistant/telemetry.py) | 183 |
+| [`telemetry.py`](../src/assistant/telemetry.py) | 193 |
 
 Three passes over `client.py`: (1) `stream_step` — the happy path; (2)
 `_create_stream` — 429 backoff and `stream_options` fallback; (3)
@@ -151,14 +151,15 @@ Read in **pipeline order** — this is how a document becomes an answer.
 
 | Read | Lines | Stage |
 |---|---|---|
-| [`rag/chunking.py`](../src/assistant/rag/chunking.py) | 116 | split documents |
-| [`rag/embeddings.py`](../src/assistant/rag/embeddings.py) | 110 | text → vectors |
-| [`rag/sparse.py`](../src/assistant/rag/sparse.py) | 53 | the keyword channel |
-| [`rag/store.py`](../src/assistant/rag/store.py) | 184 | Qdrant + RRF fusion |
+| [`rag/chunking.py`](../src/assistant/rag/chunking.py) | 186 | split documents |
+| [`rag/embeddings.py`](../src/assistant/rag/embeddings.py) | 125 | text → vectors |
+| [`rag/sparse.py`](../src/assistant/rag/sparse.py) | 57 | the keyword channel |
+| [`rag/store.py`](../src/assistant/rag/store.py) | 183 | Qdrant + RRF fusion |
 | [`rag/rerank.py`](../src/assistant/rag/rerank.py) | 64 | reorder + the relevance gate |
-| [`rag/retriever.py`](../src/assistant/rag/retriever.py) | 88 | the orchestrator |
-| [`rag/ingest.py`](../src/assistant/rag/ingest.py) | 134 | the write path |
-| [`rag/repo.py`](../src/assistant/rag/repo.py) | 240 | GitHub repo → knowledge base, sources namespaced `owner/repo/path` |
+| [`rag/retriever.py`](../src/assistant/rag/retriever.py) | 93 | the orchestrator |
+| [`rag/ingest.py`](../src/assistant/rag/ingest.py) | 154 | the write path |
+| [`rag/repo.py`](../src/assistant/rag/repo.py) | 215 | GitHub repo → knowledge base, sources namespaced `owner/repo/path` |
+| [`rag/filetypes.py`](../src/assistant/rag/filetypes.py) | 56 | which suffixes are prose and which are code — one answer for every path |
 
 **Read:** [theory/02 — Embeddings & vector search](theory/02-embeddings-and-vector-search.md)
 → [theory/03 — RAG](theory/03-rag.md) →
@@ -189,12 +190,12 @@ pipeline.
 | Read | Lines |
 |---|---|
 | [`agent/tools/base.py`](../src/assistant/agent/tools/base.py) | 120 — **the single most important file for safety** |
-| [`agent/tools/search_docs.py`](../src/assistant/agent/tools/search_docs.py) | 154 |
-| [`agent/tools/fetch.py`](../src/assistant/agent/tools/fetch.py) | 173 |
-| [`agent/tools/repo_read.py`](../src/assistant/agent/tools/repo_read.py) | 80 — one exact file from any GitHub repo, tokenless for public |
-| [`agent/tools/ingest_repo.py`](../src/assistant/agent/tools/ingest_repo.py) | 105 — the one write tool: adds a repo's docs, nothing else |
+| [`agent/tools/search_docs.py`](../src/assistant/agent/tools/search_docs.py) | 146 |
+| [`agent/tools/fetch.py`](../src/assistant/agent/tools/fetch.py) | 258 |
+| [`agent/tools/repo_read.py`](../src/assistant/agent/tools/repo_read.py) | 79 — one exact file from any GitHub repo, tokenless for public |
+| [`agent/tools/ingest_repo.py`](../src/assistant/agent/tools/ingest_repo.py) | 110 — the one write tool: adds a repo's docs, nothing else |
 | [`agent/output_guard.py`](../src/assistant/agent/output_guard.py) | 71 — why a prompt rule is not a control |
-| [`agent/backends/custom.py`](../src/assistant/agent/backends/custom.py) | 98 — the ReAct loop, no framework |
+| [`agent/backends/custom.py`](../src/assistant/agent/backends/custom.py) | 103 — the ReAct loop, no framework |
 
 **Read:** [theory/04 — Tool calling & agents](theory/04-tool-calling-and-agents.md)
 → [handbook/06 — Tools & MCP](handbook/06-tools-mcp.md) §1–§2 →
@@ -218,8 +219,8 @@ Only after the hand-written loop makes sense.
 
 | Read | Lines |
 |---|---|
-| [`agent/backends/pydantic_ai.py`](../src/assistant/agent/backends/pydantic_ai.py) | 286 |
-| [`agent/backends/langgraph.py`](../src/assistant/agent/backends/langgraph.py) | 278 |
+| [`agent/backends/pydantic_ai.py`](../src/assistant/agent/backends/pydantic_ai.py) | 361 |
+| [`agent/backends/langgraph.py`](../src/assistant/agent/backends/langgraph.py) | 297 |
 
 **Read:** [theory/05 — Agent frameworks](theory/05-agent-frameworks.md) →
 [reference/backend-comparison.md](reference/backend-comparison.md) (the same
@@ -241,7 +242,7 @@ uv run pytest tests/test_fake_parity.py -v     # all three route alike
 
 | Read | Lines |
 |---|---|
-| [`mcp/registry.py`](../src/assistant/mcp/registry.py) | 110 |
+| [`mcp/registry.py`](../src/assistant/mcp/registry.py) | 122 |
 | [`mcp_servers/code_search.py`](../src/assistant/mcp_servers/code_search.py) | 94 |
 | [`mcp_servers/fake_github.py`](../src/assistant/mcp_servers/fake_github.py) | 131 |
 
@@ -263,8 +264,8 @@ uv run pytest tests/test_mcp.py -v      # spawns the real servers
 
 | Read | Lines |
 |---|---|
-| [`memory/session.py`](../src/assistant/memory/session.py) | 153 |
-| [`memory/conversation.py`](../src/assistant/memory/conversation.py) | 53 — small and important |
+| [`memory/session.py`](../src/assistant/memory/session.py) | 165 |
+| [`memory/conversation.py`](../src/assistant/memory/conversation.py) | 54 — small and important |
 | [`memory/summarizer.py`](../src/assistant/memory/summarizer.py) | 63 |
 
 **Read:** [theory/07 — Conversation memory](theory/07-memory.md) →
@@ -285,11 +286,11 @@ uv run pytest tests/test_memory.py -v
 
 | Read | Lines |
 |---|---|
-| [`telemetry.py`](../src/assistant/telemetry.py) | 183 — revisit with fresh eyes |
-| [`observability.py`](../src/assistant/observability.py) | 178 |
-| [`logs.py`](../src/assistant/logs.py) | 56 |
-| [`api/routes.py`](../src/assistant/api/routes.py) | 313 |
-| [`api/rate_limit.py`](../src/assistant/api/rate_limit.py) | 87 |
+| [`telemetry.py`](../src/assistant/telemetry.py) | 193 — revisit with fresh eyes |
+| [`observability.py`](../src/assistant/observability.py) | 173 |
+| [`logs.py`](../src/assistant/logs.py) | 60 |
+| [`api/routes.py`](../src/assistant/api/routes.py) | 339 |
+| [`api/rate_limit.py`](../src/assistant/api/rate_limit.py) | 107 |
 
 **Read:** [theory/09 — Observability & evals](theory/09-observability-and-evals.md)
 → [theory/10 — Infrastructure](theory/10-infrastructure.md) →
@@ -319,12 +320,21 @@ Jaeger (:16686) and Grafana (:3000).
 
 | Read | Lines |
 |---|---|
-| [`frontend/src/types.ts`](../frontend/src/types.ts) | 108 — the protocol, mirrored |
-| [`frontend/src/stores/chat.ts`](../frontend/src/stores/chat.ts) | 462 — the WS reducer |
-| [`frontend/src/App.vue`](../frontend/src/App.vue) | 52 |
+| [`frontend/src/types.ts`](../frontend/src/types.ts) | 216 — the protocol, mirrored |
+| [`frontend/src/stores/chat.ts`](../frontend/src/stores/chat.ts) | 580 — the WS reducer |
+| [`frontend/src/App.vue`](../frontend/src/App.vue) | 78 |
 
 Then the components: `ChatWindow`, `ChatMessage`, `ChatInput`, `ToolCard`,
-`ModeToggle`, `SessionsPanel`, `DocumentsPanel`.
+`ModeToggle`, `SessionsPanel`, `DocumentsPanel` — and the three small modules
+they lean on, each one answering a browser quirk:
+
+| Module | Why it exists |
+|---|---|
+| [`lib/storage.ts`](../frontend/src/lib/storage.ts) | `localStorage` throws on *access* in a private window or with site data blocked, so every read and write is wrapped and the app runs without persistence |
+| [`lib/popover.ts`](../frontend/src/lib/popover.ts) | one header panel open at a time, closed by Escape or an outside press, focus handed back to the trigger |
+| [`lib/clipboard.ts`](../frontend/src/lib/clipboard.ts) | copy that reports failure instead of throwing when the page is not a secure context |
+| [`shims-vue.d.ts`](../frontend/src/shims-vue.d.ts) | plain `tsc` (what the type-aware lint runs) needs to be told what a `.vue` import is; `vue-tsc` resolves them itself |
+| [`src/test/`](../frontend/src/test/) | the component tests' fakes: a `WebSocket` that records frames, and stubbed `fetch`/`confirm` |
 
 ```sh
 cd frontend && npm run test:run
@@ -399,7 +409,7 @@ skips. Tick them off.
 | # | Document | Answers |
 |---|---|---|
 | 1 | [../README.md](../README.md) | The landing page: what it is, quickstart, headline numbers |
-| 2 | [README.md](README.md) | How the documentation is organised, and where to go for what |
+| 2 | [README.md](README.md) | How the documentation is organized, and where to go for what |
 | 3 | [roadmap.md](roadmap.md) *(this page)* | The path through all of it |
 | 4 | [project/description.md](project/description.md) | The brief — what was actually asked for |
 | 5 | [handbook/01-project-overview.md](handbook/01-project-overview.md) | Architecture diagram + one message end to end |
@@ -453,16 +463,16 @@ Every source file, and the session that covers it. Nothing is left over.
 | Configuration & wiring | `config.py`, `main.py`, `agent/registry.py`, `agent/base.py` | 1 |
 | WebSocket & protocol | `api/schemas.py`, `api/ws.py`, `api/turn_recorder.py` | 2 |
 | LLM layer | `llm/client.py`, `llm/errors.py`, `llm/fake.py` | 3 |
-| RAG | `rag/chunking.py`, `embeddings.py`, `sparse.py`, `store.py`, `rerank.py`, `retriever.py`, `ingest.py`, `repo.py` | 4 |
+| RAG | `rag/chunking.py`, `embeddings.py`, `sparse.py`, `store.py`, `rerank.py`, `retriever.py`, `ingest.py`, `repo.py`, `filetypes.py` | 4 |
 | Tools & the loop | `agent/tools/base.py`, `search_docs.py`, `fetch.py`, `ingest_repo.py`, `repo_read.py`, `agent/output_guard.py`, `backends/custom.py` | 5 |
 | Frameworks | `backends/pydantic_ai.py`, `backends/langgraph.py` | 6 |
 | MCP | `mcp/registry.py`, `mcp_servers/code_search.py`, `fake_github.py` | 7 |
 | Memory | `memory/session.py`, `conversation.py`, `summarizer.py` | 8 |
 | Observability & ops | `telemetry.py`, `observability.py`, `logs.py`, `api/routes.py`, `api/rate_limit.py` | 9 |
 | Frontend | `types.ts`, `stores/chat.ts`, `App.vue`, components | 10 |
-| Tests & evals | `tests/` (26 files), `evals/` (4 scripts) | 11 |
+| Tests & evals | `tests/` (30 files), `evals/` (4 scripts) | 11 |
 
-**38 source files. 12 sessions. No gaps.**
+**39 source files. 12 sessions. No gaps.**
 
 ## 5. The short paths
 
@@ -472,7 +482,7 @@ about. Then the [10-minute version](reference/code-walkthrough.md) at the
 top of the walkthrough, and the [Defense Q&A](theory/12-defense-qa.md).
 
 **Two hours before presenting:** rows **1 → 5 → 6 → 34 → 40** of §3 — what it
-is, the architecture, how to run it, the code walkthrough, and the defence
+is, the architecture, how to run it, the code walkthrough, and the defense
 Q&A. **Presenting it?** [project/workshop.md](project/workshop.md) has the
 slide outline, the click-by-click demo script, and the file-map walkthrough;
 [project/demo-runbook.md](project/demo-runbook.md) has the real stack.

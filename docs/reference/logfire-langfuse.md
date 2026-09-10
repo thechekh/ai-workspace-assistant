@@ -185,7 +185,7 @@ layer and never passed through `InstrumentedLLM`, so nothing counted its
 tokens. It now reports the run's usage into the same stats and counters
 (`record_external_usage` in [telemetry.py](../../src/assistant/telemetry.py)),
 so the stats line, the cost metric and Langfuse agree, and the three backends
-are comparable on cost as well as on behaviour. That is what a second,
+are comparable on cost as well as on behavior. That is what a second,
 independent measurement is for.
 
 ## 7. Privacy and cost, stated plainly

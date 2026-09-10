@@ -95,7 +95,7 @@ deliberately evaluating.
    captures were taken by driving a headless browser against the real
    server.
 
-573 tests, offline, in seconds, $0 (2026-09-05, `uv run pytest -q`). The
+621 tests, offline, in seconds, $0 (2026-09-05, `uv run pytest -q`). The
 fakes aren't a compromise — they're what makes the suite *possible*.
 
 ## 4. What we deliberately do NOT test with fakes
@@ -125,7 +125,7 @@ answer in this chapter.
 **"How do you know the assistant gives correct answers?"** — Three layers:
 retrieval is *measured* (recall@5 = 1.00 on the golden set — the right
 evidence reaches the model); answers are *grounded* (the model cites
-retrieved chunks the user can inspect); behavior is *pinned* by 573
+retrieved chunks the user can inspect); behavior is *pinned* by 621
 deterministic tests. Model-quality evaluation on real models reuses the
 same golden harness the day a key exists — which, as of 2026-09-04, it does
 for faithfulness (§4).
@@ -160,7 +160,7 @@ stronger story once the marginal cost is just an exporter.
   failure mode ([reference/ragas.md §8](../reference/ragas.md)). The 0.48
   control score is evidence the judge catches gross fabrication; it is not
   evidence against subtler, self-serving bias.
-- **573 tests at $0 prove behavior, not intelligence.** Every fake is
+- **621 tests at $0 prove behavior, not intelligence.** Every fake is
   scripted to be predictable — a model that got measurably dumber would not
   fail a single one of them. That is exactly why §3's retrieval numbers and
   §4's judge exist as a separate, real-model-dependent tier.

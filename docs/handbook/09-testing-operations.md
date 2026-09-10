@@ -8,7 +8,7 @@ tiered, feature-by-feature script is
 [reference/testing.md](../reference/testing.md); this chapter is what runs
 without a human at the keyboard, plus how to run the platform once it does.
 
-## 1. The automated suite (573 tests, fully offline)
+## 1. The automated suite (621 tests, fully offline)
 
 ```sh
 uv run pytest -q          # ~26s. No network, no Docker, no keys.
@@ -35,7 +35,13 @@ scripted provider errors. Map of the suite:
 | test_agent.py / test_tool_loop.py | the custom loop's mechanics |
 | test_pydantic_backend.py / test_langgraph_backend.py | runtime parity |
 | test_rag.py | chunking, hybrid search, rerank, ingest idempotency |
+| test_chunking_code.py | source files chunked by lines, not headings — a `# comment` at column one is a comment, and one inside a fence is code |
+| test_embedders.py | the hosted embedders offline: batching at 128, the dimensions each model reports, the token on the wire, provider errors raised not swallowed |
+| test_repo_ingest.py | GitHub ingestion: `owner/repo/path` namespacing, the file and size limits, traversal-shaped paths refused, the skip reasons a user sees |
 | test_mcp.py | real stdio MCP servers spawn + tools round-trip |
+| test_mcp_servers.py | the two bundled servers called in-process — the half `test_mcp.py` runs in a subprocess, where coverage cannot see it |
+| test_mcp_registry.py | the connect path without subprocesses: a server that never answers the handshake is torn down at the timeout rather than left running |
+| test_runtime.py | startup and shutdown: Redis socket timeouts, one shared embedder, a failed startup releasing what it opened, and a close that continues past a failing step |
 | test_memory.py | rolling summarization math |
 | test_api_routes.py / test_config.py | REST + auth + settings |
 | test_documents_api.py | documents added at runtime: upload (file + pasted), list, re-upload replaces rather than duplicates, delete, rejected types, auth, and the empty-knowledge-base message |
@@ -65,10 +71,11 @@ bundled MCP servers for real and asserts `code__search_code` finds
 `"custom.py"` when it greps this very repository for `class CustomAgent`.
 
 Quality gates (CI, every push): `ruff check` · `ruff format --check` ·
-`pyright` (0 errors) · `pytest` with a coverage floor — on Python 3.12 **and**
-3.13 — plus a frontend job (typecheck, vitest, build), a Docker image build,
-and a **retrieval quality gate**. A second workflow runs CodeQL, `pip-audit`
-and `npm audit` weekly.
+`pyright` (0 errors) · `pytest` with a 90% coverage floor — on Python 3.12
+**and** 3.13 — plus a frontend job (lint, typecheck, vitest **with its own
+coverage floor**, build), a Docker image build, and a **retrieval quality
+gate** that also records its measurement to the trend log on `main`. A second
+workflow runs CodeQL, `pip-audit` and `npm audit` weekly.
 
 The quality gate is the one that catches what no assertion can. A chunking
 tweak or a change to the fusion weights can leave every test green and still
@@ -146,7 +153,7 @@ keeps them out of logs. The `log_prompts` toggle is dev-only by policy
 | [api/routes.py](../../src/assistant/api/routes.py) | `require_token` (auth), `limit_writes` (the upload bucket), and the open `/api/info` / `/api/health` endpoints |
 
 The two rate-limit buckets are independent and both keyed by caller, not
-global: `ASSISTANT_RATE_LIMIT_TURNS_PER_MINUTE` (default 20, per session) on
+global: `ASSISTANT_RATE_LIMIT_TURNS_PER_MINUTE` (default 20, per caller) on
 chat turns, `ASSISTANT_RATE_LIMIT_UPLOADS_PER_HOUR` (default 50, per bearer
 token or peer address) on `POST /api/documents`. Both live in one sliding
 Redis sorted set per caller, checked *before* any LLM call or embedding
@@ -224,7 +231,7 @@ Three short demos, all offline except the third:
   model's *answers* less faithful (or the reverse) — the two are measured
   separately in `evals/`, and only the free, deterministic one runs on every
   push (§1).
-- **"573 tests" is a snapshot, not a promise.** New tests land between
+- **"621 tests" is a snapshot, not a promise.** New tests land between
   updates to this number; `tests/test_docs_consistency.py` tolerates drift
   up to 5% before failing the build, which is a deliberate looseness, not
   proof the count is current at this exact moment.

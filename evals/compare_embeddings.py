@@ -79,8 +79,10 @@ async def run(k: int) -> None:
     lines = [
         "# Embedding comparison — golden retrieval set",
         "",
-        f"Corpus: `evals/corpus/` · questions: {len(load_golden())} · "
-        "mode: hybrid (dense + sparse RRF) + lexical rerank",
+        (
+            f"Corpus: `evals/corpus/` · questions: {len(load_golden())} · "
+            "mode: hybrid (dense + sparse RRF) + lexical rerank"
+        ),
         "",
         f"| model | recall@1 | recall@{k} | MRR |",
         "|---|---:|---:|---:|",
@@ -93,9 +95,11 @@ async def run(k: int) -> None:
     if skipped:
         lines += [
             "",
-            f"Not run (no API key configured): {', '.join(skipped)} — set "
-            "`ASSISTANT_EMBEDDING_API_KEY` (openai) / `ASSISTANT_VOYAGE_API_KEY` "
-            "(voyage) and re-run.",
+            (
+                f"Not run (no API key configured): {', '.join(skipped)} — set "
+                "`ASSISTANT_EMBEDDING_API_KEY` (openai) / `ASSISTANT_VOYAGE_API_KEY` "
+                "(voyage) and re-run."
+            ),
         ]
     RESULTS.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"\nwrote {RESULTS}")

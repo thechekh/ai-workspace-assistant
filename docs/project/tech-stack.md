@@ -109,7 +109,7 @@ Branches work for a quick spike, but for a lasting comparison they have real dow
 
 ```
 src/assistant/agent/
-├── base.py           # AgentBackend protocol: async def run(session, message) -> AsyncIterator[AgentEvent]
+├── base.py           # AgentBackend protocol: run(history, message) -> AsyncGenerator[AgentEvent]
 ├── tools/          # shared tool definitions (RAG search, MCP tools)
 └── backends/
     ├── custom.py     # Phase A — hand-written ReAct loop
@@ -281,7 +281,7 @@ Honest caveat: there is overlap, and two dashboards is a cost in attention. If i
 |---|---|
 | Framework | Vue 3, Composition API, `<script setup lang="ts">` |
 | Build | Vite (dev server + proxy to backend) |
-| WS client | `useWebSocket` from **@vueuse/core** — auto-reconnect and heartbeat for free |
+| WS client | `useWebSocket` from **@vueuse/core** — auto-reconnect for free (no heartbeat: the server validates every frame and would answer a ping with an error) |
 | State | **Pinia** (sessions, message list, streaming buffer) |
 | Rendering | `markdown-it` + `highlight.js`/shiki for streamed Markdown & code blocks |
 | Styling | Tailwind CSS (optional but fast for a chat UI) |
@@ -310,7 +310,7 @@ src/assistant/       # Python backend
 | `redis` | `redis:7-alpine` | sessions, summaries, audit trail, rate-limit windows |
 | `frontend` | node build stage → nginx (or served by `api`) | Vue SPA |
 
-MCP servers (GitHub, custom code-search via FastMCP) run either as sidecar containers or are spawned by the app, depending on transport (stdio vs streamable HTTP).
+MCP servers (GitHub, custom code-search on the MCP SDK) run either as sidecar containers or are spawned by the app, depending on transport (stdio vs streamable HTTP).
 
 ---
 

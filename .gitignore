@@ -26,8 +26,8 @@ frontend/dist/
 Thumbs.db
 .DS_Store
 
-# Browser-test session artifacts
-
 # Transient browser-automation output (docs/images/ is curated and tracked)
 .playwright-mcp/
+
+# Side environment for the Ragas judge (Python 3.13; see docs/reference/ragas.md)
 .venv-evals/

@@ -4,7 +4,7 @@
 implement, the WebSocket wire protocol and how a turn can be stopped
 cleanly, rolling conversation memory, and where the turn's own bookkeeping
 lives in the code.** It is not the measured comparison of the three
-runtimes — lines of code, latency, streaming behaviour, debuggability — for
+runtimes — lines of code, latency, streaming behavior, debuggability — for
 that, see [reference/backend-comparison.md](../reference/backend-comparison.md).
 
 ## 1. The agent contract (one interface, three runtimes)
@@ -14,12 +14,16 @@ Every backend implements the same tiny protocol
 
 ```python
 class AgentBackend(Protocol):
-    def run(self, history: list[ChatMessage], user_message: str) -> AsyncIterator[AgentEvent]:
+    def run(
+        self, history: list[ChatMessage], user_message: str
+    ) -> AsyncGenerator[AgentEvent, None]:
         """Stream agent events for one user turn.
 
         `history` is the prior conversation (without the current message);
         the backend is responsible for composing the full prompt. The stream
-        must end with a FinalEvent (or ErrorEvent).
+        must end with a FinalEvent (or ErrorEvent). It is an async generator,
+        so a consumer that stops early can `aclose()` it and have the
+        backend's cleanup run in the consumer's own task.
         """
         ...
 ```
@@ -129,8 +133,12 @@ A stopped turn is **not** an error:
   the turn-duration histogram: a stopped turn measures the user's patience,
   not the system's latency.
 
-Closing the tab does the same thing — the connection's `finally` cancels a
-turn still in flight, so nobody pays for an answer no one is reading.
+Closing the tab cancels the same task — the connection's `finally` cancels a
+turn still in flight, so nobody pays for an answer no one is reading — but
+it is recorded differently: the partial answer is stored with a
+`[connection lost]` marker, and `assistant_cancelled_turns_total` does not
+move, because nobody pressed Stop. Counting closed tabs as user stops had
+made the button look far more used than it was.
 
 ### One `turn` frame per turn, always
 
@@ -303,7 +311,7 @@ About ninety seconds, offline or real profile:
   at connect; switching backends means reconnecting, which the UI does
   seamlessly, but a turn already streaming cannot change engines partway.
 - **An unknown `?backend=` fails silently.** `test_backend_query_param_switches_runtime`
-  pins this as intended behaviour (falls back to the default), but it also
+  pins this as intended behavior (falls back to the default), but it also
   means a typo in the query string never surfaces as an error — only the
   `backend` field of the resulting `turn` frame reveals what actually ran.
 - **Folding is lossy on purpose.** `ExtractiveSummarizer` keeps one-line
@@ -313,7 +321,9 @@ About ninety seconds, offline or real profile:
   ask the model which details it dropped.
 - **In-memory checkpointing on the LangGraph backend is not durable.** A
   process restart loses any graph state that lived only in the
-  `InMemorySaver`; conversation history survives in Redis regardless, but
+  `InMemorySaver`, and each turn's thread is deleted the moment the turn
+  ends (an in-process saver that kept every turn grew by one transcript per
+  turn until restart); conversation history survives in Redis regardless, but
   LangGraph's own resumability story does not apply here yet — a named,
   deliberately deferred item in
   [future-tools.md §4](../project/future-tools.md).
@@ -330,12 +340,12 @@ About ninety seconds, offline or real profile:
 | `error: still answering the previous message — stop it first, or wait for it to finish` | a second `user_message` arrived while a turn was in flight | wait for the `turn` frame, or send `{"type": "cancel"}` first |
 | Reopening a chat with `?session_id=` shows an empty transcript, but the model still remembers it | the client reconnected the socket but never called `GET /api/sessions/{id}/messages` | fetch the transcript over HTTP on reopen — the WebSocket resumes history for the model but never replays it to the client |
 | `?backend=does_not_exist` answers normally instead of erroring | unknown backend names silently fall back to the configured default | check the `backend` field of the `turn` frame to see what actually ran |
-| A long conversation's prompt-size figure stops climbing | `ConversationMemory` folded the tail into a rolling summary — this is the intended behaviour, not a bug | inspect `session:{id}:summary` in Redis, or the token counts in `turn.summary` log lines (chapter 07) |
+| A long conversation's prompt-size figure stops climbing | `ConversationMemory` folded the tail into a rolling summary — this is the intended behavior, not a bug | inspect `session:{id}:summary` in Redis, or the token counts in `turn.summary` log lines (chapter 07) |
 | The assistant's answer claims a deletion or edit happened | the output guard should correct this; if the correction is missing, the phrasing did not match `_CLAIMED_MUTATION` | check [output_guard.py](../../src/assistant/agent/output_guard.py) and add the phrasing to `tests/test_review_regressions.py` |
 
 ## 9. Related
 
-- [reference/backend-comparison.md](../reference/backend-comparison.md) — the three runtimes measured: lines of code, latency, streaming behaviour, debuggability
+- [reference/backend-comparison.md](../reference/backend-comparison.md) — the three runtimes measured: lines of code, latency, streaming behavior, debuggability
 - [handbook/06 — Tools & MCP](06-tools-mcp.md) — `Tool.run`, the seam every backend's tool calls pass through
 - [handbook/07 — Observability](07-observability.md) — how to watch a turn — logs, metrics, traces, stats — as it runs
 - [reference/security.md](../reference/security.md) — the output guard and the rate limiter, as security controls rather than turn mechanics
