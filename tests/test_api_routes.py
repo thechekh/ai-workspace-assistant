@@ -36,7 +36,7 @@ def test_bearer_auth_guards_writes_but_not_info() -> None:
             == 401
         )
         ok = client.post("/api/documents", data=upload, headers={"Authorization": "Bearer s3cret"})
-        assert ok.status_code == 200, ok.text
+        assert ok.status_code == 201, ok.text
 
 
 def test_ws_requires_token_when_auth_enabled():

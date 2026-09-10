@@ -239,7 +239,7 @@ def test_the_rate_limit_key_does_not_contain_the_token() -> None:
             data={"text": "# Doc\n\nbody\n", "source": "a.md"},
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
 
     async def _keys() -> list[str]:
         return [str(key) for key in await redis.keys("ratelimit:*")]

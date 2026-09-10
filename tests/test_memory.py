@@ -86,3 +86,46 @@ async def test_folding_is_incremental_across_calls():
 
     assert covered_second > covered_first
     assert len(context) == 3  # summary + keep_recent
+
+
+async def test_history_can_start_at_an_offset():
+    """ConversationMemory reads only the tail its summary does not cover."""
+    store = make_store()
+    for message in turns(6):
+        await store.append("s1", message)
+    tail = await store.history("s1", start=4)
+    assert [message.content[-1] for message in tail] == ["4", "5"]
+    assert await store.history("s1", start=99) == []
+
+
+async def test_only_the_uncovered_tail_is_read_on_later_turns():
+    """A long session's earlier messages are never re-read once summarized."""
+    store = make_store()
+    memory = ConversationMemory(store, ExtractiveSummarizer(), char_budget=100, keep_recent=2)
+    for message in turns(6):
+        await store.append("s1", message)
+    await memory.context_for("s1")  # folds 4 messages into the summary
+
+    seen: list[int] = []
+    original = store.history
+
+    async def spying_history(session_id: str, *, start: int = 0):
+        seen.append(start)
+        return await original(session_id, start=start)
+
+    store.history = spying_history  # type: ignore[method-assign]
+    await memory.context_for("s1")
+    assert seen == [4]
+
+
+async def test_append_turn_sets_the_ttl_in_the_same_round_trip():
+    from assistant.api.schemas import TurnRecord
+
+    store = make_store()
+    await store.append_turn(
+        "s1", TurnRecord(turn_id="t", backend="custom", duration_ms=1, llm_steps=1)
+    )
+    await store.set_summary("s1", "sum", covered=1)
+    redis = store._redis
+    assert 0 < await redis.ttl(SessionStore._turns_key("s1")) <= 60
+    assert 0 < await redis.ttl(SessionStore._summary_key("s1")) <= 60

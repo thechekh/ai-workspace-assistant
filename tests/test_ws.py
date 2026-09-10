@@ -311,3 +311,39 @@ def test_disconnect_mid_turn_cancels_the_work():
         # Leaving the block closes the socket; the app shutdown below only
         # completes if the turn task was actually torn down.
     assert llm.cleaned_up
+
+
+def test_a_lost_connection_is_not_counted_as_a_user_stop():
+    """Both cancel the task; only one of them is the Stop button. Counting a
+    closed tab as "stopped by the user" made the button look far more used
+    than it was, and told the next turn the user had stopped the answer."""
+    from assistant.telemetry import CANCELLED_TOTAL
+
+    llm = SlowLLM()
+    app = _slow_app(llm)
+    before = CANCELLED_TOTAL.labels(backend="custom")._value.get()
+    with TestClient(app) as client:
+        with client.websocket_connect("/chat") as ws:
+            session_id = ws.receive_json()["session_id"]
+            ws.send_json({"type": "user_message", "content": "essay please"})
+            assert ws.receive_json()["type"] == "token"
+        # The socket is gone; give the orphaned turn a moment to be torn down.
+        history = asyncio.run(app.state.session_store.history(session_id))
+    replies = [message for message in history if message.role == "assistant"]
+    assert replies, "the partial answer must survive as history"
+    assert replies[-1].content.endswith("[connection lost]")
+    assert CANCELLED_TOTAL.labels(backend="custom")._value.get() == before
+
+
+def test_a_foreign_session_id_is_replaced_rather_than_trusted(client):
+    """Only ids this server minted (32 hex chars) resume a session; anything
+    else would become a Redis key of the client's choosing."""
+    with client.websocket_connect("/chat?session_id=../../etc/passwd") as ws:
+        hello = ws.receive_json()
+        assert hello["session_id"] != "../../etc/passwd"
+        assert len(hello["session_id"]) == 32
+
+    with client.websocket_connect("/chat") as ws:
+        minted = ws.receive_json()["session_id"]
+    with client.websocket_connect(f"/chat?session_id={minted}") as ws:
+        assert ws.receive_json()["session_id"] == minted

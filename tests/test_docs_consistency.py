@@ -111,15 +111,28 @@ def test_retrieval_scores_do_not_contradict_each_other() -> None:
     )
 
 
-@pytest.mark.slow
-def test_test_count_claims_agree_and_are_not_badly_stale() -> None:
-    """Suite-size claims must agree with each other and be roughly current.
+def _collected_test_count(request: pytest.FixtureRequest) -> int:
+    """How many tests the whole suite collects.
 
-    Deliberately a tolerance rather than equality: requiring an exact match
-    would mean every added test breaks the build until five documents are
-    edited. What actually hurt was contradiction (72 vs 129 vs 145 at once)
-    and gross staleness, so that is what this catches.
+    A full run already knows: the session collected everything, so its count
+    is the answer for free. A partial run (`-k`, `-m`, one file) collected a
+    subset, so the suite is collected again in a subprocess — the 7 seconds
+    that used to be paid on every run, now only when the answer is not
+    already in hand.
     """
+    args = request.config.invocation_params.args
+    partial = (
+        any(
+            arg.startswith(("-k", "-m", "--lf", "--ff", "--sw", "--deselect"))
+            or (not arg.startswith("-") and arg.rstrip("/\\") not in ("tests", "."))
+            for arg in args
+        )
+        or request.config.getoption("keyword")
+        or request.config.getoption("markexpr")
+    )
+    if not partial:
+        return request.session.testscollected
+
     result = subprocess.run(
         [
             sys.executable,
@@ -138,7 +151,19 @@ def test_test_count_claims_agree_and_are_not_badly_stale() -> None:
     )
     match = re.search(r"(\d+) tests collected", result.stdout)
     assert match, f"could not read the collected count from pytest:\n{result.stdout[-500:]}"
-    actual = int(match.group(1))
+    return int(match.group(1))
+
+
+@pytest.mark.slow
+def test_test_count_claims_agree_and_are_not_badly_stale(request: pytest.FixtureRequest) -> None:
+    """Suite-size claims must agree with each other and be roughly current.
+
+    Deliberately a tolerance rather than equality: requiring an exact match
+    would mean every added test breaks the build until five documents are
+    edited. What actually hurt was contradiction (72 vs 129 vs 145 at once)
+    and gross staleness, so that is what this catches.
+    """
+    actual = _collected_test_count(request)
 
     # Historical acceptance records are dated evidence, not current claims,
     # and "not slow" subset counts are a different number by design.

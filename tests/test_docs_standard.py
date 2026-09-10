@@ -119,12 +119,30 @@ def test_ends_with_related_links_that_say_why(page: str) -> None:
     )
 
 
-@pytest.mark.parametrize("page", ADOPTED)
+def _troubleshooting_sections(page: str) -> list[str]:
+    return [body for title, body in _sections(_text(page)) if "Troubleshooting" in title]
+
+
+# Rule 2 allows a page to omit Troubleshooting, so only the pages that have
+# one are checked — parametrized at collection time rather than skipped at
+# run time, so a green run reads "passed", not "passed, 25 skipped".
+WITH_TROUBLESHOOTING = [page for page in ADOPTED if _troubleshooting_sections(page)]
+
+
+def test_reference_pages_all_have_a_troubleshooting_section() -> None:
+    """Rule 2 in full applies to reference/: the section is not optional there."""
+    missing = [
+        page
+        for page in ADOPTED
+        if page.startswith("reference/") and page not in WITH_TROUBLESHOOTING
+    ]
+    assert not missing, f"reference pages without a Troubleshooting section: {missing}"
+
+
+@pytest.mark.parametrize("page", WITH_TROUBLESHOOTING)
 def test_troubleshooting_table_has_symptom_cause_fix(page: str) -> None:
     """Rule 12: a Troubleshooting section is a Symptom … Fix table."""
-    matching = [body for title, body in _sections(_text(page)) if "Troubleshooting" in title]
-    if not matching:
-        pytest.skip(f"{page} has no Troubleshooting section (rule 2 allows omitting it)")
+    matching = _troubleshooting_sections(page)
     header = next((line for line in matching[0].splitlines() if line.startswith("| Symptom")), None)
     assert header is not None, (
         f"{page}: the Troubleshooting table must start with a 'Symptom' column"

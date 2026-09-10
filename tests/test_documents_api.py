@@ -5,7 +5,7 @@ POST /api/documents. These tests use the in-memory Qdrant from conftest, so
 they exercise the real chunk -> embed -> upsert path.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 from fakeredis import FakeAsyncRedis
 from fastapi.testclient import TestClient
@@ -55,7 +55,7 @@ def test_upload_file_becomes_searchable():
         response = client.post(
             "/api/documents", files={"files": ("payments.md", DOC, "text/markdown")}
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
         body = response.json()
         assert body["chunks"] > 0
         assert [doc["source"] for doc in body["indexed"]] == ["payments.md"]
@@ -82,7 +82,7 @@ def test_upload_pasted_text_with_a_name():
         response = client.post(
             "/api/documents", data={"text": "# Runbook\n\nRestart the pod.", "source": "runbook.md"}
         )
-        assert response.status_code == 200
+        assert response.status_code == 201
         assert [doc["source"] for doc in response.json()["indexed"]] == ["runbook.md"]
 
 
@@ -141,7 +141,7 @@ def test_writes_require_the_token_but_listing_does_not():
             data={"text": "# Note\n\nbody", "source": "a.md"},
             headers={"Authorization": "Bearer s3cret"},
         )
-        assert ok.status_code == 200
+        assert ok.status_code == 201
 
 
 async def test_search_docs_says_the_index_is_empty_rather_than_no_match():
@@ -160,7 +160,7 @@ def test_documents_api_needs_a_store():
     class DummyAgent:
         async def run(
             self, history: list[ChatMessage], user_message: str
-        ) -> AsyncIterator[AgentEvent]:
+        ) -> AsyncGenerator[AgentEvent, None]:
             yield FinalEvent(content="")  # pragma: no cover — never run
 
     app = create_app(
@@ -171,3 +171,75 @@ def test_documents_api_needs_a_store():
     )
     with TestClient(app) as client:
         assert client.get("/api/documents").status_code == 503
+
+
+def test_upload_answers_201_and_caps_the_pasted_text():
+    with _client() as client:
+        created = client.post("/api/documents", data={"text": "# T\n\nbody", "source": "t.md"})
+        assert created.status_code == 201
+
+        # Pasted text is bounded: Starlette's form parser refuses a field over
+        # 1 MB before the route runs, and the route's own max_length holds
+        # anything that gets past it to the file cap. Either way: refused,
+        # never chunked and embedded.
+        too_long = client.post(
+            "/api/documents", data={"text": "x" * (2 * 1024 * 1024 + 1), "source": "big.md"}
+        )
+        assert too_long.status_code == 400
+        assert "exceeded maximum size" in too_long.json()["detail"]
+        sources = [doc["source"] for doc in client.get("/api/documents").json()["documents"]]
+        assert "big.md" not in sources
+
+
+def test_an_oversized_declared_file_is_skipped_before_it_is_read(monkeypatch):
+    """The declared size is checked first; the body is only read when it fits."""
+    from starlette.datastructures import UploadFile
+
+    reads: list[str] = []
+    original_read = UploadFile.read
+
+    async def spying_read(self, size=-1):
+        reads.append(self.filename or "")
+        return await original_read(self, size)
+
+    monkeypatch.setattr(UploadFile, "read", spying_read)
+    with _client() as client:
+        response = client.post(
+            "/api/documents",
+            files=[
+                ("files", ("huge.md", b"x" * (2 * 1024 * 1024 + 1), "text/markdown")),
+                ("files", ("small.md", b"# ok\n\nbody", "text/markdown")),
+            ],
+        )
+    assert response.status_code == 201
+    body = response.json()
+    assert any("huge.md" in item and "larger than 2 MB" in item for item in body["skipped"])
+    assert [doc["source"] for doc in body["indexed"]] == ["small.md"]
+    assert "huge.md" not in reads
+
+
+def test_uploads_use_the_apps_shared_embedder():
+    """Index and query vectors must come from one embedder — the retriever's."""
+    retriever = build_seeded_retriever()
+    app = create_app(
+        HermeticSettings(llm_provider="fake", mcp_enabled=False),
+        redis_client=FakeAsyncRedis(decode_responses=True),
+        llm=FakeLLM(),
+        retriever=retriever,
+    )
+    calls: list[int] = []
+    embedder = retriever.embedder
+    original = embedder.embed
+
+    async def counting_embed(texts: list[str]) -> list[list[float]]:
+        calls.append(len(texts))
+        return await original(texts)
+
+    embedder.embed = counting_embed  # type: ignore[method-assign]
+    try:
+        with TestClient(app) as client:
+            assert app.state.embedder is embedder
+            client.post("/api/documents", data={"text": "# T\n\nbody", "source": "t.md"})
+    finally:
+        embedder.embed = original  # type: ignore[method-assign]
+    assert calls == [1]

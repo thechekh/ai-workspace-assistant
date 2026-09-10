@@ -72,12 +72,42 @@ async def test_scripted_tool_loop_executes_through_registry():
 
 
 async def test_recursion_limit_bounds_the_loop():
+    from assistant.agent.base import ITERATION_LIMIT_MESSAGE
+
     llm = ScriptedLLM([[ToolCallRequest(id="c", name="search_docs", arguments="{}")]])
     agent = LangGraphAgent(llm=llm, system_prompt="s", tools=make_registry([]), max_iterations=3)
     events = [event async for event in agent.run(history=[], user_message="loop forever")]
     final = events[-1]
     assert isinstance(final, FinalEvent)
-    assert "limit" in final.content.lower()
+    assert final.content == ITERATION_LIMIT_MESSAGE  # the same words as the other backends
+    assert len([e for e in events if isinstance(e, ToolCallEvent)]) == 3
+
+
+async def test_checkpoints_do_not_outlive_the_turn():
+    """The in-memory saver kept every turn's checkpoints (history + tool
+    results) until restart: a chat server that grew by one transcript per
+    turn. Each thread is deleted when its turn ends."""
+    agent = LangGraphAgent(llm=FakeLLM(), system_prompt="s")
+    for message in ("one", "two", "three"):
+        events = [event async for event in agent.run(history=[], user_message=message)]
+        assert isinstance(events[-1], FinalEvent)
+    assert not agent._checkpointer.storage
+
+
+async def test_checkpoints_are_dropped_when_the_turn_fails_midway():
+    class ExplodingLLM:
+        async def stream_step(self, messages, tools=None):
+            yield TextDelta("partial ")
+            raise RuntimeError("provider went away")
+
+    agent = LangGraphAgent(llm=ExplodingLLM(), system_prompt="s")
+    events = []
+    try:
+        async for event in agent.run(history=[], user_message="boom"):
+            events.append(event)
+    except RuntimeError:
+        pass
+    assert not agent._checkpointer.storage
 
 
 async def test_rag_tool_loop_end_to_end():

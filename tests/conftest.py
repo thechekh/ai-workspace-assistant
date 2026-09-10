@@ -6,6 +6,8 @@ not import from each other (that couples unrelated suites and executes a
 """
 
 import asyncio
+import socket
+from typing import Any
 
 import pytest
 from fakeredis import FakeAsyncRedis
@@ -42,6 +44,36 @@ class HermeticSettings(Settings):
     """Settings that never read a developer's local .env — tests stay deterministic."""
 
     model_config = SettingsConfigDict(env_file=None)
+
+
+# Loopback is fine: the WS tests, the in-memory Qdrant and the MCP stdio
+# servers all stay on this machine.
+_ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1", "::", ""})  # noqa: S104
+
+
+@pytest.fixture(autouse=True)
+def no_outbound_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail loudly if a test tries to reach the internet.
+
+    "Offline-first" is the project's first invariant, and it used to be
+    enforced only by the mocks each test set up. That is one library upgrade
+    from being untrue: openai 3.0 moved the SDK onto `httpx2`, respx patches
+    `httpx`, and an embedder test that had always been mocked began sending a
+    real request to api.openai.com — passing or failing on a live API key.
+    A blocked connect turns that class of accident into an immediate failure.
+    """
+    real_connect = socket.socket.connect
+
+    def guarded(self: socket.socket, address: Any, *args: Any, **kwargs: Any) -> Any:
+        host = address[0] if isinstance(address, tuple) else address
+        if isinstance(host, str) and host not in _ALLOWED_HOSTS:
+            raise RuntimeError(
+                f"the test suite is offline by design, but something tried to connect to {host!r}. "
+                "Mock the provider (see tests/test_llm_errors.py) rather than reaching the network."
+            )
+        return real_connect(self, address, *args, **kwargs)
+
+    monkeypatch.setattr(socket.socket, "connect", guarded)
 
 
 async def build_seeded_retriever_async(

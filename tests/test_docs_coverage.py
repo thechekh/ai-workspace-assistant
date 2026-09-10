@@ -139,6 +139,23 @@ def test_every_source_module_is_referenced() -> None:
     assert not unreferenced, "source files no document points at:\n  " + "\n  ".join(unreferenced)
 
 
+def test_every_test_file_is_in_the_suite_map() -> None:
+    """The handbook's map promises "every test file and what it proves".
+
+    Source files have had this ratchet for a while; test files had none, and
+    six of them had quietly fallen out of the map by the time anyone looked.
+    Documented test coverage is how a reader finds out what is *already*
+    guaranteed before adding a duplicate.
+    """
+    suite_map = (REPO_ROOT / "docs/handbook/09-testing-operations.md").read_text(encoding="utf-8")
+    files = sorted(path.name for path in REPO_ROOT.glob("tests/test_*.py"))
+    missing = [name for name in files if name not in suite_map]
+    assert not missing, (
+        "test files missing from the suite map in docs/handbook/09-testing-operations.md:\n  "
+        + "\n  ".join(missing)
+    )
+
+
 def test_every_runtime_dependency_is_named() -> None:
     """ "Which technologies is this built on?" must be answerable from the docs."""
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
@@ -189,7 +206,7 @@ def _code_blocks(language: str) -> list[tuple[Path, str]]:
         text = path.read_text(encoding="utf-8")
         blocks += [
             (path, match.group(1))
-            for match in re.finditer(rf"^```{language}\n(.*?)^```", text, re.S | re.M)
+            for match in re.finditer(rf"^```{language}\n(.*?)^```", text, re.DOTALL | re.MULTILINE)
         ]
     return blocks
 
@@ -355,7 +372,7 @@ def test_the_reading_roadmap_places_every_document() -> None:
         "documents missing from the reading roadmap in docs/README.md:\n  " + "\n  ".join(unplaced)
     )
 
-    numbers = [int(n) for n in re.findall(r"^\| (\d+) \|", section, re.M)]
+    numbers = [int(n) for n in re.findall(r"^\| (\d+) \|", section, re.MULTILINE)]
     assert numbers == list(range(1, len(numbers) + 1)), (
         f"reading-roadmap numbering is not contiguous 1..{len(numbers)}: {numbers}"
     )

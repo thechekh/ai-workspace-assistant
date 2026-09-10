@@ -98,7 +98,7 @@ def _app(
     )
 
 
-def test_chat_turns_are_limited_per_session():
+def test_chat_turns_are_limited_per_caller():
     """Over the limit, the client gets an error frame — not an LLM call."""
     app = _app(turns_per_minute=2)
     with TestClient(app) as client, client.websocket_connect("/chat") as ws:
@@ -118,7 +118,10 @@ def test_chat_turns_are_limited_per_session():
         ws.send_json({"type": "cancel"})
 
 
-def test_a_second_session_is_not_affected_by_the_first():
+def test_a_new_session_does_not_reset_the_budget():
+    """The session id is the client's to choose; a budget it can escape by
+    reconnecting with a fresh one was not a budget. Turns are keyed by the
+    caller (address, or token), so the second session shares the bucket."""
     app = _app(turns_per_minute=1)
     # Nested deliberately (not SIM117): the first socket must be closed before
     # the second connects, so the two sessions never overlap.
@@ -128,20 +131,52 @@ def test_a_second_session_is_not_affected_by_the_first():
             first.send_json({"type": "user_message", "content": "hello"})
             while first.receive_json()["type"] != "turn":
                 pass
-            first.send_json({"type": "user_message", "content": "again"})
-            assert first.receive_json()["type"] == "error"
 
         with client.websocket_connect("/chat") as second:
-            second.receive_json()  # a fresh session id -> its own bucket
+            second.receive_json()  # a fresh session id — same caller
             second.send_json({"type": "user_message", "content": "hello"})
-            assert any(second.receive_json()["type"] == "final" for _ in range(50))
+            refused = second.receive_json()
+            assert refused["type"] == "error"
+            assert "rate limit reached" in refused["message"]
+
+
+def test_another_caller_is_not_affected_by_the_first():
+    """One noisy client must not lock everyone else out."""
+    app = _app(turns_per_minute=1)
+    with TestClient(app, client=("10.0.0.1", 50001)) as first_caller:
+        with first_caller.websocket_connect("/chat") as ws:
+            ws.receive_json()
+            ws.send_json({"type": "user_message", "content": "hello"})
+            while ws.receive_json()["type"] != "turn":
+                pass
+            ws.send_json({"type": "user_message", "content": "again"})
+            assert ws.receive_json()["type"] == "error"
+
+        with (
+            TestClient(app, client=("10.0.0.2", 50002)) as second_caller,
+            second_caller.websocket_connect("/chat") as ws,
+        ):
+            ws.receive_json()
+            ws.send_json({"type": "user_message", "content": "hello"})
+            assert any(ws.receive_json()["type"] == "final" for _ in range(50))
+
+
+def test_caller_identity_hashes_tokens_and_falls_back_to_the_address():
+    from assistant.api.rate_limit import caller_identity
+
+    hashed = caller_identity(credential="Bearer s3cret", client_host="1.2.3.4")
+    assert "s3cret" not in hashed
+    assert len(hashed) == 16
+    assert hashed == caller_identity(credential="Bearer s3cret", client_host="9.9.9.9")
+    assert caller_identity(credential="", client_host="1.2.3.4") == "1.2.3.4"
+    assert caller_identity(credential="", client_host=None) == "unknown"
 
 
 def test_uploads_are_limited_and_report_retry_after():
     app = _app(uploads_per_hour=1)
     with TestClient(app) as client:
         first = client.post("/api/documents", data={"text": "# One", "source": "a.md"})
-        assert first.status_code == 200
+        assert first.status_code == 201
 
         second = client.post("/api/documents", data={"text": "# Two", "source": "b.md"})
         assert second.status_code == 429
@@ -170,7 +205,7 @@ def test_cleanup_still_works_after_hitting_the_upload_limit():
     with TestClient(app) as client:
         assert (
             client.post("/api/documents", data={"text": "# One", "source": "a.md"}).status_code
-            == 200
+            == 201
         )
         assert (
             client.post("/api/documents", data={"text": "# Two", "source": "b.md"}).status_code
@@ -186,4 +221,4 @@ def test_disabling_the_feature_restores_unlimited_use():
     with TestClient(app) as client:
         for i in range(5):
             response = client.post("/api/documents", data={"text": "# Doc", "source": f"{i}.md"})
-            assert response.status_code == 200
+            assert response.status_code == 201

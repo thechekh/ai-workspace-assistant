@@ -343,3 +343,66 @@ def test_noise_sampler_never_judges_server_spans_by_host() -> None:
         None, 1, "HTTP /chat", kind=SpanKind.SERVER, attributes=attributes
     )
     assert result.decision == Decision.RECORD_AND_SAMPLE
+
+
+def test_otlp_and_langfuse_exporters_are_wired_with_their_endpoints(monkeypatch) -> None:
+    """Without Logfire, a plain SDK provider carries one exporter per
+    destination: Jaeger's OTLP endpoint, and Langfuse's with basic auth.
+    The exporters and the provider are stubbed — nothing opens a socket."""
+    import base64
+
+    from fastapi import FastAPI
+    from pydantic import SecretStr
+
+    from assistant.observability import configure_observability
+    from tests.conftest import HermeticSettings
+
+    exporters: list[dict[str, object]] = []
+    installed: list[object] = []
+
+    class StubExporter:
+        def __init__(self, endpoint: str, headers: dict[str, str] | None = None) -> None:
+            exporters.append({"endpoint": endpoint, "headers": headers or {}})
+
+    class StubProcessor:
+        def __init__(self, exporter: object) -> None:
+            self.exporter = exporter
+
+        def on_start(self, span, parent_context=None) -> None:
+            return None
+
+        def on_end(self, span) -> None:
+            return None
+
+        def shutdown(self) -> None:
+            return None
+
+        def force_flush(self, timeout_millis: int = 30000) -> bool:
+            return True
+
+    monkeypatch.setattr(
+        "opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter", StubExporter
+    )
+    monkeypatch.setattr("opentelemetry.sdk.trace.export.BatchSpanProcessor", StubProcessor)
+    monkeypatch.setattr("opentelemetry.trace.set_tracer_provider", installed.append)
+
+    settings = HermeticSettings(
+        otlp_endpoint="http://localhost:4318/",
+        langfuse_public_key="pk-lf-test",
+        langfuse_secret_key=SecretStr("sk-lf-test"),
+        langfuse_host="https://cloud.langfuse.com/",
+    )
+    configure_observability(FastAPI(), settings)
+
+    assert [e["endpoint"] for e in exporters] == [
+        "http://localhost:4318/v1/traces",
+        "https://cloud.langfuse.com/api/public/otel/v1/traces",
+    ]
+    expected = base64.b64encode(b"pk-lf-test:sk-lf-test").decode()
+    assert exporters[1]["headers"] == {"Authorization": f"Basic {expected}"}
+    from opentelemetry.sdk.trace import TracerProvider
+
+    assert len(installed) == 1, "one tracer provider, installed once"
+    provider = installed[0]
+    assert isinstance(provider, TracerProvider)
+    assert provider.sampler.get_description() == "DropNoisyRootSpans"

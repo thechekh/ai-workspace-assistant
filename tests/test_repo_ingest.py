@@ -121,7 +121,7 @@ async def test_malformed_repo_names_are_rejected_before_any_request(bad: str) ->
     async with httpx.AsyncClient() as client:  # no respx: nothing may go out
         with pytest.raises(RepoIngestError) as exc:
             await fetch_repo_documents(bad, client=client)
-    assert exc.value.status_code == 422
+    assert "not an owner/repository name" in exc.value.detail
 
 
 async def test_the_github_token_reaches_the_wire_and_traversal_paths_do_not_land() -> None:

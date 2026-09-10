@@ -41,3 +41,23 @@ def test_server_event_discriminated_union_parses():
     session = adapter.validate_python({"type": "session", "session_id": "abc"})
     assert type(token).__name__ == "TokenEvent"
     assert type(session).__name__ == "SessionStarted"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("history_keep_recent", 0),  # would fold an empty slice every turn
+        ("history_char_budget", 0),
+        ("session_ttl_seconds", 0),
+        ("rate_limit_turns_per_minute", -1),  # 0 is "disabled"; negative is a typo
+    ],
+)
+def test_integer_settings_are_bounded(field: str, value: int):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match=field):
+        HermeticSettings.model_validate({field: value})
+
+
+def test_zero_disables_a_rate_limit_bucket_and_is_still_valid():
+    assert HermeticSettings(rate_limit_turns_per_minute=0).rate_limit_turns_per_minute == 0

@@ -4,7 +4,7 @@ friendly WS error frames, and indicative cost accounting."""
 import json
 from types import SimpleNamespace
 
-import httpx
+import httpx2  # the OpenAI SDK's transport since 3.0: its errors carry httpx2 requests
 import pytest
 from fakeredis import FakeAsyncRedis
 from fastapi.testclient import TestClient
@@ -25,8 +25,8 @@ from tests.conftest import HermeticSettings, collect_until_final
 
 
 def _http_error(cls, status: int, headers: dict[str, str] | None = None):
-    request = httpx.Request("POST", "https://api.test/v1/chat/completions")
-    response = httpx.Response(status, request=request, headers=headers or {})
+    request = httpx2.Request("POST", "https://api.test/v1/chat/completions")
+    response = httpx2.Response(status, request=request, headers=headers or {})
     return cls("boom", response=response, body=None)
 
 
@@ -73,7 +73,7 @@ def test_describe_llm_error_walks_the_cause_chain():
 
 
 def test_describe_llm_error_handles_connection_errors():
-    exc = APIConnectionError(request=httpx.Request("POST", "https://api.test"))
+    exc = APIConnectionError(request=httpx2.Request("POST", "https://api.test"))
     mapped = describe_llm_error(exc)
     assert mapped is not None
     assert mapped[0] == "provider_unreachable"
@@ -245,7 +245,7 @@ def _tool_use_error(failed_generation: str | None = None) -> APIError:
         body["failed_generation"] = failed_generation
     return APIError(
         "Failed to call a function. Please adjust your prompt.",
-        httpx.Request("POST", "https://api.test/v1/chat/completions"),
+        httpx2.Request("POST", "https://api.test/v1/chat/completions"),
         body=body,
     )
 
