@@ -12,6 +12,7 @@ WebSocket.
 """
 
 import time
+from typing import assert_never
 
 from assistant.agent.base import (
     AgentEvent,
@@ -53,46 +54,56 @@ class TurnRecorder:
         return round((time.perf_counter() - self._started) * 1000)
 
     def observe(self, event: AgentEvent) -> None:
-        """Record one agent event. Pure accounting — no I/O."""
+        """Record one agent event. Pure accounting — no I/O.
+
+        `match` over the closed `AgentEvent` union rather than a chain of
+        isinstance checks: adding a member to the union makes the missing
+        `case` a type error here, instead of an event that silently stops
+        being recorded.
+        """
         now = self.elapsed_ms()
 
-        if isinstance(event, TokenEvent):
-            if self.first_token_ms is None:
-                self.first_token_ms = now
-            self.answer_chars += len(event.content)
-            self._streamed.append(event.content)
+        match event:
+            case TokenEvent():
+                if self.first_token_ms is None:
+                    self.first_token_ms = now
+                self.answer_chars += len(event.content)
+                self._streamed.append(event.content)
 
-        elif isinstance(event, ToolCallEvent):
-            self.tool_calls.append(event.tool)
-            self.events.append(
-                TurnAuditEvent(
-                    ms=now,
-                    type="tool_call",
-                    tool=event.tool,
-                    arguments=str(event.arguments)[:_ARGUMENTS_PREVIEW_CHARS],
+            case ToolCallEvent():
+                self.tool_calls.append(event.tool)
+                self.events.append(
+                    TurnAuditEvent(
+                        ms=now,
+                        type="tool_call",
+                        tool=event.tool,
+                        arguments=str(event.arguments)[:_ARGUMENTS_PREVIEW_CHARS],
+                    )
                 )
-            )
 
-        elif isinstance(event, ToolResultEvent):
-            self.events.append(
-                TurnAuditEvent(
-                    ms=now,
-                    type="tool_result",
-                    tool=event.tool,
-                    result_chars=len(event.result),
+            case ToolResultEvent():
+                self.events.append(
+                    TurnAuditEvent(
+                        ms=now,
+                        type="tool_result",
+                        tool=event.tool,
+                        result_chars=len(event.result),
+                    )
                 )
-            )
 
-        elif isinstance(event, FinalEvent):
-            self.events.append(TurnAuditEvent(ms=now, type="final", chars=len(event.content)))
+            case FinalEvent():
+                self.events.append(TurnAuditEvent(ms=now, type="final", chars=len(event.content)))
 
-        elif isinstance(event, ErrorEvent):
-            self.error_count += 1
-            self.events.append(
-                TurnAuditEvent(
-                    ms=now, type="error", message=event.message[:_ARGUMENTS_PREVIEW_CHARS]
+            case ErrorEvent():
+                self.error_count += 1
+                self.events.append(
+                    TurnAuditEvent(
+                        ms=now, type="error", message=event.message[:_ARGUMENTS_PREVIEW_CHARS]
+                    )
                 )
-            )
+
+            case _:
+                assert_never(event)
 
     def summary(self, *, cancelled: bool = False, failed: bool = False) -> TurnSummary:
         """The `turn` frame the UI renders as a stats line."""

@@ -287,8 +287,11 @@ class PydanticAIAgent:
                                             result=truncate_for_event(text),
                                         )
                                     )
-            output = run.result.output if run.result is not None else ""
-            queue.put_nowait(FinalEvent(content=output if isinstance(output, str) else str(output)))
+            # The agent is built with the default output type, so a completed
+            # run's output is a string; an unfinished one (cancelled between
+            # the loop and here) has no result at all.
+            answer = run.result.output if run.result is not None else ""
+            queue.put_nowait(FinalEvent(content=answer))
         except UsageLimitExceeded:
             # The same ending the other two backends give a looping model.
             queue.put_nowait(FinalEvent(content=ITERATION_LIMIT_MESSAGE))

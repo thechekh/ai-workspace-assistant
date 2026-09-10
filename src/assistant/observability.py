@@ -28,7 +28,12 @@ from opentelemetry.trace import SpanKind  # the API package, already loaded by t
 from assistant.config import Settings
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from opentelemetry.context import Context
     from opentelemetry.sdk.trace.sampling import Sampler
+    from opentelemetry.trace import Link, TraceState
+    from opentelemetry.util.types import Attributes
 
 logger = structlog.get_logger("assistant.observability")
 
@@ -51,7 +56,7 @@ _HOST_KEYS = ("server.address", "net.peer.name", "http.host")
 _URL_KEYS = ("url.full", "http.url")
 
 
-def _is_machinery(name: str, kind: object, attributes: object) -> bool:
+def _is_machinery(name: str, kind: "SpanKind | None", attributes: "Attributes") -> bool:
     """Name says so, or — for HTTP *client* spans — the attributes do.
 
     httpx spans are created under a bare method name ("POST") and renamed
@@ -65,7 +70,7 @@ def _is_machinery(name: str, kind: object, attributes: object) -> bool:
         return True
     if kind is not SpanKind.CLIENT:
         return False
-    attrs = attributes if isinstance(attributes, dict) else {}
+    attrs = attributes or {}
     if any(str(attrs.get(key, "")) in _LOCAL_HOSTS for key in _HOST_KEYS):
         return True
     return any(
@@ -82,16 +87,16 @@ def make_noise_sampler() -> "Sampler":
     from opentelemetry.sdk.trace.sampling import Decision, Sampler, SamplingResult
 
     class DropNoisyRootSpans(Sampler):
-        def should_sample(  # type: ignore[override]  # OTel's signature is untyped
+        def should_sample(
             self,
-            parent_context,
-            trace_id,  # noqa: ARG002 — OTel's signature; the decision never needs it
-            name,
-            kind=None,
-            attributes=None,
-            links=None,  # noqa: ARG002
-            trace_state=None,
-        ):
+            parent_context: "Context | None",
+            trace_id: int,  # noqa: ARG002 — OTel's signature; the decision never needs it
+            name: str,
+            kind: SpanKind | None = None,
+            attributes: "Attributes" = None,
+            links: "Sequence[Link] | None" = None,  # noqa: ARG002
+            trace_state: "TraceState | None" = None,
+        ) -> SamplingResult:
             parent = trace.get_current_span(parent_context).get_span_context()
             if parent.is_valid:
                 sampled = (

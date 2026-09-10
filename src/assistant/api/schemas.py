@@ -145,7 +145,7 @@ class TurnRecord(TurnMetrics):
     typed rather than a bare dict.
     """
 
-    events: list[TurnAuditEvent] = Field(default_factory=list)
+    events: list[TurnAuditEvent] = Field(default_factory=list[TurnAuditEvent])
 
 
 class SessionSummary(BaseModel):

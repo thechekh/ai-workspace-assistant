@@ -76,8 +76,10 @@ class SessionStore:
         cutoff = time.time() - self._ttl
         await self._redis.zremrangebyscore(_INDEX_KEY, 0, cutoff)
         # `withscores=True` returns (member, score) pairs; redis-py types the
-        # reply loosely because it depends on the arguments.
-        entries: list[tuple[str, float]] = await self._redis.zrevrange(  # pyright: ignore[reportAssignmentType]
+        # reply loosely because it depends on the arguments, and its overloads
+        # take a bare `Callable` score cast that a strict checker cannot see
+        # through. The annotation is what this call actually returns.
+        entries: list[tuple[str, float]] = await self._redis.zrevrange(  # pyright: ignore[reportAssignmentType, reportUnknownMemberType]
             _INDEX_KEY, 0, limit - 1, withscores=True
         )
         if not entries:

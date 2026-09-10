@@ -47,7 +47,18 @@ from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
-from langgraph.graph import END, START, MessagesState, StateGraph
+
+# `langgraph` is a PEP 420 namespace package split across several
+# distributions, and the one holding `langgraph.graph` ships no `py.typed`
+# marker — so pyright infers what it can from the source and leaves the
+# rest Unknown. That is why the graph-building calls below carry ignores:
+# they are the boundary this adapter exists to cross, not our own types.
+from langgraph.graph import (  # pyright: ignore[reportMissingTypeStubs]
+    END,
+    START,
+    MessagesState,
+    StateGraph,
+)
 from pydantic import PrivateAttr
 
 from assistant.agent.base import (
@@ -141,7 +152,8 @@ class LLMClientChatModel(BaseChatModel):
         run_manager: AsyncCallbackManagerForLLMRun | None = None,  # noqa: ARG002
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
-        tool_dicts = kwargs.get("tools") or []
+        # LangChain binds tools by pushing OpenAI-format dicts through kwargs.
+        tool_dicts: list[dict[str, Any]] = kwargs.get("tools") or []
         specs = [
             ToolSpec(
                 name=tool["function"]["name"],
@@ -222,12 +234,12 @@ class LangGraphAgent:
             return "tools" if has_calls else END
 
         builder = StateGraph(MessagesState)
-        builder.add_node("agent", agent_node)
-        builder.add_node("tools", tools_node)
+        builder.add_node("agent", agent_node)  # pyright: ignore[reportUnknownMemberType]
+        builder.add_node("tools", tools_node)  # pyright: ignore[reportUnknownMemberType]
         builder.add_edge(START, "agent")
         builder.add_conditional_edges("agent", route_after_agent, {"tools": "tools", END: END})
         builder.add_edge("tools", "agent")
-        return builder.compile(checkpointer=self._checkpointer)
+        return builder.compile(checkpointer=self._checkpointer)  # pyright: ignore[reportUnknownMemberType]
 
     async def run(
         self, history: list[ChatMessage], user_message: str
@@ -251,10 +263,17 @@ class LangGraphAgent:
         }
 
         final_text = ""
-        graph_stream = self._graph.astream(
-            cast("MessagesState", {"messages": lc_history}),
-            config,
-            stream_mode=["messages", "updates"],
+        # A list of stream modes makes astream yield (mode, payload) pairs —
+        # "messages" carrying (chunk, metadata), "updates" carrying
+        # {node: state-delta} — but its declared return type only describes the
+        # single-mode case. The cast says what this call actually yields.
+        graph_stream = cast(
+            "AsyncIterator[tuple[str, Any]]",
+            self._graph.astream(  # pyright: ignore[reportUnknownMemberType]
+                cast("MessagesState", {"messages": lc_history}),
+                config,
+                stream_mode=["messages", "updates"],
+            ),
         )
         try:
             async for mode, payload in graph_stream:
@@ -269,8 +288,10 @@ class LangGraphAgent:
                     continue
                 if not isinstance(payload, dict):
                     continue
-                for delta in payload.values():
-                    for message in delta.get("messages") or []:
+                # {node name: the state delta that node returned}
+                for delta in cast("dict[str, Any]", payload).values():
+                    updated: list[Any] = delta.get("messages") or []
+                    for message in updated:
                         if isinstance(message, AIMessage):
                             if message.tool_calls:
                                 for call in message.tool_calls:

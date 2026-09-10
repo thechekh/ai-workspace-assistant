@@ -79,7 +79,7 @@ class TurnStats:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     usage_estimated: bool = False
-    seen_tool_calls: set[tuple[str, str]] = field(default_factory=set)
+    seen_tool_calls: set[tuple[str, str]] = field(default_factory=set[tuple[str, str]])
 
 
 current_turn_stats: ContextVar[TurnStats | None] = ContextVar("current_turn_stats", default=None)
@@ -151,15 +151,16 @@ class InstrumentedLLM:
                 span.set_attribute("llm.prompt_messages", len(messages))
                 try:
                     async for event in self._inner.stream_step(messages, tools):
-                        if isinstance(event, UsageEvent):
-                            usage = event  # consumed here; never forwarded to the agent loop
-                            continue
-                        if isinstance(event, TextDelta):
-                            text_chars += len(event.text)
-                            if self._log_prompts:
-                                completion_text.append(event.text)
-                        elif isinstance(event, ToolCallRequest):
-                            tool_calls += 1
+                        match event:
+                            case UsageEvent():
+                                usage = event  # consumed here; never forwarded on
+                                continue
+                            case TextDelta():
+                                text_chars += len(event.text)
+                                if self._log_prompts:
+                                    completion_text.append(event.text)
+                            case ToolCallRequest():
+                                tool_calls += 1
                         yield event
                 finally:
                     duration = time.perf_counter() - start

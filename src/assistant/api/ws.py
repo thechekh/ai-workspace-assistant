@@ -16,7 +16,12 @@ from assistant.agent.base import (
 )
 from assistant.agent.output_guard import correct_unsupported_action_claims
 from assistant.api.rate_limit import RateLimiter, caller_identity
-from assistant.api.schemas import CancelRequest, ClientMessage, SessionStarted
+from assistant.api.schemas import (
+    CancelRequest,
+    ClientMessage,
+    SessionStarted,
+    UserMessage,
+)
 from assistant.api.turn_recorder import TurnRecorder
 from assistant.config import Settings
 from assistant.llm.errors import describe_llm_error
@@ -41,6 +46,13 @@ logger = structlog.get_logger("assistant.ws")
 # server ever created, and must not become a Redis key of arbitrary content
 # and length.
 _SESSION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+# Built once, at import: a TypeAdapter compiles a validator, and constructing
+# one per received frame paid that cost on every keystroke-sized message. The
+# explicit annotation is also what gives the parsed frame a real type — the
+# alias is an `Annotated[...]` discriminated union, which pyright cannot infer
+# through the constructor.
+_CLIENT_MESSAGES: TypeAdapter[UserMessage | CancelRequest] = TypeAdapter(ClientMessage)
 
 
 def _resolve_session_id(requested: str | None) -> str:
@@ -102,7 +114,7 @@ async def chat_endpoint(websocket: WebSocket) -> None:
         while True:
             raw = await websocket.receive_text()
             try:
-                incoming = TypeAdapter(ClientMessage).validate_json(raw)
+                incoming = _CLIENT_MESSAGES.validate_json(raw)
             except ValidationError:
                 ERRORS_TOTAL.labels(kind="invalid_message").inc()
                 await websocket.send_text(

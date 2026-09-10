@@ -96,9 +96,13 @@ class RateLimiter:
         # Over the limit: take this request back out, so a client that keeps
         # hammering does not push its own reset time further away.
         await self._redis.zrem(key, f"{now:.6f}")
-        oldest = await self._redis.zrange(key, 0, 0, withscores=True)
-        # `zrange(withscores=True)` is typed as loosely as Redis replies are;
-        # the score is the timestamp this entry was written with.
+        # `zrange(withscores=True)` is typed as loosely as Redis replies are —
+        # redis-py's overloads take a bare `Callable` score cast, which is
+        # partially unknown to a strict checker. The score is the timestamp
+        # this entry was written with.
+        oldest: list[tuple[str, float]] = await self._redis.zrange(  # pyright: ignore[reportAssignmentType, reportUnknownMemberType]
+            key, 0, 0, withscores=True
+        )
         wait = window_seconds - (now - float(oldest[0][1])) if oldest else window_seconds
         return RateLimitDecision(allowed=False, retry_after=max(1, round(wait)))
 

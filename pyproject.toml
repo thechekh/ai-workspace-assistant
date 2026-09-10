@@ -41,6 +41,16 @@ dependencies = [
 # huggingface-hub) that would roughly double the Docker image, and every one
 # of its metrics is an LLM call, so nothing here can run in the offline suite.
 # See docs/reference/metrics.md for why it sits outside CI.
+#
+# It is not free even so: uv resolves every group into one lock, so ragas'
+# transitive `openai<3.11` (via instructor) holds the *application* at openai
+# 3.3 rather than 3.11, and pydantic-ai at 2.38 rather than 2.42. Both were
+# tried — the suite is green on the newer pair — and both ways out were worse:
+# `[tool.uv] conflicts` does not fork here (project dependencies apply to every
+# fork), and a `python_full_version < '3.14'` marker would split the lock so
+# that CI, which runs 3.12 and 3.13, tested a different openai than a developer
+# on 3.14. One lock, one tested set, everywhere. Revisit when ragas' dependency
+# chain catches up.
 evals = [
     # <1.0 because `ragas.metrics.Faithfulness` is deprecated for removal there.
     "ragas>=0.4,<1.0",
@@ -58,7 +68,7 @@ dev = [
     # a new release could fail the build with nothing in the diff to explain
     # it. It still checks npm and warns on stderr when a newer version exists;
     # CI sets PYRIGHT_PYTHON_IGNORE_WARNINGS=1 to keep that out of the log.
-    "pyright==1.1.413",
+    "pyright==1.1.414",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
@@ -127,6 +137,17 @@ extend-immutable-calls = [
 [tool.pyright]
 include = ["src", "tests", "evals"]
 typeCheckingMode = "standard"
+# `src` is held to strict: every parameter and return annotated, no value of
+# an unknown type flowing anywhere. That is affordable for 3k lines of
+# application code and it is where a type error would reach a user. Tests and
+# evals stay standard on purpose — a fake that ignores half a protocol
+# signature, or a fixture returning a bare dict, is fine there and annotating
+# it would add noise without catching anything.
+#
+# Where strict cannot be satisfied the suppression is at the call site with
+# the reason: redis-py's overloads take a bare `Callable`, and `langgraph.graph`
+# ships no `py.typed` marker. Those are the only two, and both are third-party.
+strict = ["src"]
 pythonVersion = "3.12"
 venvPath = "."
 venv = ".venv"
@@ -140,10 +161,15 @@ testpaths = ["tests"]
 addopts = "--strict-markers --strict-config"
 filterwarnings = [
     "error",
-    # langgraph/pydantic-ai still emit these from their own internals.
-    "default::DeprecationWarning",
-    "default::PendingDeprecationWarning",
-    # mcp's FastMCP settings model declares a forward reference pydantic-settings
+    # Two upstream warnings, each silenced by its own message rather than by
+    # allowing a whole category: a blanket `default::DeprecationWarning` also
+    # waves through deprecations in *our* code, which is the only kind worth
+    # failing a build over. A run should print no warnings at all, so a new
+    # one is visible the moment it appears.
+    #
+    # starlette's TestClient imports a deprecated anyio alias at module level.
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+    # mcp's server settings model declares a forward reference pydantic-settings
     # cannot resolve; importing the bundled servers in-process trips it.
     "ignore:Field 'lifespan' has an incomplete definition:pydantic_settings.exceptions.IncompleteFieldDefinitionWarning",
 ]

@@ -6,8 +6,9 @@ A step with no tool calls is the final answer. No framework, no magic:
 this is the mechanism the Pydantic AI and LangGraph backends wrap.
 """
 
-import json
 from collections.abc import AsyncGenerator
+
+from pydantic import TypeAdapter, ValidationError
 
 from assistant.agent.base import (
     ITERATION_LIMIT_MESSAGE,
@@ -27,14 +28,20 @@ from assistant.llm.client import LLMClient, TextDelta, ToolCallRequest, aclose_i
 # Tool output shown in the UI event is trimmed; the LLM always gets the full text.
 
 
+# A model's tool-call arguments arrive as a JSON string it wrote itself, so
+# every failure mode is expected: truncated JSON from a cut-off stream, a bare
+# string, a list. One validator covers all of them, and — unlike json.loads,
+# which is typed Any — it gives the result the type the signature promises.
+_ARGUMENTS = TypeAdapter(dict[str, object])
+
+
 def _parse_arguments(raw: str) -> dict[str, object]:
     if not raw:
         return {}
     try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
+        return _ARGUMENTS.validate_json(raw)
+    except ValidationError:
         return {}
-    return parsed if isinstance(parsed, dict) else {}
 
 
 class CustomAgent:

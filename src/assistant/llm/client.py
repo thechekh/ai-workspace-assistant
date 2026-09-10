@@ -26,6 +26,7 @@ from openai.types.chat import (
     ChatCompletionToolParam,
 )
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
+from pydantic import TypeAdapter, ValidationError
 
 from assistant.agent.base import ChatMessage
 from assistant.config import Settings
@@ -92,6 +93,20 @@ def is_tool_use_failure(exc: BaseException) -> bool:
 # is matched loosely and the closer stays optional.
 # The JSON is brace-matched with raw_decode, so nested arguments parse fine.
 _LEAKED_CALL_PREFIX = re.compile(r"[<(]function[.=(]\s*([\w./-]+)\s*[)>]?", re.IGNORECASE)
+
+# The shape a recovered payload has to have to be readable: a JSON object with
+# string keys. `json.loads` types its result `Any`, which spreads untyped
+# values through every caller; one validator checks the shape and hands back
+# something the type checker can follow.
+_JSON_OBJECT = TypeAdapter(dict[str, object])
+
+
+def _as_json_object(value: object) -> dict[str, object]:
+    """That value as a JSON object, or an empty one if it is not."""
+    try:
+        return _JSON_OBJECT.validate_python(value)
+    except ValidationError:
+        return {}
 
 
 @dataclass(frozen=True)
@@ -160,17 +175,14 @@ def parse_leaked_tool_calls(text: str) -> list[ToolCallRequest] | None:
 
     # Bare-JSON form: one object naming the function directly.
     try:
-        payload = json.loads(text.strip())
-    except ValueError:
+        bare = _JSON_OBJECT.validate_json(text.strip())
+    except ValidationError:
+        return None  # not JSON, or JSON that is not an object
+    name = bare.get("name")
+    if not isinstance(name, str):
         return None
-    if isinstance(payload, dict) and isinstance(payload.get("name"), str):
-        arguments = payload.get("arguments") or payload.get("parameters") or {}
-        return [
-            ToolCallRequest(
-                id="call_recovered_0", name=payload["name"], arguments=json.dumps(arguments)
-            )
-        ]
-    return None
+    arguments: object = bare.get("arguments") or bare.get("parameters") or {}
+    return [ToolCallRequest(id="call_recovered_0", name=name, arguments=json.dumps(arguments))]
 
 
 class LLMClient(Protocol):
@@ -401,7 +413,7 @@ class OpenAICompatibleLLM:
                     continue
                 # Retries exhausted — the provider reports the model's attempt
                 # in failed_generation; recover it instead of failing the turn.
-                body = exc.body if isinstance(exc.body, dict) else {}
+                body = _as_json_object(exc.body)  # the SDK types it `object`
                 recovered = parse_leaked_tool_calls(str(body.get("failed_generation") or ""))
                 if not recovered:
                     raise

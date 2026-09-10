@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Awaitable
+from collections.abc import AsyncGenerator, Awaitable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -6,10 +6,8 @@ from pathlib import Path
 import httpx2
 import redis.asyncio as aioredis
 import structlog
-from fastapi import FastAPI, Response
-from fastapi.responses import FileResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from qdrant_client import AsyncQdrantClient
 from redis.asyncio import Redis
 
@@ -26,6 +24,8 @@ from assistant.agent.tools import (
 from assistant.agent.tools.fetch import new_http_client
 from assistant.api.rate_limit import RateLimiter
 from assistant.api.routes import router as api_router
+from assistant.api.system import dev_router
+from assistant.api.system import router as system_router
 from assistant.api.ws import router as ws_router
 from assistant.config import Settings
 from assistant.llm.client import LLMClient, OpenAICompatibleLLM, build_llm
@@ -89,7 +89,7 @@ class Runtime:
     # The one embedder: queries and ingestion share it (and its connection pool).
     embedder: Embedder | None = None
     mcp_registry: MCPRegistry | None = None
-    mcp_tool_names: list[str] = field(default_factory=list)
+    mcp_tool_names: list[str] = field(default_factory=list[str])
     owns_redis: bool = True
 
     async def aclose(self) -> None:
@@ -228,7 +228,7 @@ def create_app(
     configure_logging(app_settings)
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         runtime = await build_runtime(
             app_settings,
             redis_client=redis_client,
@@ -257,23 +257,10 @@ def create_app(
     app = FastAPI(title="AI Workspace Assistant", lifespan=lifespan)
     app.include_router(ws_router)
     app.include_router(api_router)
-    configure_observability(app, app_settings)
-
-    @app.get("/healthz")
-    async def healthz() -> dict[str, str]:
-        return {"status": "ok"}
-
-    @app.get("/metrics", include_in_schema=False)
-    async def metrics() -> Response:
-        # Prometheus scrape target (counters/histograms from assistant.telemetry).
-        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
-
+    app.include_router(system_router)
     if app_settings.debug:
-        dev_page = Path(__file__).parent / "static" / "dev.html"
-
-        @app.get("/dev", include_in_schema=False)
-        async def dev_console() -> FileResponse:
-            return FileResponse(dev_page)
+        app.include_router(dev_router)
+    configure_observability(app, app_settings)
 
     # Serve the built Vue SPA at / when it exists (mounted last, so API routes win).
     frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
