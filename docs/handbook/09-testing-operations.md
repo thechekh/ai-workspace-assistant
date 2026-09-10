@@ -8,7 +8,7 @@ tiered, feature-by-feature script is
 [reference/testing.md](../reference/testing.md); this chapter is what runs
 without a human at the keyboard, plus how to run the platform once it does.
 
-## 1. The automated suite (621 tests, fully offline)
+## 1. The automated suite (622 tests, fully offline)
 
 ```sh
 uv run pytest -q          # ~26s. No network, no Docker, no keys.
@@ -231,7 +231,7 @@ Three short demos, all offline except the third:
   model's *answers* less faithful (or the reverse) — the two are measured
   separately in `evals/`, and only the free, deterministic one runs on every
   push (§1).
-- **"621 tests" is a snapshot, not a promise.** New tests land between
+- **"622 tests" is a snapshot, not a promise.** New tests land between
   updates to this number; `tests/test_docs_consistency.py` tolerates drift
   up to 5% before failing the build, which is a deliberate looseness, not
   proof the count is current at this exact moment.

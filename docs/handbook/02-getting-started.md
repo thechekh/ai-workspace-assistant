@@ -140,14 +140,16 @@ prints `30` — the 5 Markdown files under
 [evals/corpus/](../../evals/corpus/) are what ingestion path 4 above would
 load, and the number [05 — RAG & Qdrant](05-rag-qdrant.md) evaluates against.
 
-![The Documents panel open over the chat, 2026-09-05: a dropzone for .md/.txt/.rst files, a paste-text expander, and the ingested todometer sources listed with their chunk counts and a remove button each](../images/ui-documents.png)
+![The Documents panel open over the chat, 2026-09-10: a dropzone for .md/.txt/.rst files, a paste-text expander, and the ingested todometer sources listed with their chunk counts and a remove button each](../images/ui-documents.png)
 
 Line by line — way 2 above, as the UI shows it:
 
 - **`Documents (30)`** in the header — the knowledge base holds 30 sources
   at capture time; the count is live.
-- **`Drop .md / .txt / .rst here, or click to choose`** — way 2's dropzone;
-  the accepted suffixes are the same list `POST /api/documents` enforces.
+- **`Drop .md / .txt / .rst here, or choose files`** — way 2's dropzone; the
+  accepted suffixes are the same list `POST /api/documents` enforces.
+  **`choose files`** is a real button wrapping the file input, so the panel
+  is operable from the keyboard and not only by pointer.
 - **`or paste text`** — the expander for a named snippet (`name.md` and a
   body), indexed like a file.
 - **The list** — every source with its chunk count: `cassidoo/todometer/README.md
@@ -216,7 +218,7 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 3. Open http://localhost:8000/ → send `ping` → tokens stream, a stats line
    appears under the answer. *That stats line is the same one every other
    chapter in this handbook points back to.*
-4. `uv run pytest -q` → `621 passed` (fully offline, ~25 s).
+4. `uv run pytest -q` → `622 passed` (fully offline, ~25 s).
 
 ## 7. Troubleshooting
 

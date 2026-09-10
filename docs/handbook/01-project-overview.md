@@ -173,7 +173,7 @@ frontend/              Vue 3 + Pinia + Vite chat UI
 evals/corpus/          retrieval test fixture (golden-set answers live here)
 observability/         Prometheus config + Grafana provisioning + dashboard
 evals/                 golden set + retrieval quality + embedding comparison
-tests/                 621 deterministic tests (no network, no Docker needed)
+tests/                 622 deterministic tests (no network, no Docker needed)
 docs/                  ALL documentation (handbook, theory, reference, project)
 ```
 
@@ -223,15 +223,17 @@ About thirty seconds, no keys:
 Total: well under a minute, and free to repeat as many times as a question
 needs it.
 
-![The chat UI on first load, 2026-09-05: header controls and the three-line hint about documents, the Documents panel and Dev mode](../images/ui-empty.png)
+![The chat UI on first load, 2026-09-10: header controls and the three-line hint about documents, the Documents panel and Dev mode](../images/ui-empty.png)
 
 Line by line — step 1 of the demo, what the room sees before the first
 question:
 
 - **The header row** — the health dot (green: every component answered),
-  the `openai · hybrid` badge, the **Dev** toggle, **Chats**, **Documents**,
-  the backend dropdown, and **connected** — the whole control surface §1
-  describes, in one row.
+  the `openai · hybrid` badge, the mode toggle reading **Standard**,
+  **Chats**, **Documents (30)**, the backend dropdown on *custom loop*, and
+  the green **connected** pill — the whole control surface §1 describes, in
+  one row. When the socket drops, that pill becomes a **disconnected · retry**
+  button rather than a dead label.
 - **The hint** — *"Ask about your documents, the codebase, or a URL. Add
   documents with the Documents panel — the knowledge base starts empty.
   Turn on Dev in the header to see tools, timings, tokens and cost."* — the

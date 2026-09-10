@@ -292,30 +292,31 @@ that says "treat this number as approximate".
   `+1284 ms tool_call fetch_url {...} → +2591 ms tool_result (1501 chars) →
   +3290 ms final (439 chars)`.
 
-![The details timeline under an answer in Dev mode, 2026-09-05: the stats line 5.1s · first token 4922 ms · 3 LLM steps · 19489→72 tok · ~$0.0020 · search_docs, repo_read_file, then five timeline rows with millisecond offsets](../images/ui-details.png)
+![The details timeline under an answer in Dev mode, 2026-09-10: the stats line 10.5s · first token 10515 ms · 2 LLM steps · 4074→73 tok · ~$0.0004 · search_docs, then three timeline rows with millisecond offsets](../images/ui-details.png)
 
 Line by line — the timeline **details** opens, from a real turn on
 *"What does the progress meter in todometer compute?"*:
 
-- **The stats line** — `5.1s · first token 4922 ms · 3 LLM steps ·
-  19489→72 tok · ~$0.0020 · search_docs, repo_read_file · hide` — the
-  `turn` frame; **hide** collapses the timeline again.
-- **`+1978 ms tool_call search_docs {'query': 'progress meter in todometer'}`**
-  — the first LLM step took about two seconds to decide on a search; the
-  offset is from the start of the turn.
-- **`+2307 ms tool_result search_docs → 1501 chars`** — retrieval took
-  ~330 ms here (a warm embeddings call); the `1501 chars` is the UI's
-  display cap on tool results, not what the model received.
-- **`+3618 ms tool_call repo_read_file {'repo': 'cassidoo/todometer', 'path': 'src/main/index.js'}`**
-  — step 2 chose to open the file the search named.
-- **`+4150 ms tool_result repo_read_file → 1501 chars`** — the file came
-  back from GitHub in ~530 ms.
-- **`+5056 ms final answer, 151 chars`** — step 3 wrote the answer; the
-  first visible token had arrived at 4,922 ms, because nothing is written
-  before the tools are done.
+- **The stats line** — `10.5s · first token 10515 ms · 2 LLM steps ·
+  4074→73 tok · ~$0.0004 · search_docs · hide` — the `turn` frame; **hide**
+  collapses the timeline again.
+- **`+1476 ms tool_call search_docs {'query': 'progress meter in todometer'}`**
+  — the first LLM step took about a second and a half to decide on a search;
+  the offset is from the start of the turn.
+- **`+9041 ms tool_result search_docs → 1501 chars`** — and here is why a
+  timeline earns its place: retrieval took **7.5 seconds**, nearly the whole
+  turn, because this was a cold embeddings call against the provider. The
+  stats line alone would have said "10.5s" and left you guessing which layer
+  spent it. The `1501 chars` is the UI's display cap on tool results, not
+  what the model received.
+- **`+10537 ms final answer, 296 chars`** — the second step wrote the
+  answer; the first visible token arrived at 10,515 ms, because nothing is
+  written before the tools are done.
 
-The tool-result card above the answer shows the code the model read —
-the `1501 chars` the timeline names, cut with `…`.
+The tool-result card above the answer shows the code the model read — the
+`1501 chars` the timeline names, cut with `…`. A turn where the model also
+opens the file it found runs to three steps and two tools; the same question
+on 2026-09-05 read `3 LLM steps · 19489→72 tok · ~$0.0020`.
 
 ## 6. Deep health — the "controlled" part
 

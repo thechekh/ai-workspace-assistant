@@ -375,24 +375,29 @@ Line by line, mapped to the steps above:
 - **`POST …/chat/completions`** at `11:51:50.901` — step 7 again, the answer.
 - **`turn.summary …`** — step 12: every number the stats line shows.
 
-![The chat UI in Dev mode after a turn on the walkthrough's question, 2026-09-05: the answer, and the stats line 8.9s · first token 7964 ms · 3 LLM steps · 14609→273 tok · ~$0.0016 · search_docs, repo_read_file](../images/ui-chat-turn.png)
+![The chat UI in Dev mode after a turn on the walkthrough's question, 2026-09-10: the tool-result card, the answer, and the stats line 2.8s · first token 2691 ms · 2 LLM steps · 3318→63 tok · ~$0.0004 · search_docs](../images/ui-chat-turn.png)
 
-The same question in the browser, a later turn than the log above (this one
-opened the file as well, so three steps and two tools):
+The same question in the browser, a separate turn from the log above:
 
 - **The header** — the `openai · hybrid` badge (provider and retrieval
-  mode from `/api/info`), the **Dev** toggle on, **Chats**, **Documents
+  mode from `/api/info`), the mode toggle on **Dev**, **Chats**, **Documents
   (30)** with the knowledge base's source count, the backend dropdown on
   *custom loop*, and the green **connected** pill — step 1's socket.
 - **The tool-result card** above the answer (scrolled) shows the
   `RELEASE-DOCS.md` excerpt the model read — step 8's result, as the user
   sees it.
-- **The answer** — the release steps, quoted from that file — step 10.
-- **The stats line** — `8.9s · first token 7964 ms · 3 LLM steps ·
-  14609→273 tok · ~$0.0016 · search_docs, repo_read_file` — step 12's
-  `turn` frame rendered: three LLM steps because the model searched, then
-  read the file, then answered; real token counts (no `(est)`); the cost at
-  list price. **details** opens the timeline ([handbook/07 §5](../handbook/07-observability.md)).
+- **The answer** — the release steps, naming `RELEASE-DOCS.md` and
+  `README.md` — step 10 — with a **copy** control beneath it that yields the
+  Markdown source rather than the rendered text.
+- **The stats line** — `2.8s · first token 2691 ms · 2 LLM steps ·
+  3318→63 tok · ~$0.0004 · search_docs` — step 12's `turn` frame rendered:
+  two LLM steps because the model searched and then answered from the
+  excerpt without opening the file; real token counts (no `(est)`); the cost
+  at list price. **details** opens the timeline
+  ([handbook/07 §5](../handbook/07-observability.md)). A turn that also opens
+  the file costs a third step and roughly three times the prompt tokens — the
+  same question on 2026-09-05 read `8.9s · 3 LLM steps · 14609→273 tok ·
+  ~$0.0016`, which is how much one extra tool call moves the numbers.
 
 ![A Jaeger trace of one real turn on 2026-09-05: the WebSocket request at the root, agent.turn beneath it, three llm.step spans and two tool.execute spans, the first containing rag.retrieve — 15 spans in 6.44 s](../images/jaeger-trace-waterfall.png)
 
