@@ -142,7 +142,7 @@ receives the same finished list regardless of which one is running.
 - **The bounding guarantee has exactly one shot at being caught if it
   breaks.** It holds because
   `test_long_conversations_stay_bounded_by_summary` passes — one assertion
-  inside the 624-test offline suite (2026-09-10, `uv run pytest -q`). If
+  inside the 627-test offline suite (2026-09-10, `uv run pytest -q`). If
   that test were ever weakened, nothing else here would notice prompts
   silently growing again.
 - **The char-per-token approximation drifts by provider and language.** ~4

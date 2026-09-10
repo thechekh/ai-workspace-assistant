@@ -85,7 +85,7 @@ once per shell, then the same `uv run` command.
 
 | Run | Wall clock | Cost |
 |---|---|---|
-| the suite, `uv run pytest -q` (2026-09-10) | 20.7 s, 624 passed, nothing skipped | nothing |
+| the suite, `uv run pytest -q` (2026-09-10) | 20.5 s, 627 passed, nothing skipped | nothing |
 | Tier A startup | ~3 s | nothing |
 | Tier B, `docker compose up -d` from a warm image cache | ~10 s until Redis and Qdrant report healthy | nothing |
 | one Tier C turn with a tool call | 4–5 s | $0.001–0.002 |
@@ -93,11 +93,11 @@ once per shell, then the same `uv run` command.
 
 ## 5. How to see it
 
-![The suite tail and the Tier A deep-health JSON: 624 passed, and a degraded status whose only error is the absent Qdrant](../images/testing-suite-and-health.png)
+![The suite tail and the Tier A deep-health JSON: 627 passed, and a degraded status whose only error is the absent Qdrant](../images/testing-suite-and-health.png)
 
 Line by line:
 
-- **`624 passed in 20.74s`** — the whole suite, offline: no network, no
+- **`627 passed in 20.45s`** — the whole suite, offline: no network, no
   Docker, no keys, and nothing skipped. "Offline" is enforced rather than
   assumed: a fixture in `tests/conftest.py` blocks any connect to a
   non-loopback address, so a test that loses its mock fails instead of

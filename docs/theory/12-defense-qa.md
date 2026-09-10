@@ -18,7 +18,7 @@ which of these are re-runnable on demand and which can drift)*
 
 | Claim | Value | How to prove it |
 |---|---|---|
-| Tests | 624 backend tests + 92 frontend tests | `uv run pytest -q`, `npm run test:run` |
+| Tests | 627 backend tests + 92 frontend tests | `uv run pytest -q`, `npm run test:run` |
 | Coverage | ~92%, with a 90% floor enforced in CI (2026-09-07) | `uv run pytest --cov` |
 | Retrieval quality | recall@1 **0.83**, recall@5 **1.00**, MRR **0.92** | `uv run python evals/run_retrieval.py --memory` |
 | Agent backends | 110 / 364 / 318 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
@@ -321,7 +321,7 @@ accounts.
 Remove the nondeterminism from every layer except the one under evaluation:
 scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-**624 tests in ~23 seconds, fully offline** — no network, no containers, no
+**627 tests in ~23 seconds, fully offline** — no network, no containers, no
 keys. Model *quality* is deliberately out of unit scope; that's what the
 eval harness is for.
 

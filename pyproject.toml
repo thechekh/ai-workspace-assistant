@@ -191,5 +191,8 @@ fail_under = 90
 exclude_also = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
+    # An exhaustiveness guard on a closed union: pyright proves it
+    # unreachable, so reaching it in a test is impossible by construction.
+    "assert_never\\(",
     "\\.\\.\\.$",
 ]

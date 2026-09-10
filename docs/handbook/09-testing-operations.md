@@ -8,7 +8,7 @@ tiered, feature-by-feature script is
 [reference/testing.md](../reference/testing.md); this chapter is what runs
 without a human at the keyboard, plus how to run the platform once it does.
 
-## 1. The automated suite (624 tests, fully offline)
+## 1. The automated suite (627 tests, fully offline)
 
 ```sh
 uv run pytest -q          # ~26s. No network, no Docker, no keys.
@@ -43,6 +43,7 @@ scripted provider errors. Map of the suite:
 | test_mcp_registry.py | the connect path without subprocesses: a server that never answers the handshake is torn down at the timeout rather than left running |
 | test_runtime.py | startup and shutdown: Redis socket timeouts, one shared embedder, a failed startup releasing what it opened, and a close that continues past a failing step |
 | test_memory.py | rolling summarization math |
+| test_turn_recorder.py | per-turn accounting on its own: the timeline and estimated counts a normal turn produces, and the failure path — error counted, partial answer kept, provider message truncated before it reaches Redis |
 | test_api_routes.py / test_config.py | REST + auth + settings |
 | test_documents_api.py | documents added at runtime: upload (file + pasted), list, re-upload replaces rather than duplicates, delete, rejected types, auth, and the empty-knowledge-base message |
 | test_fake_parity.py | all three backends route the same prompt to the same tool — the regression guard for the drift that made one backend's offline fake miss a tool |
@@ -231,7 +232,7 @@ Three short demos, all offline except the third:
   model's *answers* less faithful (or the reverse) — the two are measured
   separately in `evals/`, and only the free, deterministic one runs on every
   push (§1).
-- **"624 tests" is a snapshot, not a promise.** New tests land between
+- **"627 tests" is a snapshot, not a promise.** New tests land between
   updates to this number; `tests/test_docs_consistency.py` tolerates drift
   up to 5% before failing the build, which is a deliberate looseness, not
   proof the count is current at this exact moment.

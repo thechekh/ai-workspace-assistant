@@ -29,7 +29,7 @@ SDK use its own default," which is exactly what makes adding a fourth
 OpenAI-compatible provider a one-line change.
 
 **The two modes you will actually use.** `fake` for everything you can test
-without spending — the full tool loop, RAG, streaming, cancellation, all 624
+without spending — the full tool loop, RAG, streaming, cancellation, all 627
 tests — and `openai` when you want real answers. Switching is two lines in
 `.env`; no code changes, because the provider is a config value.
 
