@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LLMProvider = Literal["fake", "openai", "ollama", "gemini"]
@@ -176,3 +176,26 @@ class Settings(BaseSettings):
     langfuse_public_key: str | None = None
     langfuse_secret_key: SecretStr | None = None
     langfuse_host: str = "https://cloud.langfuse.com"
+
+    # Every optional credential and endpoint above means "not configured" when
+    # it is absent — and `ASSISTANT_OTLP_ENDPOINT=` in a .env file is how
+    # people write that. Without this, an empty string is a *value*: it is
+    # not None, so tracing switched itself on and pointed the exporter at
+    # nothing, which logged a connection warning and an export error every few
+    # seconds for the life of the process. Blank now means unset, everywhere.
+    @field_validator(
+        "auth_token",
+        "llm_api_key",
+        "llm_base_url",
+        "embedding_api_key",
+        "voyage_api_key",
+        "github_token",
+        "otlp_endpoint",
+        "logfire_token",
+        "langfuse_public_key",
+        "langfuse_secret_key",
+        mode="before",
+    )
+    @classmethod
+    def _blank_means_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
