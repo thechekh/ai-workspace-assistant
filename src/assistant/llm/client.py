@@ -12,25 +12,26 @@ step with the results appended.
 
 import asyncio
 import json
-import logging
 import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Protocol, cast
 
-import httpx
+import httpx2  # the OpenAI SDK's transport since 3.0 — see OpenAICompatibleLLM
+import structlog
 from openai import APIError, AsyncOpenAI, AsyncStream, BadRequestError, RateLimitError
 from openai.types.chat import (
     ChatCompletionChunk,
     ChatCompletionMessageParam,
     ChatCompletionToolParam,
 )
+from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 
 from assistant.agent.base import ChatMessage
 from assistant.config import Settings
 from assistant.llm.fake import decide_fake_tool_call, echo_reply, stream_words, tool_result_reply
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger("assistant.llm")
 
 PROVIDER_BASE_URLS: dict[str, str | None] = {
     "openai": None,  # SDK default
@@ -180,6 +181,20 @@ class LLMClient(Protocol):
         ...
 
 
+async def aclose_iterator(iterator: AsyncIterator[object]) -> None:
+    """Close an async iterator now, in this task, if it can be closed.
+
+    Every `stream_step` in this project is an async generator, but the
+    protocol only promises an iterator. A consumer that stops early (a
+    stopped turn) must not leave the generator — and the provider's HTTP
+    stream inside it — to be finalized by the garbage collector in whatever
+    task happens to run then.
+    """
+    aclose = getattr(iterator, "aclose", None)
+    if aclose is not None:
+        await aclose()
+
+
 def _to_openai_messages(messages: list[ChatMessage]) -> list[ChatCompletionMessageParam]:
     payload: list[dict[str, object]] = []
     for message in messages:
@@ -282,7 +297,7 @@ class _LeakedTextBuffer:
         self._held = []
         leaked = parse_leaked_tool_calls(text)
         if leaked:
-            logger.warning("recovered %d tool call(s) from text output", len(leaked))
+            logger.warning("llm.recovered_tool_calls", source="text", count=len(leaked))
             return list(leaked)
         return [TextDelta(text=text)]
 
@@ -293,7 +308,7 @@ class _ToolCallAccumulator:
     def __init__(self) -> None:
         self._pending: dict[int, dict[str, str]] = {}
 
-    def add(self, fragment) -> None:
+    def add(self, fragment: ChoiceDeltaToolCall) -> None:
         entry = self._pending.setdefault(fragment.index, {"id": "", "name": "", "arguments": ""})
         if fragment.id:
             entry["id"] = fragment.id
@@ -322,8 +337,10 @@ class OpenAICompatibleLLM:
             # The SDK defaults to a 600s read timeout, which would pin a chat
             # turn for ten minutes on a stalled provider. Its own retries are
             # disabled because this class hand-rolls them below (otherwise the
-            # two multiply).
-            timeout=httpx.Timeout(_REQUEST_TIMEOUT_S, connect=5.0),
+            # two multiply). httpx2, not httpx: openai 3.0 moved its own
+            # transport there, and the two libraries' types are not
+            # interchangeable even though the API is nearly identical.
+            timeout=httpx2.Timeout(_REQUEST_TIMEOUT_S, connect=5.0),
             max_retries=0,
         )
 
@@ -377,9 +394,9 @@ class OpenAICompatibleLLM:
                 if tool_use_retries < TOOL_USE_RETRIES:
                     tool_use_retries += 1
                     logger.warning(
-                        "model produced an invalid tool call — retrying step (%d/%d)",
-                        tool_use_retries,
-                        TOOL_USE_RETRIES,
+                        "llm.invalid_tool_call_retry",
+                        attempt=tool_use_retries,
+                        retries=TOOL_USE_RETRIES,
                     )
                     continue
                 # Retries exhausted — the provider reports the model's attempt
@@ -388,7 +405,9 @@ class OpenAICompatibleLLM:
                 recovered = parse_leaked_tool_calls(str(body.get("failed_generation") or ""))
                 if not recovered:
                     raise
-                logger.warning("recovered %d tool call(s) from failed_generation", len(recovered))
+                logger.warning(
+                    "llm.recovered_tool_calls", source="failed_generation", count=len(recovered)
+                )
                 for call in recovered:
                     yield call
                 return
@@ -422,10 +441,10 @@ class OpenAICompatibleLLM:
                 rate_limit_retries += 1
                 delay = rate_limit_delay(exc, rate_limit_retries)
                 logger.warning(
-                    "LLM rate limited (429) — retry %d/%d in %.1fs",
-                    rate_limit_retries,
-                    RATE_LIMIT_RETRIES,
-                    delay,
+                    "llm.rate_limited",
+                    attempt=rate_limit_retries,
+                    retries=RATE_LIMIT_RETRIES,
+                    delay_s=round(delay, 1),
                 )
                 await asyncio.sleep(delay)
 

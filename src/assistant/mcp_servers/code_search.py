@@ -12,9 +12,9 @@ import re
 from collections.abc import Iterator
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
-mcp = FastMCP("code-search")
+mcp = MCPServer("code-search")
 
 ROOT = Path(os.environ.get("CODE_SEARCH_ROOT", ".")).resolve()
 

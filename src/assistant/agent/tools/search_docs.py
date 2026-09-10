@@ -9,12 +9,11 @@ outcomes, because they need different answers from the model:
 - matches               -> the chunks, with source and heading for citation
 """
 
-import re
-
 from assistant.agent.tools.base import Tool
+from assistant.rag.filetypes import is_code_path
 from assistant.rag.retriever import Retriever
-
-_TOKEN_RE = re.compile(r"\w+")
+from assistant.rag.sparse import WORD_RE
+from assistant.rag.store import RetrievedChunk
 
 _MAX_CHUNK_CHARS = 1500
 
@@ -50,7 +49,7 @@ def _zero_result_help(query: str, sources: list[tuple[str, int]]) -> str:
         by_repo[repo] = by_repo.get(repo, 0) + 1
     inventory = "; ".join(f"{repo} ({count} files)" for repo, count in sorted(by_repo.items()))
 
-    tokens = {token.lower() for token in _TOKEN_RE.findall(query) if len(token) >= 3}
+    tokens = {token.lower() for token in WORD_RE.findall(query) if len(token) >= 3}
     matches = [
         source
         for source, _count in sources
@@ -71,18 +70,11 @@ def _zero_result_help(query: str, sources: list[tuple[str, int]]) -> str:
     )
 
 
-_CODE_SUFFIXES = (
-    ".py", ".pyi", ".js", ".jsx", ".ts", ".tsx", ".vue", ".go", ".rs",
-    ".rb", ".java", ".kt", ".c", ".h", ".cpp", ".hpp", ".cs", ".php",
-    ".sql", ".sh",
-)  # fmt: skip
-
-
-def _code_hint(results: list) -> str:
+def _code_hint(results: list[RetrievedChunk]) -> str:
     """The chained call, spelled out, for the best code hit (if any)."""
     for result in results:
         source = result.source
-        if not source.endswith(_CODE_SUFFIXES):
+        if not is_code_path(source):
             continue
         parts = source.split("/")
         if len(parts) < 3:

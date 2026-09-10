@@ -9,13 +9,14 @@ WS layer) is merged into every line from every logger automatically.
 import logging
 
 import structlog
+from structlog.typing import Processor
 
 from assistant.config import Settings
 
 
 def configure_logging(settings: Settings) -> None:
     timestamper = structlog.processors.TimeStamper(fmt="iso")
-    shared_processors: list = [
+    shared_processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
@@ -27,10 +28,13 @@ def configure_logging(settings: Settings) -> None:
         else structlog.dev.ConsoleRenderer()
     )
 
-    # stdlib logging (uvicorn deps, our logging.getLogger modules) -> same renderer.
-    # JSON mode needs format_exc_info to turn exc_info into an "exception" string
-    # (ConsoleRenderer pretty-prints tracebacks itself and must NOT get it).
-    formatter_processors: list = [structlog.stdlib.ProcessorFormatter.remove_processors_meta]
+    # stdlib logging (uvicorn, the SDKs — every module of ours uses structlog)
+    # -> same renderer. JSON mode needs format_exc_info to turn exc_info into
+    # an "exception" string (ConsoleRenderer pretty-prints tracebacks itself
+    # and must NOT get it).
+    formatter_processors: list[Processor] = [
+        structlog.stdlib.ProcessorFormatter.remove_processors_meta
+    ]
     if settings.log_json:
         formatter_processors.append(structlog.processors.format_exc_info)
     formatter_processors.append(renderer)

@@ -42,10 +42,9 @@ class SessionStarted(BaseModel):
     session_id: str
 
 
-class TurnSummary(BaseModel):
-    """Per-turn stats, sent after `final` — rendered as a meta line in the UI."""
+class TurnMetrics(BaseModel):
+    """What one turn cost and how it ended — shared by the WS frame and the audit row."""
 
-    type: Literal["turn"] = "turn"
     turn_id: str
     backend: str
     duration_ms: int
@@ -57,13 +56,49 @@ class TurnSummary(BaseModel):
     usage_estimated: bool = True
     # Indicative spend at listed pay-per-token prices (0.0 for fake/unknown models)
     cost_usd: float = 0.0
-    # True when the user stopped the turn: whatever streamed before the stop
-    # is kept, and the partial cost is still accounted for.
+    # True when the turn was stopped before its final answer — by the user, or
+    # by the client going away: whatever streamed before the stop is kept, and
+    # the partial cost is still accounted for.
     cancelled: bool = False
     # True when the turn ended in an error (the `error` frame carries the
     # message). The tokens spent getting there are still counted — a provider
     # that fails after two retries is exactly when spend must stay visible.
     failed: bool = False
+
+
+class TurnSummary(TurnMetrics):
+    """Per-turn stats, sent after `final` — rendered as a meta line in the UI."""
+
+    type: Literal["turn"] = "turn"
+
+
+class PlatformInfo(BaseModel):
+    """What the UI needs before it can talk: runtimes, providers, whether to send a token."""
+
+    backends: list[str]
+    default_backend: str
+    llm_provider: str
+    embedding_provider: str
+    retrieval_mode: str
+    collection: str
+    auth_required: bool
+
+
+class HealthReport(BaseModel):
+    """Deep health: one entry per dependency, each with its own status and details."""
+
+    status: Literal["ok", "degraded"]
+    components: dict[str, dict[str, object]]
+
+
+class SessionDeleted(BaseModel):
+    session_id: str
+    deleted: Literal[True] = True
+
+
+class DocumentDeleted(BaseModel):
+    source: str
+    removed_chunks: int
 
 
 class IndexedDocument(BaseModel):
@@ -102,7 +137,7 @@ class TurnAuditEvent(BaseModel):
     message: str | None = None
 
 
-class TurnRecord(BaseModel):
+class TurnRecord(TurnMetrics):
     """A replayable turn: the same stats the UI shows, plus the timeline.
 
     This is a real contract — it round-trips through Redis and is served by
@@ -110,18 +145,6 @@ class TurnRecord(BaseModel):
     typed rather than a bare dict.
     """
 
-    turn_id: str
-    backend: str
-    duration_ms: int
-    first_token_ms: int | None = None
-    llm_steps: int
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    usage_estimated: bool = True
-    cost_usd: float = 0.0
-    cancelled: bool = False
-    failed: bool = False
-    tool_calls: list[str] = Field(default_factory=list)
     events: list[TurnAuditEvent] = Field(default_factory=list)
 
 

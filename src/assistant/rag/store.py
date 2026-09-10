@@ -7,15 +7,14 @@ automatically if an older single-vector schema is found — chunks are
 derived data, re-ingesting is cheap and idempotent.
 """
 
-import logging
-
+import structlog
 from pydantic import BaseModel
 from qdrant_client import AsyncQdrantClient
 from qdrant_client import models as qm
 
 from assistant.rag.chunking import Chunk
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger("assistant.rag")
 
 DENSE = "dense"
 SPARSE = "lexical"
@@ -39,7 +38,7 @@ class VectorStore:
         if await self._client.collection_exists(self.collection):
             if not recreate and await self._has_expected_schema(dimension):
                 return
-            logger.info("recreating collection %r (schema change requested)", self.collection)
+            logger.info("collection.recreate", collection=self.collection)
             await self._client.delete_collection(self.collection)
         await self._client.create_collection(
             collection_name=self.collection,

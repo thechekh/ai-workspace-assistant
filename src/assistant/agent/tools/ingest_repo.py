@@ -10,17 +10,17 @@ plus one additive, rate-limited exception", and the allowlist test in
 `test_review_regressions.py` pins exactly that.
 """
 
-import logging
-
 import httpx
+import structlog
 
 from assistant.agent.tools.base import Tool
 from assistant.config import Settings
+from assistant.rag.embeddings import Embedder
 from assistant.rag.ingest import ingest_documents
 from assistant.rag.repo import RepoIngestError, fetch_repo_documents
 from assistant.rag.store import VectorStore
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger("assistant.tools")
 
 _DESCRIPTION = (
     "Add a GitHub repository's documentation to the internal knowledge base so "
@@ -57,10 +57,15 @@ _PARAMETERS: dict[str, object] = {
 
 
 def make_ingest_repo(
-    settings: Settings, store: VectorStore, *, client: httpx.AsyncClient | None = None
+    settings: Settings,
+    store: VectorStore,
+    *,
+    client: httpx.AsyncClient | None = None,
+    embedder: Embedder | None = None,
 ) -> Tool:
-    """`client` is the app's pooled outbound client (a private one is made per
-    call without it — fine for tests and scripts)."""
+    """`client` is the app's pooled outbound client and `embedder` the one the
+    retriever queries with (private ones are made per call without them —
+    fine for tests and scripts)."""
 
     async def handler(arguments: dict[str, object]) -> str:
         repo = str(arguments.get("repo", "")).strip()
@@ -88,8 +93,8 @@ def make_ingest_repo(
             listing = hint + listing
             return f"error: no .md/.txt/.rst files found in {repo!r}.{listing}"
 
-        chunks = await ingest_documents(documents, settings, store=store)
-        logger.info("ingest_repo: %d chunks from %d file(s) in %s", chunks, len(documents), repo)
+        chunks = await ingest_documents(documents, settings, store=store, embedder=embedder)
+        logger.info("ingest_repo.indexed", repo=repo, files=len(documents), chunks=chunks)
         sources = "\n".join(f"- {source}" for source, _ in documents)
         note = f"\nSkipped: {'; '.join(skipped)}" if skipped else ""
         return (

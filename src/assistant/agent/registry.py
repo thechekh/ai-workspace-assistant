@@ -1,8 +1,7 @@
 """Factory: settings -> the available agent backends.
 
-All backends implement AgentBackend and receive the same tool registry, so
-the WS layer can switch between them per session (`?backend=`). `langgraph`
-plugs in here in Phase 6.
+All three backends implement AgentBackend and receive the same tool
+registry, so the WS layer can switch between them per session (`?backend=`).
 """
 
 from assistant.agent.backends.custom import CustomAgent
@@ -17,7 +16,7 @@ from assistant.llm.client import LLMClient
 def build_agents(
     settings: Settings, llm: LLMClient, tools: ToolRegistry | None = None
 ) -> dict[str, AgentBackend]:
-    return {
+    agents: dict[str, AgentBackend] = {
         "custom": CustomAgent(llm=llm, system_prompt=settings.system_prompt, tools=tools),
         "pydantic_ai": PydanticAIAgent(
             model=build_pydantic_model(settings),
@@ -26,3 +25,4 @@ def build_agents(
         ),
         "langgraph": LangGraphAgent(llm=llm, system_prompt=settings.system_prompt, tools=tools),
     }
+    return agents

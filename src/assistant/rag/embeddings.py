@@ -4,22 +4,25 @@
 deterministic, zero-cost, no network, and good enough for lexical matches.
 It is the dev/test default so the whole RAG pipeline runs for free.
 
-`openai` — text-embedding-3-small (~$0.02 per 1M tokens). Phase 7 adds
-voyage-3 for the measured comparison.
+`openai` — text-embedding-3-small (~$0.02 per 1M tokens); `voyage` —
+voyage-3 over raw HTTP. `evals/compare_embeddings.py` measures all three on
+the golden set.
+
+One embedder is built per process and shared by the retriever, the upload
+endpoint and the repository ingester: the hosted ones own an HTTP connection
+pool, and building one per upload leaked a pool each time.
 """
 
 import asyncio
 import hashlib
 import math
-import re
 from typing import Protocol
 
 import httpx
 from openai import AsyncOpenAI
 
 from assistant.config import Settings
-
-_TOKEN_RE = re.compile(r"\w+")
+from assistant.rag.sparse import WORD_RE
 
 
 class Embedder(Protocol):
@@ -27,6 +30,10 @@ class Embedder(Protocol):
     model_id: str  # labels collections and eval reports
 
     async def embed(self, texts: list[str]) -> list[list[float]]: ...
+
+    async def aclose(self) -> None:
+        """Release whatever the embedder holds (a connection pool, for the hosted ones)."""
+        ...
 
 
 class HashEmbedder:
@@ -40,9 +47,12 @@ class HashEmbedder:
         # loop that is serving live chats while a corpus is being ingested.
         return await asyncio.to_thread(lambda: [self._embed_one(text) for text in texts])
 
+    async def aclose(self) -> None:
+        return None
+
     def _embed_one(self, text: str) -> list[float]:
         vector = [0.0] * self.dimension
-        for token in _TOKEN_RE.findall(text.lower()):
+        for token in WORD_RE.findall(text.lower()):
             digest = hashlib.md5(token.encode(), usedforsecurity=False).digest()
             slot = int.from_bytes(digest[:4], "little") % self.dimension
             sign = 1.0 if digest[4] % 2 == 0 else -1.0
@@ -58,7 +68,9 @@ class OpenAIEmbedder:
         self.model_id = model
         # text-embedding-3-small -> 1536, text-embedding-3-large -> 3072
         self.dimension = 3072 if "large" in model else 1536
-        self._client = AsyncOpenAI(api_key=api_key)
+        # The SDK's default read timeout is ten minutes; an embedding call
+        # that takes longer than a minute is a broken provider, not a slow one.
+        self._client = AsyncOpenAI(api_key=api_key, timeout=60.0)
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         vectors: list[list[float]] = []
@@ -67,6 +79,9 @@ class OpenAIEmbedder:
             response = await self._client.embeddings.create(model=self.model_id, input=batch)
             vectors.extend(item.embedding for item in response.data)
         return vectors
+
+    async def aclose(self) -> None:
+        await self._client.close()
 
 
 class VoyageEmbedder:
@@ -78,21 +93,21 @@ class VoyageEmbedder:
         self.model_id = model
         # voyage-3 family -> 1024 dims; the -lite variant -> 512
         self.dimension = 512 if "lite" in model else 1024
-        self._api_key = api_key
+        self._http = httpx.AsyncClient(timeout=60, headers={"Authorization": f"Bearer {api_key}"})
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         vectors: list[list[float]] = []
-        async with httpx.AsyncClient(timeout=60) as http:
-            for start in range(0, len(texts), 128):
-                batch = texts[start : start + 128]
-                response = await http.post(
-                    self._ENDPOINT,
-                    headers={"Authorization": f"Bearer {self._api_key}"},
-                    json={"model": self.model_id, "input": batch},
-                )
-                response.raise_for_status()
-                vectors.extend(item["embedding"] for item in response.json()["data"])
+        for start in range(0, len(texts), 128):
+            batch = texts[start : start + 128]
+            response = await self._http.post(
+                self._ENDPOINT, json={"model": self.model_id, "input": batch}
+            )
+            response.raise_for_status()
+            vectors.extend(item["embedding"] for item in response.json()["data"])
         return vectors
+
+    async def aclose(self) -> None:
+        await self._http.aclose()
 
 
 def build_embedder(settings: Settings) -> Embedder:

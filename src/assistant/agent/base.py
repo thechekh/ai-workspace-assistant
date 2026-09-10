@@ -5,7 +5,7 @@ inputs and emit the same event stream, so the WebSocket layer and the frontend
 never care which backend is active.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field
@@ -59,6 +59,16 @@ AgentEvent = TokenEvent | ToolCallEvent | ToolResultEvent | FinalEvent | ErrorEv
 # drifting on this would silently change what users see per runtime.
 EVENT_RESULT_LIMIT = 1500
 
+# How many LLM steps one turn may take before the loop gives up, and what the
+# user reads when it does. Defined once for the same reason: the custom loop,
+# LangGraph's recursion limit and Pydantic AI's request limit all derive from
+# this number, so a runaway turn costs the same on every runtime.
+MAX_ITERATIONS = 6
+ITERATION_LIMIT_MESSAGE = (
+    "I hit the tool-call limit for one turn without reaching a final "
+    "answer. Please rephrase or narrow the question."
+)
+
 
 def truncate_for_event(result: str, limit: int = EVENT_RESULT_LIMIT) -> str:
     """Clip a tool result for a ToolResultEvent, marking that it was clipped."""
@@ -66,11 +76,15 @@ def truncate_for_event(result: str, limit: int = EVENT_RESULT_LIMIT) -> str:
 
 
 class AgentBackend(Protocol):
-    def run(self, history: list[ChatMessage], user_message: str) -> AsyncIterator[AgentEvent]:
+    def run(
+        self, history: list[ChatMessage], user_message: str
+    ) -> AsyncGenerator[AgentEvent, None]:
         """Stream agent events for one user turn.
 
         `history` is the prior conversation (without the current message);
         the backend is responsible for composing the full prompt. The stream
-        must end with a FinalEvent (or ErrorEvent).
+        must end with a FinalEvent (or ErrorEvent). It is an async generator,
+        so a consumer that stops early can `aclose()` it and have the
+        backend's cleanup run in the consumer's own task.
         """
         ...

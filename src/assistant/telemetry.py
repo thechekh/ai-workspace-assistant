@@ -12,6 +12,7 @@
 """
 
 import time
+from collections.abc import AsyncIterator
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
@@ -20,7 +21,14 @@ from opentelemetry import trace
 from prometheus_client import Counter, Histogram
 
 from assistant.agent.base import ChatMessage
-from assistant.llm.client import LLMClient, TextDelta, ToolCallRequest, ToolSpec, UsageEvent
+from assistant.llm.client import (
+    LLMClient,
+    LLMEvent,
+    TextDelta,
+    ToolCallRequest,
+    ToolSpec,
+    UsageEvent,
+)
 
 logger = structlog.get_logger("assistant.telemetry")
 tracer = trace.get_tracer("assistant")
@@ -111,7 +119,9 @@ class InstrumentedLLM:
         self._model = model
         self._log_prompts = log_prompts
 
-    async def stream_step(self, messages: list[ChatMessage], tools: list[ToolSpec] | None = None):
+    async def stream_step(
+        self, messages: list[ChatMessage], tools: list[ToolSpec] | None = None
+    ) -> AsyncIterator[LLMEvent]:
         prompt_chars = sum(len(message.content) for message in messages)
         if self._log_prompts:
             logger.info(

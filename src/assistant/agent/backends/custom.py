@@ -3,13 +3,15 @@
 One user turn: stream an LLM step; if the model requested tools, execute
 them, append the results, and run another step — bounded by max_iterations.
 A step with no tool calls is the final answer. No framework, no magic:
-this is the mechanism Pydantic AI (Phase 5) and LangGraph (Phase 6) wrap.
+this is the mechanism the Pydantic AI and LangGraph backends wrap.
 """
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 from assistant.agent.base import (
+    ITERATION_LIMIT_MESSAGE,
+    MAX_ITERATIONS,
     AgentEvent,
     ChatMessage,
     FinalEvent,
@@ -20,7 +22,7 @@ from assistant.agent.base import (
     truncate_for_event,
 )
 from assistant.agent.tools import ToolRegistry
-from assistant.llm.client import LLMClient, TextDelta, ToolCallRequest
+from assistant.llm.client import LLMClient, TextDelta, ToolCallRequest, aclose_iterator
 
 # Tool output shown in the UI event is trimmed; the LLM always gets the full text.
 
@@ -41,7 +43,7 @@ class CustomAgent:
         llm: LLMClient,
         system_prompt: str,
         tools: ToolRegistry | None = None,
-        max_iterations: int = 6,
+        max_iterations: int = MAX_ITERATIONS,
     ) -> None:
         self._llm = llm
         self._system_prompt = system_prompt
@@ -50,7 +52,9 @@ class CustomAgent:
         self._tools = tools if tools is not None else ToolRegistry()
         self._max_iterations = max_iterations
 
-    async def run(self, history: list[ChatMessage], user_message: str) -> AsyncIterator[AgentEvent]:
+    async def run(
+        self, history: list[ChatMessage], user_message: str
+    ) -> AsyncGenerator[AgentEvent, None]:
         messages = [
             ChatMessage(role="system", content=self._system_prompt),
             *history,
@@ -61,13 +65,19 @@ class CustomAgent:
         for _ in range(self._max_iterations):
             parts: list[str] = []
             requests: list[ToolCallRequest] = []
-            async for event in self._llm.stream_step(messages, tools=specs):
-                if isinstance(event, TextDelta):
-                    parts.append(event.text)
-                    yield TokenEvent(content=event.text)
-                elif isinstance(event, ToolCallRequest):
-                    requests.append(event)
-                # other event kinds (e.g. usage) are telemetry-only — ignore
+            step = self._llm.stream_step(messages, tools=specs)
+            try:
+                async for event in step:
+                    if isinstance(event, TextDelta):
+                        parts.append(event.text)
+                        yield TokenEvent(content=event.text)
+                    elif isinstance(event, ToolCallRequest):
+                        requests.append(event)
+                    # other event kinds (e.g. usage) are telemetry-only — ignore
+            finally:
+                # A stopped turn closes this generator mid-step; close the
+                # provider stream here, in the same task, not at GC time.
+                await aclose_iterator(step)
             text = "".join(parts)
 
             if not requests:
@@ -90,9 +100,4 @@ class CustomAgent:
                 yield ToolResultEvent(tool=request.name, result=truncate_for_event(result))
                 messages.append(ChatMessage(role="tool", content=result, tool_call_id=request.id))
 
-        yield FinalEvent(
-            content=(
-                "I hit the tool-call limit for one turn without reaching a final "
-                "answer. Please rephrase or narrow the question."
-            )
-        )
+        yield FinalEvent(content=ITERATION_LIMIT_MESSAGE)

@@ -15,11 +15,19 @@ The graph is compiled with an InMemorySaver checkpointer and a fresh
 thread_id per turn: cross-turn memory stays in Redis (shared by all
 backends), while the checkpointer records per-turn graph state — LangGraph's
 native persistence, demonstrated without diverging from the other runtimes.
+The thread is deleted when the turn ends: an in-process saver that keeps
+every turn's checkpoints (full history plus tool results) would grow until
+restart.
+
+One visible difference from the custom loop: graph "updates" arrive per node,
+so a step that requests several tools emits all of its tool_call events
+before any tool_result. The custom loop interleaves call and result per tool.
+Consumers pair results to calls by name, first pending first.
 """
 
 import json
 import uuid
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from typing import Any, cast
 
 from langchain_core.callbacks import (
@@ -36,12 +44,15 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, MessagesState, StateGraph
 from pydantic import PrivateAttr
 
 from assistant.agent.base import (
+    ITERATION_LIMIT_MESSAGE,
+    MAX_ITERATIONS,
     AgentEvent,
     ChatMessage,
     FinalEvent,
@@ -57,6 +68,7 @@ from assistant.llm.client import (
     TextDelta,
     ToolCallRequest,
     ToolSpec,
+    aclose_iterator,
     to_openai_tools,
 )
 
@@ -125,8 +137,8 @@ class LLMClientChatModel(BaseChatModel):
     async def _astream(
         self,
         messages: list[BaseMessage],
-        stop: list[str] | None = None,
-        run_manager: AsyncCallbackManagerForLLMRun | None = None,
+        stop: list[str] | None = None,  # noqa: ARG002 — LangChain's signature
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,  # noqa: ARG002
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
         tool_dicts = kwargs.get("tools") or []
@@ -165,7 +177,7 @@ class LangGraphAgent:
         llm: LLMClient,
         system_prompt: str,
         tools: ToolRegistry | None = None,
-        max_iterations: int = 6,
+        max_iterations: int = MAX_ITERATIONS,
     ) -> None:
         self._system_prompt = system_prompt
         self._tools = tools if tools is not None else ToolRegistry()
@@ -178,6 +190,9 @@ class LangGraphAgent:
             model.bind(tools=to_openai_tools(self._tools.specs)) if len(self._tools) else model
         )
 
+        # Per-turn checkpointing: native LangGraph persistence for state
+        # inspection, while cross-turn memory stays in shared Redis.
+        self._checkpointer = InMemorySaver()
         self._graph = self._build_graph()
 
     def _build_graph(self):
@@ -212,11 +227,11 @@ class LangGraphAgent:
         builder.add_edge(START, "agent")
         builder.add_conditional_edges("agent", route_after_agent, {"tools": "tools", END: END})
         builder.add_edge("tools", "agent")
-        # Per-turn checkpointing: native LangGraph persistence for state
-        # inspection, while cross-turn memory stays in shared Redis.
-        return builder.compile(checkpointer=InMemorySaver())
+        return builder.compile(checkpointer=self._checkpointer)
 
-    async def run(self, history: list[ChatMessage], user_message: str) -> AsyncIterator[AgentEvent]:
+    async def run(
+        self, history: list[ChatMessage], user_message: str
+    ) -> AsyncGenerator[AgentEvent, None]:
         lc_history: list[BaseMessage] = [SystemMessage(content=self._system_prompt)]
         for message in history:
             if message.role == "user":
@@ -228,19 +243,21 @@ class LangGraphAgent:
                 lc_history.append(SystemMessage(content=message.content))
         lc_history.append(HumanMessage(content=user_message))
 
-        config: Any = {
-            "configurable": {"thread_id": uuid.uuid4().hex},
+        thread_id = uuid.uuid4().hex
+        config: RunnableConfig = {
+            "configurable": {"thread_id": thread_id},
             # agent + tools alternate: 2 super-steps per LLM iteration
             "recursion_limit": 2 * self._max_iterations,
         }
 
         final_text = ""
+        graph_stream = self._graph.astream(
+            cast("MessagesState", {"messages": lc_history}),
+            config,
+            stream_mode=["messages", "updates"],
+        )
         try:
-            async for mode, payload in self._graph.astream(
-                cast("MessagesState", {"messages": lc_history}),
-                config,
-                stream_mode=["messages", "updates"],
-            ):
+            async for mode, payload in graph_stream:
                 if mode == "messages":
                     chunk, _metadata = payload
                     if (
@@ -252,7 +269,7 @@ class LangGraphAgent:
                     continue
                 if not isinstance(payload, dict):
                     continue
-                for _node_name, delta in payload.items():
+                for delta in payload.values():
                     for message in delta.get("messages") or []:
                         if isinstance(message, AIMessage):
                             if message.tool_calls:
@@ -268,11 +285,13 @@ class LangGraphAgent:
                                 result=truncate_for_event(str(message.content)),
                             )
         except GraphRecursionError:
-            yield FinalEvent(
-                content=(
-                    "I hit the tool-call limit for one turn without reaching a final "
-                    "answer. Please rephrase or narrow the question."
-                )
-            )
+            yield FinalEvent(content=ITERATION_LIMIT_MESSAGE)
             return
+        finally:
+            # A stopped turn leaves the graph stream suspended: close it in
+            # this task rather than at GC time, then drop the checkpoints —
+            # they served their purpose (this turn), and keeping them would
+            # make the process grow by one full transcript per turn.
+            await aclose_iterator(graph_stream)
+            await self._checkpointer.adelete_thread(thread_id)
         yield FinalEvent(content=final_text)

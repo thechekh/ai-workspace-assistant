@@ -41,8 +41,14 @@ class SessionStore:
     def _key(session_id: str) -> str:
         return f"session:{session_id}:messages"
 
-    async def history(self, session_id: str) -> list[ChatMessage]:
-        raw = await self._redis.lrange(self._key(session_id), 0, -1)
+    async def history(self, session_id: str, *, start: int = 0) -> list[ChatMessage]:
+        """The transcript from message `start` on (0 = all of it).
+
+        `start` lets ConversationMemory read only the messages its rolling
+        summary does not cover yet, instead of the whole transcript on every
+        turn of a long session.
+        """
+        raw = await self._redis.lrange(self._key(session_id), start, -1)
         return [ChatMessage.model_validate_json(item) for item in raw]
 
     async def append(self, session_id: str, message: ChatMessage) -> None:
@@ -120,9 +126,13 @@ class SessionStore:
     async def append_turn(self, session_id: str, record: TurnRecord) -> None:
         """Audit trail: one record per turn (summary + event timeline), capped at 50."""
         key = self._turns_key(session_id)
-        await self._redis.rpush(key, record.model_dump_json())
-        await self._redis.ltrim(key, -_MAX_AUDIT_TURNS, -1)
-        await self._redis.expire(key, self._ttl)
+        # One round trip, transactional — like `append`. Three separate calls
+        # could leave the key without a TTL if the process died in between.
+        pipe = self._redis.pipeline(transaction=True)
+        pipe.rpush(key, record.model_dump_json())
+        pipe.ltrim(key, -_MAX_AUDIT_TURNS, -1)
+        pipe.expire(key, self._ttl)
+        await pipe.execute()
 
     async def turns(self, session_id: str) -> list[TurnRecord]:
         raw = await self._redis.lrange(self._turns_key(session_id), 0, -1)
@@ -148,6 +158,8 @@ class SessionStore:
         return str(data.get("text", "")), int(data.get("covered", 0))
 
     async def set_summary(self, session_id: str, text: str, covered: int) -> None:
-        key = self._summary_key(session_id)
-        await self._redis.set(key, json.dumps({"text": text, "covered": covered}))
-        await self._redis.expire(key, self._ttl)
+        await self._redis.set(
+            self._summary_key(session_id),
+            json.dumps({"text": text, "covered": covered}),
+            ex=self._ttl,
+        )

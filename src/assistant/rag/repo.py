@@ -10,45 +10,17 @@ the first's (found in live testing). Namespaced sources cannot collide, and
 re-ingesting the same repo replaces exactly its own chunks.
 """
 
-import posixpath
 import re
 
 import httpx
+
+from assistant.rag.filetypes import is_code_path, is_doc_path
 
 _API = "https://api.github.com"
 # GitHub's own rules, tightened: owner has no dots, repo may have them, and a
 # repo named "." / ".." is rejected by the path-segment check below anyway.
 REPO_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})?/[A-Za-z0-9._-]{1,100}$")
 
-DOC_SUFFIXES = {".md", ".txt", ".rst"}
-# Source code the sparse lexical vector can genuinely match on (identifiers,
-# function names). Config/lockfile formats are left out on purpose: a lockfile
-# is thousands of lines nobody asks questions about.
-CODE_SUFFIXES = {
-    ".py",
-    ".pyi",
-    ".js",
-    ".jsx",
-    ".ts",
-    ".tsx",
-    ".vue",
-    ".go",
-    ".rs",
-    ".rb",
-    ".java",
-    ".kt",
-    ".c",
-    ".h",
-    ".cpp",
-    ".hpp",
-    ".cs",
-    ".php",
-    ".sql",
-    ".sh",
-    ".yml",
-    ".yaml",
-    ".toml",
-}
 # Directories that are all bulk and no signal.
 SKIP_DIR_PARTS = {
     "node_modules",
@@ -70,15 +42,20 @@ MAX_CODE_FILE_BYTES = 300 * 1024  # a source file bigger than this is generated 
 
 
 class RepoIngestError(Exception):
-    """A fetch failure the caller can turn into an actionable HTTP response."""
+    """A GitHub fetch failure with a message the model (or a user) can act on.
 
-    def __init__(self, status_code: int, detail: str) -> None:
+    `detail` is what the tool layer returns as its `error:` result.
+    """
+
+    def __init__(self, detail: str) -> None:
         super().__init__(detail)
-        self.status_code = status_code
         self.detail = detail
 
 
-def _headers(token: str | None) -> dict[str, str]:
+def github_headers(token: str | None) -> dict[str, str]:
+    """The headers every GitHub API call sends: JSON, a pinned API version, and
+    the token when there is one. Shared by the repo tools and `fetch_url`'s
+    GitHub fast path, so a configured token authenticates all of them."""
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
@@ -88,11 +65,14 @@ def _headers(token: str | None) -> dict[str, str]:
     return headers
 
 
+# The raw-content variant: the response is the file itself, not JSON about it.
+GITHUB_RAW = "application/vnd.github.raw+json"
+
+
 def _is_document(path: str, size: int | None, *, include_code: bool) -> str | None:
     """Return a skip reason, or None when the file should be ingested."""
-    suffix = posixpath.splitext(path)[1].lower()
-    is_doc = suffix in DOC_SUFFIXES
-    is_code = include_code and suffix in CODE_SUFFIXES
+    is_doc = is_doc_path(path)
+    is_code = include_code and is_code_path(path)
     if not (is_doc or is_code):
         return "not documentation"
     # The tree is data from an external service: refuse traversal-shaped paths
@@ -131,21 +111,19 @@ async def fetch_repo_documents(
     overwrite each other's documents.
     """
     if not REPO_RE.match(repo):
-        raise RepoIngestError(422, f"{repo!r} is not an owner/repository name")
-    headers = _headers(token)
+        raise RepoIngestError(f"{repo!r} is not an owner/repository name")
+    headers = github_headers(token)
 
     if ref is None:
         meta = await client.get(f"{_API}/repos/{repo}", headers=headers)
         if meta.status_code == 404:
             raise RepoIngestError(
-                404,
                 f"repository {repo!r} not found — private repositories need "
-                "ASSISTANT_GITHUB_TOKEN with read access to it",
+                "ASSISTANT_GITHUB_TOKEN with read access to it"
             )
         if meta.status_code in (401, 403):
             raise RepoIngestError(
-                meta.status_code,
-                "GitHub rejected the token (or the unauthenticated rate limit ran out)",
+                "GitHub rejected the token (or the unauthenticated rate limit ran out)"
             )
         meta.raise_for_status()
         ref = str(meta.json()["default_branch"])
@@ -154,11 +132,10 @@ async def fetch_repo_documents(
         f"{_API}/repos/{repo}/git/trees/{ref}", params={"recursive": "1"}, headers=headers
     )
     if tree.status_code == 404:
-        raise RepoIngestError(404, f"ref {ref!r} not found in {repo!r} (empty repository?)")
+        raise RepoIngestError(f"ref {ref!r} not found in {repo!r} (empty repository?)")
     if tree.status_code in (401, 403):
         raise RepoIngestError(
-            tree.status_code,
-            "GitHub rejected the token (or the unauthenticated rate limit ran out)",
+            "GitHub rejected the token (or the unauthenticated rate limit ran out)"
         )
     tree.raise_for_status()
     payload = tree.json()
@@ -188,7 +165,7 @@ async def fetch_repo_documents(
         raw = await client.get(
             f"{_API}/repos/{repo}/contents/{path}",
             params={"ref": ref},
-            headers={**headers, "Accept": "application/vnd.github.raw+json"},
+            headers={**headers, "Accept": GITHUB_RAW},
         )
         if raw.status_code != 200:
             skipped.append(f"{path} (fetch failed: HTTP {raw.status_code})")
@@ -212,29 +189,27 @@ async def fetch_repo_file(
     tool layer turns it into an `error:` result the model can react to.
     """
     if not REPO_RE.match(repo):
-        raise RepoIngestError(422, f"{repo!r} is not an owner/repository name")
+        raise RepoIngestError(f"{repo!r} is not an owner/repository name")
     parts = path.split("/")
     if not path or any(part in ("", ".", "..") for part in parts):
-        raise RepoIngestError(422, f"unsafe or empty path: {path!r}")
+        raise RepoIngestError(f"unsafe or empty path: {path!r}")
 
     params = {"ref": ref} if ref else None
     response = await client.get(
         f"{_API}/repos/{repo}/contents/{path}",
         params=params,
-        headers={**_headers(token), "Accept": "application/vnd.github.raw+json"},
+        headers={**github_headers(token), "Accept": GITHUB_RAW},
     )
     if response.status_code == 404:
         raise RepoIngestError(
-            404,
             f"{path!r} not found in {repo!r} — check the path (case matters), or the "
-            "repository is private and needs ASSISTANT_GITHUB_TOKEN",
+            "repository is private and needs ASSISTANT_GITHUB_TOKEN"
         )
     if response.status_code in (401, 403):
         raise RepoIngestError(
-            response.status_code,
-            "GitHub rejected the request (bad token, or the unauthenticated rate limit ran out)",
+            "GitHub rejected the request (bad token, or the unauthenticated rate limit ran out)"
         )
     response.raise_for_status()
     if len(response.content) > MAX_FILE_BYTES:
-        raise RepoIngestError(413, f"{path!r} is larger than {MAX_FILE_BYTES // 1024 // 1024} MB")
+        raise RepoIngestError(f"{path!r} is larger than {MAX_FILE_BYTES // 1024 // 1024} MB")
     return response.text

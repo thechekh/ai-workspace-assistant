@@ -9,15 +9,14 @@ Read-only by construction: one GET against api.github.com with a validated
 owner/repo and path. The model never supplies a URL.
 """
 
-import logging
-
 import httpx
+import structlog
 
 from assistant.agent.tools.base import Tool
 from assistant.config import Settings
 from assistant.rag.repo import RepoIngestError, fetch_repo_file
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger("assistant.tools")
 
 _DESCRIPTION = (
     "Read ONE file from a GitHub repository by exact path — public repositories "
@@ -69,7 +68,7 @@ def make_repo_read_file(settings: Settings, *, client: httpx.AsyncClient | None 
             if owns_client:
                 await http.aclose()
 
-        logger.info("repo_read_file: %s/%s (%d chars)", repo, path, len(text))
+        logger.info("repo_read_file.read", repo=repo, path=path, chars=len(text))
         return f"// {repo}/{path}\n{text}"
 
     return Tool(

@@ -40,6 +40,11 @@ class Retriever:
         """The backing store — document management writes where search reads."""
         return self._store
 
+    @property
+    def embedder(self) -> Embedder:
+        """The query embedder — ingestion must index with the same one."""
+        return self._embedder
+
     async def search(
         self,
         query: str,

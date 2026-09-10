@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import re
 import secrets
 import uuid
 
@@ -14,7 +15,7 @@ from assistant.agent.base import (
     FinalEvent,
 )
 from assistant.agent.output_guard import correct_unsupported_action_claims
-from assistant.api.rate_limit import RateLimiter
+from assistant.api.rate_limit import RateLimiter, caller_identity
 from assistant.api.schemas import CancelRequest, ClientMessage, SessionStarted
 from assistant.api.turn_recorder import TurnRecorder
 from assistant.config import Settings
@@ -35,6 +36,18 @@ from assistant.telemetry import (
 router = APIRouter()
 logger = structlog.get_logger("assistant.ws")
 
+# Session ids are minted by SessionStore.new_session_id (a uuid4 hex). A
+# reconnecting client presents one back; anything else is not a session this
+# server ever created, and must not become a Redis key of arbitrary content
+# and length.
+_SESSION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _resolve_session_id(requested: str | None) -> str:
+    if requested and _SESSION_ID_RE.match(requested):
+        return requested
+    return SessionStore.new_session_id()
+
 
 @router.websocket("/chat")
 async def chat_endpoint(websocket: WebSocket) -> None:
@@ -44,9 +57,8 @@ async def chat_endpoint(websocket: WebSocket) -> None:
     # compare_digest for the same reason as the HTTP guard: `!=` returns early
     # on the first differing byte and leaks the secret to a timing attack.
     expected = websocket.app.state.settings.auth_token
-    if expected is not None and not secrets.compare_digest(
-        websocket.query_params.get("token", ""), expected.get_secret_value()
-    ):
+    presented = websocket.query_params.get("token", "")
+    if expected is not None and not secrets.compare_digest(presented, expected.get_secret_value()):
         await websocket.close(code=1008, reason="missing or invalid token")
         return
 
@@ -67,14 +79,25 @@ async def chat_endpoint(websocket: WebSocket) -> None:
     agent = agents[requested_backend]
 
     # Reconnecting clients pass ?session_id=... to resume their history.
-    session_id = websocket.query_params.get("session_id") or SessionStore.new_session_id()
+    session_id = _resolve_session_id(websocket.query_params.get("session_id"))
     await websocket.send_text(SessionStarted(session_id=session_id).model_dump_json())
     logger.info("ws.connected", session_id=session_id, backend=requested_backend)
+
+    # The turn budget is per caller, not per session: a session id is the
+    # client's to choose, and a budget a client can reset by picking a new one
+    # is not a budget.
+    identity = caller_identity(
+        credential=presented if expected is not None else "",
+        client_host=websocket.client.host if websocket.client else None,
+    )
 
     # The turn runs as a task rather than inline, so this loop stays free to
     # read the next frame — which is the only way a `cancel` can arrive while
     # the model is still streaming.
     turn: asyncio.Task[None] | None = None
+    # Set when the user asks to stop, so the turn can tell a Stop from the
+    # client going away: both cancel the task, only one is "stopped by the user".
+    stop_requested = asyncio.Event()
     try:
         while True:
             raw = await websocket.receive_text()
@@ -95,6 +118,7 @@ async def chat_endpoint(websocket: WebSocket) -> None:
             if isinstance(incoming, CancelRequest):
                 if running and turn is not None:
                     logger.info("turn.cancel_requested", session_id=session_id)
+                    stop_requested.set()
                     turn.cancel()
                 continue
 
@@ -109,9 +133,10 @@ async def chat_endpoint(websocket: WebSocket) -> None:
                 )
                 continue
 
-            if not await _within_rate_limit(websocket, limiter, settings, session_id):
+            if not await _within_rate_limit(websocket, limiter, settings, identity):
                 continue
 
+            stop_requested = asyncio.Event()
             turn = asyncio.create_task(
                 _handle_turn(
                     websocket,
@@ -122,6 +147,7 @@ async def chat_endpoint(websocket: WebSocket) -> None:
                     session_id,
                     incoming.content,
                     llm_model,
+                    stop_requested,
                 )
             )
             # Nobody awaits a finished turn, so without this an escaping
@@ -140,7 +166,7 @@ async def chat_endpoint(websocket: WebSocket) -> None:
 
 
 async def _within_rate_limit(
-    websocket: WebSocket, limiter: RateLimiter, settings: Settings, session_id: str
+    websocket: WebSocket, limiter: RateLimiter, settings: Settings, identity: str
 ) -> bool:
     """Check the turn budget, reporting a refusal to the client.
 
@@ -148,16 +174,30 @@ async def _within_rate_limit(
     round trip instead of an LLM call.
     """
     decision = await limiter.check(
-        "turns", session_id, limit=settings.rate_limit_turns_per_minute, window_seconds=60
+        "turns", identity, limit=settings.rate_limit_turns_per_minute, window_seconds=60
     )
     if decision.allowed:
         return True
 
     ERRORS_TOTAL.labels(kind="rate_limited").inc()
     RATE_LIMITED_TOTAL.labels(bucket="turns").inc()
-    logger.warning("turn.rate_limited", session_id=session_id, retry_after=decision.retry_after)
+    logger.warning("turn.rate_limited", retry_after=decision.retry_after)
     await websocket.send_text(ErrorEvent(message=decision.message("messages")).model_dump_json())
     return False
+
+
+async def _persist_partial(
+    store: SessionStore, session_id: str, recorder: TurnRecorder, marker: str
+) -> None:
+    """Keep what the user already saw of an answer that never finished.
+
+    Dropping it desynchronises the screen from the history the next prompt is
+    built from: the model would re-answer a question the user watched it half
+    answer. The marker tells the next turn (and a reader of the transcript)
+    why it stops short.
+    """
+    if partial := recorder.streamed_text.strip():
+        await store.append(session_id, ChatMessage(role="assistant", content=f"{partial} {marker}"))
 
 
 def _log_turn_task_result(task: asyncio.Task[None]) -> None:
@@ -179,6 +219,7 @@ async def _handle_turn(
     session_id: str,
     user_message: str,
     llm_model: str,
+    stop_requested: asyncio.Event,
 ) -> None:
     """One user message: run the agent, forward events, record telemetry + audit.
 
@@ -203,25 +244,40 @@ async def _handle_turn(
                 history = await memory.context_for(session_id)
                 await store.append(session_id, ChatMessage(role="user", content=user_message))
 
-                async for event in agent.run(history=history, user_message=user_message):
-                    if isinstance(event, FinalEvent):
-                        # Guard here, not in a backend: all three funnel through
-                        # this loop, and the UI replaces the streamed text with
-                        # `final.content`, so correcting the event corrects what
-                        # the user actually reads and what history keeps.
-                        event = event.model_copy(
-                            update={
-                                "content": correct_unsupported_action_claims(
-                                    event.content, tools_used=recorder.tool_calls
-                                )
-                            }
-                        )
-                    await websocket.send_text(event.model_dump_json())
-                    recorder.observe(event)
-                    if isinstance(event, FinalEvent):
-                        await store.append(
-                            session_id, ChatMessage(role="assistant", content=event.content)
-                        )
+                stream = agent.run(history=history, user_message=user_message)
+                try:
+                    async for event in stream:
+                        if isinstance(event, FinalEvent):
+                            # Guard here, not in a backend: all three funnel
+                            # through this loop, and the UI replaces the
+                            # streamed text with `final.content`, so correcting
+                            # the event corrects what the user actually reads
+                            # and what history keeps.
+                            event = event.model_copy(
+                                update={
+                                    "content": correct_unsupported_action_claims(
+                                        event.content, tools_used=recorder.tool_calls
+                                    )
+                                }
+                            )
+                        await websocket.send_text(event.model_dump_json())
+                        recorder.observe(event)
+                        if isinstance(event, FinalEvent):
+                            await store.append(
+                                session_id, ChatMessage(role="assistant", content=event.content)
+                            )
+                finally:
+                    # Close the agent's generator here, in the turn's own task,
+                    # rather than leaving it to the garbage collector: a stopped
+                    # turn must run the backend's cleanup (spans, the provider's
+                    # HTTP stream, pydantic-ai's cancel scopes) where it started,
+                    # not in whatever task finalizes it later. A failure while
+                    # closing is logged, never allowed to replace the exception
+                    # that ended the turn.
+                    try:
+                        await stream.aclose()
+                    except Exception:
+                        logger.warning("turn.stream_close_failed", exc_info=True)
 
                 if recorder.error_count:
                     ERRORS_TOTAL.labels(kind="agent_event").inc(recorder.error_count)
@@ -234,8 +290,9 @@ async def _handle_turn(
             logger.info("turn.abandoned")
             raise
         except asyncio.CancelledError:
-            # The user pressed Stop. Everything streamed so far is real and
-            # stays on screen; the tokens were spent and still get counted.
+            # Either the user pressed Stop or the client went away and the
+            # receive loop cancelled the orphaned turn. Everything streamed so
+            # far is real; the tokens were spent and still get counted.
             # `agent.run` is a generator, so leaving this block closes it and
             # its own finally-blocks end the spans and release the LLM stream.
             cancelled = True
@@ -245,15 +302,16 @@ async def _handle_turn(
             # balance the count.
             if (task := asyncio.current_task()) is not None:
                 task.uncancel()
-            CANCELLED_TOTAL.labels(backend=backend).inc()
-            logger.info("turn.cancelled", answer_chars=recorder.answer_chars)
-            # Persist the partial answer, otherwise the history holds a question
-            # nobody replied to and the next turn re-answers it from scratch.
-            if partial := recorder.streamed_text.strip():
-                await store.append(
-                    session_id,
-                    ChatMessage(role="assistant", content=f"{partial} [stopped by the user]"),
-                )
+            if stop_requested.is_set():
+                CANCELLED_TOTAL.labels(backend=backend).inc()
+                logger.info("turn.cancelled", answer_chars=recorder.answer_chars)
+                await _persist_partial(store, session_id, recorder, "[stopped by the user]")
+            else:
+                # Not a Stop: nobody asked, the socket is simply gone. Counting
+                # it as "stopped by the user" made the Stop button look far
+                # more used than it was.
+                logger.info("turn.abandoned", answer_chars=recorder.answer_chars)
+                await _persist_partial(store, session_id, recorder, "[connection lost]")
         except Exception as exc:
             kind, message = describe_llm_error(exc) or (
                 "turn_exception",
@@ -261,14 +319,7 @@ async def _handle_turn(
             )
             ERRORS_TOTAL.labels(kind=kind).inc()
             logger.exception("turn.failed", kind=kind)
-            # Same reasoning as the stopped path: text the user already saw is
-            # part of the conversation. Dropping it desynchronises the screen
-            # from the history the next prompt is built from.
-            if partial := recorder.streamed_text.strip():
-                await store.append(
-                    session_id,
-                    ChatMessage(role="assistant", content=f"{partial} [answer interrupted]"),
-                )
+            await _persist_partial(store, session_id, recorder, "[answer interrupted]")
             await websocket.send_text(ErrorEvent(message=message).model_dump_json())
             # Falls through to the summary rather than returning: `turn` is the
             # frame that ends a turn, so a client can wait for exactly one of
@@ -291,7 +342,7 @@ async def _handle_turn(
 
         try:
             await websocket.send_text(summary.model_dump_json())
-        except Exception:  # client may close right after `final` — stats still get logged
+        except Exception:  # noqa: BLE001 — the client may close right after `final`; the stats still get logged
             logger.info("turn.summary_send_failed")
 
         logger.info(

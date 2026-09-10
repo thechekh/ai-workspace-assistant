@@ -14,19 +14,22 @@ from pathlib import Path
 from qdrant_client import AsyncQdrantClient
 
 from assistant.config import Settings
-from assistant.rag.chunking import Chunk, chunk_markdown
-from assistant.rag.embeddings import build_embedder
+from assistant.rag.chunking import Chunk, chunk_document
+from assistant.rag.embeddings import Embedder, build_embedder
+from assistant.rag.filetypes import is_doc_path
 from assistant.rag.sparse import encode_sparse
 from assistant.rag.store import VectorStore
 
 
 def load_chunks(corpus_dir: Path) -> list[Chunk]:
-    """Read and chunk every doc. Synchronous by design — callers on an event
-    loop must go through `load_chunks_async`."""
+    """Read and chunk every document (.md/.markdown/.txt/.rst). Synchronous by
+    design — callers on an event loop must go through `load_chunks_async`."""
     chunks: list[Chunk] = []
-    for path in sorted(corpus_dir.rglob("*.md")):
+    for path in sorted(corpus_dir.rglob("*")):
+        if not path.is_file() or not is_doc_path(path.name):
+            continue
         source = path.relative_to(corpus_dir).as_posix()
-        chunks.extend(chunk_markdown(path.read_text(encoding="utf-8"), source=source))
+        chunks.extend(chunk_document(path.read_text(encoding="utf-8"), source=source))
     return chunks
 
 
@@ -40,10 +43,16 @@ async def ingest_chunks(
     settings: Settings,
     *,
     store: VectorStore,
+    embedder: Embedder | None = None,
     recreate: bool = False,
 ) -> int:
     """Embed and upsert already-chunked documents. The shared tail of both the
     CLI corpus path and the runtime upload endpoint.
+
+    `embedder` is the app's shared one when called from the running server —
+    the same object the retriever queries with, so index and query vectors
+    come from one model by construction. The CLI, with no server, builds its
+    own from settings.
 
     Ingesting a source **replaces** it: every chunk it already had is deleted
     first. Relying on the deterministic ids to overwrite is not enough — an id
@@ -54,13 +63,21 @@ async def ingest_chunks(
 
     Sources are replaced individually rather than by wiping the collection,
     because one Qdrant collection holds both the corpus folder and whatever was
-    uploaded at runtime — a nightly re-index must not erase someone's upload.
-    A file *removed* from the corpus folder is the remaining gap; `--recreate`
-    is the deliberate full rebuild for that.
+    uploaded at runtime — ingesting a folder again must not erase someone's
+    upload. A file *removed* from the corpus folder is the remaining gap;
+    `--recreate` is the deliberate full rebuild for that.
     """
     if not chunks:
         return 0
-    embedder = build_embedder(settings)
+    if embedder is None:
+        # No shared one (the CLI): build, use, and release it here.
+        own = build_embedder(settings)
+        try:
+            return await ingest_chunks(
+                chunks, settings, store=store, embedder=own, recreate=recreate
+            )
+        finally:
+            await own.aclose()
     dense_vectors = await embedder.embed([chunk.text for chunk in chunks])
     sparse_vectors = [encode_sparse(chunk.text) for chunk in chunks]
     await store.ensure_collection(embedder.dimension, recreate=recreate)
@@ -76,18 +93,21 @@ async def ingest_documents(
     settings: Settings,
     *,
     store: VectorStore,
+    embedder: Embedder | None = None,
 ) -> int:
-    """Ingest documents supplied at runtime as (source_name, markdown_text).
+    """Ingest documents supplied at runtime as (source_name, text).
 
     Chunking is CPU-bound, so it runs off the event loop — an upload must not
-    stall live chats. Re-uploading a source replaces it (see `ingest_chunks`).
+    stall live chats. Each document is chunked by what it is (headings for
+    prose, lines for source code). Re-uploading a source replaces it (see
+    `ingest_chunks`).
     """
     chunks = await asyncio.to_thread(
         lambda: [
-            chunk for source, text in documents for chunk in chunk_markdown(text, source=source)
+            chunk for source, text in documents for chunk in chunk_document(text, source=source)
         ]
     )
-    return await ingest_chunks(chunks, settings, store=store)
+    return await ingest_chunks(chunks, settings, store=store, embedder=embedder)
 
 
 async def ingest(
@@ -98,7 +118,7 @@ async def ingest(
     collection: str | None = None,
     recreate: bool = False,
 ) -> int:
-    """Ingest every *.md under corpus_dir; returns the number of chunks."""
+    """Ingest every document under corpus_dir; returns the number of chunks."""
     owns_client = client is None
     qdrant = client or AsyncQdrantClient(url=settings.qdrant_url)
     store = VectorStore(qdrant, collection or settings.qdrant_collection)
@@ -111,8 +131,8 @@ async def ingest(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ingest a Markdown corpus into Qdrant")
-    parser.add_argument("corpus", type=Path, help="folder of *.md to ingest")
+    parser = argparse.ArgumentParser(description="Ingest a folder of documents into Qdrant")
+    parser.add_argument("corpus", type=Path, help="folder of .md/.txt/.rst files to ingest")
     parser.add_argument("--collection", default=None, help="override ASSISTANT_QDRANT_COLLECTION")
     parser.add_argument(
         "--recreate", action="store_true", help="drop and recreate the collection first"

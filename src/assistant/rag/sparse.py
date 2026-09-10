@@ -11,7 +11,11 @@ import math
 import re
 from collections import Counter
 
-_TOKEN_RE = re.compile(r"\w+")
+# A "word" for every lexical purpose in the RAG layer: the hash embedder, the
+# sparse encoder and the search tool's filename matching all use this one
+# definition, so they cannot disagree about what a token is.
+WORD_RE = re.compile(r"\w+")
+_TOKEN_RE = WORD_RE
 # Inside an identifier: camelCase humps, ALLCAPS runs, digit runs. Applied to
 # the ORIGINAL casing — lowercasing first would erase the camel boundary,
 # which is exactly how `completedPercentage` was unfindable by "percentage"

@@ -1,4 +1,4 @@
-"""Per-session request throttling.
+"""Per-caller request throttling.
 
 Without this, one stuck client — a retry loop, a held-down Enter key, a
 misbehaving script — can drain a whole day's LLM quota in under a minute.
@@ -7,19 +7,39 @@ an anti-abuse system (auth belongs at the gateway).
 
 The window is a **sliding log** in Redis: one sorted-set entry per allowed
 request, scored by timestamp. Compared with the usual `INCR`+`EXPIRE` fixed
-window, it costs one small key per session and cannot be gamed by the
+window, it costs one small key per caller and cannot be gamed by the
 boundary burst that lets a fixed window pass 2x the limit across two adjacent
 windows. Redis (not process memory) so the limit still holds when the app runs
 as more than one worker.
 
 Rejected requests are removed from the log again, so being throttled never
 extends the block — the caller is told exactly how long to wait.
+
+Both surfaces (chat turns over the WebSocket, uploads over HTTP) key their
+buckets by the same `caller_identity`: the bearer token when one is
+configured, the peer address otherwise. Chat turns used to be keyed by the
+client-chosen session id, which a client could rotate to sidestep the budget.
 """
 
+import hashlib
 import time
 from dataclasses import dataclass
 
 from redis.asyncio import Redis
+
+
+def caller_identity(*, credential: str, client_host: str | None) -> str:
+    """Who is asking, for the purpose of a budget.
+
+    The credential when one was presented (the deployed case: every client
+    behind a shared proxy address would otherwise share one bucket), hashed
+    because it ends up in a Redis key name — a slice of the raw token would
+    put part of the secret somewhere it can be dumped with KEYS, logged by a
+    slowlog, or read from an RDB snapshot. The peer address otherwise.
+    """
+    if credential:
+        return hashlib.sha256(credential.encode()).hexdigest()[:16]
+    return client_host or "unknown"
 
 
 @dataclass(frozen=True)
@@ -36,7 +56,7 @@ class RateLimitDecision:
 
 
 class RateLimiter:
-    """Sliding-window limiter keyed by session (or any caller identity)."""
+    """Sliding-window limiter keyed by caller identity."""
 
     def __init__(self, redis: Redis, *, enabled: bool = True) -> None:
         self._redis = redis
@@ -83,5 +103,5 @@ class RateLimiter:
         return RateLimitDecision(allowed=False, retry_after=max(1, round(wait)))
 
     async def reset(self, bucket: str, identity: str) -> None:
-        """Forget a caller's history — used by tests and by `/api/sessions/new`."""
+        """Forget a caller's history in one bucket (nothing in the app calls this; tests do)."""
         await self._redis.delete(self._key(bucket, identity))

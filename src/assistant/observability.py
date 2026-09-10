@@ -18,10 +18,10 @@ tracer in assistant.telemetry remains a no-op.
 """
 
 import base64
-import logging
 import re
 from typing import TYPE_CHECKING
 
+import structlog
 from fastapi import FastAPI
 from opentelemetry.trace import SpanKind  # the API package, already loaded by telemetry.py
 
@@ -30,7 +30,7 @@ from assistant.config import Settings
 if TYPE_CHECKING:
     from opentelemetry.sdk.trace.sampling import Sampler
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger("assistant.observability")
 
 # Requests that are pure machinery, never a user turn: Prometheus scrapes
 # /metrics every 5 s, the UI polls /api/health every 10 s. Matched as regexes
@@ -85,11 +85,11 @@ def make_noise_sampler() -> "Sampler":
         def should_sample(  # type: ignore[override]  # OTel's signature is untyped
             self,
             parent_context,
-            trace_id,
+            trace_id,  # noqa: ARG002 — OTel's signature; the decision never needs it
             name,
             kind=None,
             attributes=None,
-            links=None,
+            links=None,  # noqa: ARG002
             trace_state=None,
         ):
             parent = trace.get_current_span(parent_context).get_span_context()
@@ -115,7 +115,7 @@ def configure_observability(app: FastAPI, settings: Settings) -> None:
         settings.langfuse_public_key is not None and settings.langfuse_secret_key is not None
     )
     if not (has_otlp or has_logfire or has_langfuse):
-        logger.info("tracing disabled — no OTLP/Logfire/Langfuse destination configured")
+        logger.info("tracing.disabled", reason="no OTLP/Logfire/Langfuse destination configured")
         return
 
     # Heavy imports only when a destination is actually enabled.
@@ -170,9 +170,4 @@ def configure_observability(app: FastAPI, settings: Settings) -> None:
             provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
 
-    logger.info(
-        "tracing configured (otlp=%s, logfire=%s, langfuse=%s)",
-        has_otlp,
-        has_logfire,
-        has_langfuse,
-    )
+    logger.info("tracing.configured", otlp=has_otlp, logfire=has_logfire, langfuse=has_langfuse)

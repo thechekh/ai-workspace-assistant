@@ -33,8 +33,10 @@ def describe_llm_error(exc: BaseException) -> tuple[str, str] | None:
         if is_tool_use_failure(current):
             return (
                 "tool_use_failed",
-                "The model failed to generate a valid tool call (a known "
-                "flake, already retried) — send the message again or rephrase.",
+                (
+                    "The model failed to generate a valid tool call (a known "
+                    "flake, already retried) — send the message again or rephrase."
+                ),
             )
 
         status = getattr(current, "status_code", None)

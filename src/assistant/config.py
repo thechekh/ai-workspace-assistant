@@ -115,8 +115,8 @@ class Settings(BaseSettings):
 
     # Embeddings / RAG
     # "hash" is an offline feature-hashing embedder: zero cost, deterministic,
-    # good enough for lexical matches — the dev/test default. Voyage arrives in
-    # Phase 7 for the measured comparison.
+    # good enough for lexical matches — the dev/test default. "openai" and
+    # "voyage" are the real ones, compared in evals/compare_embeddings.py.
     embedding_provider: EmbeddingProvider = "hash"
     embedding_model: str = "text-embedding-3-small"
     embedding_api_key: SecretStr | None = None
@@ -135,26 +135,29 @@ class Settings(BaseSettings):
 
     # Conversation summarization: when the un-summarized history exceeds the
     # budget, older turns are folded into a rolling summary; the most recent
-    # messages stay verbatim.
-    history_char_budget: int = 8000  # ~2k tokens
-    history_keep_recent: int = 6  # messages kept verbatim
+    # messages stay verbatim. keep_recent=0 would fold an empty slice and
+    # rewrite the summary on every turn while the context kept growing, so
+    # the bounds are validated rather than trusted.
+    history_char_budget: int = Field(default=8000, ge=1)  # ~2k tokens
+    history_keep_recent: int = Field(default=6, ge=1)  # messages kept verbatim
 
     # MCP tool servers (see MCPServerConfig above; JSON via ASSISTANT_MCP_SERVERS)
     mcp_enabled: bool = True
     mcp_servers: list[MCPServerConfig] = Field(default_factory=_default_mcp_servers)
 
     # Rate limiting — a budget guard, not access control: it stops one stuck
-    # client from draining the day's LLM quota. Limits are per session, in a
-    # sliding window shared through Redis. Set a limit to 0 to disable just
-    # that bucket; rate_limit_enabled=false disables all of them.
+    # client from draining the day's LLM quota. Limits are per caller (the
+    # bearer token when auth is on, the peer address otherwise), in a sliding
+    # window shared through Redis. Set a limit to 0 to disable just that
+    # bucket; rate_limit_enabled=false disables all of them.
     rate_limit_enabled: bool = True
-    rate_limit_turns_per_minute: int = 20  # chat turns (the expensive path)
-    rate_limit_uploads_per_hour: int = 50  # document uploads
+    rate_limit_turns_per_minute: int = Field(default=20, ge=0)  # chat turns (the expensive path)
+    rate_limit_uploads_per_hour: int = Field(default=50, ge=0)  # document uploads
 
     # Infra
     redis_url: str = "redis://localhost:6379/0"
     qdrant_url: str = "http://localhost:6333"
-    session_ttl_seconds: int = 60 * 60 * 24
+    session_ttl_seconds: int = Field(default=60 * 60 * 24, ge=1)
 
     # Logging (always on) — structured logs, pretty console by default,
     # JSON lines when log_json=true. log_prompts dumps full prompts and

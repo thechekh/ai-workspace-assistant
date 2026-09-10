@@ -34,9 +34,10 @@ class ConversationMemory:
 
     async def context_for(self, session_id: str) -> list[ChatMessage]:
         """History as the agent should see it: bounded, summary-first."""
-        history = await self._store.history(session_id)
         summary, covered = await self._store.summary(session_id)
-        pending = history[covered:]
+        # Only the tail the summary does not cover yet: a long session's
+        # earlier messages are never re-read, let alone re-summarized.
+        pending = await self._store.history(session_id, start=covered)
 
         pending_chars = sum(len(message.content) for message in pending)
         if pending_chars > self._char_budget and len(pending) > self._keep_recent:
