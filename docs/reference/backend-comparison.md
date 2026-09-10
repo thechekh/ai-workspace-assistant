@@ -19,7 +19,7 @@ everything below differs *only* because of the framework.
 
 | | custom loop | Pydantic AI | LangGraph |
 |---|---:|---:|---:|
-| Backend file, lines (`wc -l`, docstrings included) | **103** | **361** | **297** |
+| Backend file, lines (`wc -l`, docstrings included) | **110** | **364** | **318** |
 | Inherits the shared provider hardening in `llm/client.py` | yes | **no — re-implemented** | yes, through the adapter |
 | Of which framework-adapter code | 0 | ~45 (`FunctionModel` fake) + ~25 (model builder) | ~95 (`BaseChatModel` adapter) + ~35 (message conversion) |
 | Extra runtime dependencies | none | `pydantic-ai` and its provider SDKs | `langgraph`, `langchain-core` |

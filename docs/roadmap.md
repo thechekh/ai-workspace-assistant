@@ -290,6 +290,7 @@ uv run pytest tests/test_memory.py -v
 | [`observability.py`](../src/assistant/observability.py) | 173 |
 | [`logs.py`](../src/assistant/logs.py) | 60 |
 | [`api/routes.py`](../src/assistant/api/routes.py) | 339 |
+| [`api/system.py`](../src/assistant/api/system.py) | 44 — /healthz, /metrics, /dev |
 | [`api/rate_limit.py`](../src/assistant/api/rate_limit.py) | 107 |
 
 **Read:** [theory/09 — Observability & evals](theory/09-observability-and-evals.md)
@@ -468,11 +469,11 @@ Every source file, and the session that covers it. Nothing is left over.
 | Frameworks | `backends/pydantic_ai.py`, `backends/langgraph.py` | 6 |
 | MCP | `mcp/registry.py`, `mcp_servers/code_search.py`, `fake_github.py` | 7 |
 | Memory | `memory/session.py`, `conversation.py`, `summarizer.py` | 8 |
-| Observability & ops | `telemetry.py`, `observability.py`, `logs.py`, `api/routes.py`, `api/rate_limit.py` | 9 |
+| Observability & ops | `telemetry.py`, `observability.py`, `logs.py`, `api/routes.py`, `api/system.py`, `api/rate_limit.py` | 9 |
 | Frontend | `types.ts`, `stores/chat.ts`, `App.vue`, components | 10 |
 | Tests & evals | `tests/` (30 files), `evals/` (4 scripts) | 11 |
 
-**39 source files. 12 sessions. No gaps.**
+**40 source files. 12 sessions. No gaps.**
 
 ## 5. The short paths
 

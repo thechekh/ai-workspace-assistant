@@ -18,10 +18,10 @@ which of these are re-runnable on demand and which can drift)*
 
 | Claim | Value | How to prove it |
 |---|---|---|
-| Tests | 622 backend tests + 91 frontend tests | `uv run pytest -q`, `npm run test:run` |
+| Tests | 624 backend tests + 92 frontend tests | `uv run pytest -q`, `npm run test:run` |
 | Coverage | ~92%, with a 90% floor enforced in CI (2026-09-07) | `uv run pytest --cov` |
 | Retrieval quality | recall@1 **0.83**, recall@5 **1.00**, MRR **0.92** | `uv run python evals/run_retrieval.py --memory` |
-| Agent backends | 103 / 361 / 297 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
+| Agent backends | 110 / 364 / 318 lines, one protocol | `wc -l src/assistant/agent/backends/*.py` |
 | Real-model cost | ~$0.012 for a full 8-case acceptance run | the stats line under every answer |
 | Suite runtime | ~25 s, fully offline | no network, no Docker |
 
@@ -32,7 +32,7 @@ which of these are re-runnable on demand and which can drift)*
 **Q: Why implement the agent three times? Isn't once enough?**
 Because "which framework?" was a real open question and we wanted an
 evidence-based answer, not a blog-post opinion. The marginal cost was low —
-103/361/297 lines; everything else (tools, memory, telemetry, protocol) is
+110/364/318 lines; everything else (tools, memory, telemetry, protocol) is
 shared — and the payoff is [backend-comparison.md](../reference/backend-comparison.md)
 with measured numbers, plus the choice stays reversible via one config value.
 The comparison *is* a deliverable, not a detour.
@@ -321,7 +321,7 @@ accounts.
 Remove the nondeterminism from every layer except the one under evaluation:
 scripted LLMs for the loop's branches, `FakeLLM` + fakeredis + in-memory
 Qdrant for protocol tests, a deterministic embedder for retrieval evals.
-**622 tests in ~23 seconds, fully offline** — no network, no containers, no
+**624 tests in ~23 seconds, fully offline** — no network, no containers, no
 keys. Model *quality* is deliberately out of unit scope; that's what the
 eval harness is for.
 

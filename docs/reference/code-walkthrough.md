@@ -22,7 +22,7 @@ recur below where each layer produced them.
 **The 10-minute version.** If you only have ten minutes before you present,
 read these six:
 
-1. [`api/ws.py` → `_handle_turn`](../../src/assistant/api/ws.py#L213) — the conductor
+1. [`api/ws.py` → `_handle_turn`](../../src/assistant/api/ws.py#L225) — the conductor
 2. [`agent/backends/custom.py` → `CustomAgent.run`](../../src/assistant/agent/backends/custom.py#L55) — the agent loop, 45 lines
 3. [`agent/tools/base.py` → `Tool.run`](../../src/assistant/agent/tools/base.py#L52) — the one seam every tool call passes through
 4. [`rag/retriever.py` → `search`](../../src/assistant/rag/retriever.py#L48) — retrieve → rerank → gate
@@ -49,7 +49,7 @@ client, Qdrant, the MCP registry — and released in order by
 (`redis_client=`, `llm=`, `retriever=`) let tests substitute whole
 collaborators — fakeredis, `FakeLLM`, in-memory Qdrant — without the factory
 growing `if x is None` branches; and
-[`__getattr__`](../../src/assistant/main.py#L286) builds the app lazily, so
+[`__getattr__`](../../src/assistant/main.py#L273) builds the app lazily, so
 `uvicorn assistant.main:app` still works while *importing* the module no
 longer reads a developer's `.env`, reconfigures logging or installs a
 tracer. That was a real bug: the suite was picking up local `.env` files.
@@ -119,12 +119,12 @@ stuck client; the provider's 429 is handled separately in step 7.
 
 ### Step 4 — The conductor
 
-**[`_handle_turn`](../../src/assistant/api/ws.py#L213)**
+**[`_handle_turn`](../../src/assistant/api/ws.py#L225)**
 
 Owns the socket, the `agent.turn` span, error mapping and persistence. The
 *accounting* lives elsewhere, in
-[`TurnRecorder`](../../src/assistant/api/turn_recorder.py#L30): feed it each
-event with [`observe`](../../src/assistant/api/turn_recorder.py#L55), then
+[`TurnRecorder`](../../src/assistant/api/turn_recorder.py#L31): feed it each
+event with [`observe`](../../src/assistant/api/turn_recorder.py#L56), then
 ask for a [`summary`](../../src/assistant/api/turn_recorder.py#L97) (the
 wire frame) and a [`record`](../../src/assistant/api/turn_recorder.py#L119)
 (the audit row). It touches neither socket nor Redis, so first-token

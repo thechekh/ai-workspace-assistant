@@ -151,11 +151,12 @@ This is the six steps above, happening for real — turn `b099e9cd40ff`,
 
 ```
 src/assistant/
-  main.py              app factory: wiring, lifespan, /metrics, static UI
+  main.py              app factory: wiring, lifespan, static UI
   config.py            all settings (pydantic-settings, ASSISTANT_* env vars)
   api/  ws.py          WebSocket chat: the turn conductor
         turn_recorder.py  per-turn accounting -> stats frame + audit record
         routes.py      /api/info /api/health /api/documents /api/sessions/{id}/turns
+        system.py      /healthz (liveness), /metrics (Prometheus), /dev (console)
         schemas.py     typed WS protocol (incl. TurnSummary)
   agent/ base.py       the AgentBackend contract + event types
         registry.py    settings -> {custom, pydantic_ai, langgraph}
@@ -173,7 +174,7 @@ frontend/              Vue 3 + Pinia + Vite chat UI
 evals/corpus/          retrieval test fixture (golden-set answers live here)
 observability/         Prometheus config + Grafana provisioning + dashboard
 evals/                 golden set + retrieval quality + embedding comparison
-tests/                 622 deterministic tests (no network, no Docker needed)
+tests/                 624 deterministic tests (no network, no Docker needed)
 docs/                  ALL documentation (handbook, theory, reference, project)
 ```
 
