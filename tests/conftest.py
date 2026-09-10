@@ -143,11 +143,13 @@ class MockHTTP:
         self.routes.append(entry)
         return entry
 
-    def get(self, url: str, **kwargs: object) -> Route:
-        return self.route("GET", url, **kwargs)  # type: ignore[arg-type]
+    # `Any`, not `object`: these forward straight into typed signatures, and
+    # `object` there is what forced a blanket `# type: ignore` on each line.
+    def get(self, url: str, **kwargs: Any) -> Route:
+        return self.route("GET", url, **kwargs)
 
-    def post(self, url: str, **kwargs: object) -> Route:
-        return self.route("POST", url, **kwargs)  # type: ignore[arg-type]
+    def post(self, url: str, **kwargs: Any) -> Route:
+        return self.route("POST", url, **kwargs)
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
         for route in self.routes:
@@ -163,9 +165,9 @@ class MockHTTP:
         """The wire, for a caller that builds its own client (headers included)."""
         return httpx2.MockTransport(self._handle)
 
-    def client(self, **kwargs: object) -> httpx2.AsyncClient:
+    def client(self, **kwargs: Any) -> httpx2.AsyncClient:
         """A client whose every request is served from these routes."""
-        return httpx2.AsyncClient(transport=self.transport(), **kwargs)  # type: ignore[arg-type]
+        return httpx2.AsyncClient(transport=self.transport(), **kwargs)
 
 
 async def build_seeded_retriever_async(

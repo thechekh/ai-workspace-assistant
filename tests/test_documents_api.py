@@ -235,11 +235,11 @@ def test_uploads_use_the_apps_shared_embedder():
         calls.append(len(texts))
         return await original(texts)
 
-    embedder.embed = counting_embed  # type: ignore[method-assign]
+    embedder.embed = counting_embed
     try:
         with TestClient(app) as client:
             assert app.state.embedder is embedder
             client.post("/api/documents", data={"text": "# T\n\nbody", "source": "t.md"})
     finally:
-        embedder.embed = original  # type: ignore[method-assign]
+        embedder.embed = original
     assert calls == [1]

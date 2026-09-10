@@ -90,8 +90,8 @@ async def test_aclose_keeps_going_after_a_failing_step():
             self.closed = True
 
     http = Recorder()
-    runtime.mcp_registry = BrokenRegistry()  # type: ignore[assignment]
-    runtime.http_client = http  # type: ignore[assignment]
+    runtime.mcp_registry = BrokenRegistry()  # pyright: ignore[reportAttributeAccessIssue]
+    runtime.http_client = http  # pyright: ignore[reportAttributeAccessIssue]
 
     await runtime.aclose()  # must not raise
     assert http.closed, "the HTTP pool must be released even though MCP failed to close"

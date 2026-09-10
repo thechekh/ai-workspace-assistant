@@ -15,7 +15,7 @@ import json
 import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 
 import httpx2  # the OpenAI SDK's transport since 3.0 — see OpenAICompatibleLLM
 import structlog
@@ -366,7 +366,11 @@ class OpenAICompatibleLLM:
         """One model step. The body is the retry shell; the two fiddly parts —
         withholding leaked tool markup and reassembling fragmented tool calls —
         live in the helpers above."""
-        create_kwargs: dict[str, object] = {
+        # `Any`, not `object`: `completions.create` is overloaded on literal
+        # argument types, and this bag is assembled at runtime precisely so the
+        # two retries in `_create_stream` can rewrite it. Declaring the values
+        # `object` only moved the problem to a blanket ignore at the call.
+        create_kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": _to_openai_messages(messages),
             "stream": True,
@@ -433,7 +437,7 @@ class OpenAICompatibleLLM:
             yield usage
 
     async def _create_stream(
-        self, create_kwargs: dict[str, object]
+        self, create_kwargs: dict[str, Any]
     ) -> AsyncStream[ChatCompletionChunk]:
         """Create the completion stream, absorbing two provider quirks:
         reject-retry when stream_options is unsupported, and honored-backoff
@@ -441,7 +445,12 @@ class OpenAICompatibleLLM:
         rate_limit_retries = 0
         while True:
             try:
-                return await self._client.chat.completions.create(**create_kwargs)  # type: ignore[arg-type]
+                # `stream=True` in the bag above is what fixes the return type;
+                # the overload cannot be picked from runtime-assembled kwargs.
+                return cast(
+                    "AsyncStream[ChatCompletionChunk]",
+                    await self._client.chat.completions.create(**create_kwargs),
+                )
             except BadRequestError:
                 if "stream_options" not in create_kwargs:
                     raise

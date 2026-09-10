@@ -113,7 +113,7 @@ async def test_only_the_uncovered_tail_is_read_on_later_turns():
         seen.append(start)
         return await original(session_id, start=start)
 
-    store.history = spying_history  # type: ignore[method-assign]
+    store.history = spying_history
     await memory.context_for("s1")
     assert seen == [4]
 

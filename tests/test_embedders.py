@@ -11,6 +11,7 @@ These are the branches the offline `hash` default never exercises.
 """
 
 import json
+from typing import Any
 
 import httpx2
 import pytest
@@ -50,10 +51,11 @@ def _mock_openai(monkeypatch: pytest.MonkeyPatch, handler) -> list[httpx2.Reques
         seen.append(request)
         return handler(request)
 
-    def fake_client(**kwargs: object) -> AsyncOpenAI:
+    # `Any`: these are forwarded straight into AsyncOpenAI's typed __init__.
+    def fake_client(**kwargs: Any) -> AsyncOpenAI:
         kwargs.pop("timeout", None)  # the transport answers instantly
         return AsyncOpenAI(
-            **kwargs,  # type: ignore[arg-type]
+            **kwargs,
             http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(record)),
         )
 

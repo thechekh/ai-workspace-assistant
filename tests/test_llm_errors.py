@@ -1,5 +1,11 @@
 """LLM failure UX: 429 backoff-retry, tool_use_failed retry + salvage,
-friendly WS error frames, and indicative cost accounting."""
+friendly WS error frames, and indicative cost accounting.
+
+Provider failures are driven by replacing one method — `completions.create`
+or `_create_stream` — with a stub that raises. The SDK's classes declare
+those, so each assignment carries a narrow `reportAttributeAccessIssue`
+ignore; that is the point of the test, not an accident.
+"""
 
 import json
 from types import SimpleNamespace
@@ -155,7 +161,7 @@ async def test_create_stream_retries_rate_limits_with_retry_after(slept: list[fl
             raise _http_error(RateLimitError, 429, headers={"retry-after": "0"})
         return "the-stream"
 
-    llm._client.chat.completions.create = create  # type: ignore[method-assign]
+    llm._client.chat.completions.create = create  # pyright: ignore[reportAttributeAccessIssue]
     stream = await llm._create_stream({"model": "m", "messages": []})
     assert stream == "the-stream"
     assert attempts == 3
@@ -175,7 +181,7 @@ async def test_create_stream_uses_default_backoff_without_retry_after(slept: lis
             raise _http_error(RateLimitError, 429)  # no retry-after header
         return "the-stream"
 
-    llm._client.chat.completions.create = create  # type: ignore[method-assign]
+    llm._client.chat.completions.create = create  # pyright: ignore[reportAttributeAccessIssue]
     assert await llm._create_stream({"model": "m", "messages": []}) == "the-stream"
     assert slept == [2.0, 4.0]
 
@@ -186,7 +192,7 @@ async def test_create_stream_caps_absurd_retry_after(slept: list[float]):
     async def create(**kwargs):
         raise _http_error(RateLimitError, 429, headers={"retry-after": "3600"})
 
-    llm._client.chat.completions.create = create  # type: ignore[method-assign]
+    llm._client.chat.completions.create = create
     with pytest.raises(RateLimitError):
         await llm._create_stream({"model": "m", "messages": []})
     assert slept == [15.0, 15.0]  # _MAX_RETRY_DELAY_S, not an hour
@@ -198,7 +204,7 @@ async def test_create_stream_gives_up_after_retry_budget(slept: list[float]):
     async def create(**kwargs):
         raise _http_error(RateLimitError, 429, headers={"retry-after": "0"})
 
-    llm._client.chat.completions.create = create  # type: ignore[method-assign]
+    llm._client.chat.completions.create = create
     with pytest.raises(RateLimitError):
         await llm._create_stream({"model": "m", "messages": []})
     assert len(slept) == 2  # two retries, then give up
@@ -214,7 +220,7 @@ async def test_create_stream_drops_stream_options_on_bad_request():
             raise _http_error(BadRequestError, 400)
         return "the-stream"
 
-    llm._client.chat.completions.create = create  # type: ignore[method-assign]
+    llm._client.chat.completions.create = create  # pyright: ignore[reportAttributeAccessIssue]
     kwargs = {"model": "m", "messages": [], "stream_options": {"include_usage": True}}
     stream = await llm._create_stream(kwargs)
     assert stream == "the-stream"
@@ -278,7 +284,7 @@ async def test_stream_step_retries_tool_use_failure():
     async def fake_create_stream(create_kwargs):
         return next(streams)
 
-    llm._create_stream = fake_create_stream  # type: ignore[method-assign]
+    llm._create_stream = fake_create_stream  # pyright: ignore[reportAttributeAccessIssue]
     events = [event async for event in llm.stream_step([ChatMessage(role="user", content="hi")])]
     assert [event.text for event in events if isinstance(event, TextDelta)] == ["hel", "lo"]
 
@@ -299,7 +305,7 @@ async def test_stream_step_never_retries_after_text_was_forwarded():
     async def fake_create_stream(create_kwargs):
         return FailsMidStream()
 
-    llm._create_stream = fake_create_stream  # type: ignore[method-assign]
+    llm._create_stream = fake_create_stream  # pyright: ignore[reportAttributeAccessIssue]
     received: list[str] = []
     # PT012: the loop must run *inside* the block — we assert both that the
     # error escapes and exactly what was emitted before it did.
@@ -359,7 +365,7 @@ async def test_stream_step_converts_leaked_text_tool_call():
             "<function.gith", "ub__list_pull_requests>", '{"state":"open"}', "</function>"
         )
 
-    llm._create_stream = fake_create_stream  # type: ignore[method-assign]
+    llm._create_stream = fake_create_stream  # pyright: ignore[reportAttributeAccessIssue]
     events = [event async for event in llm.stream_step([ChatMessage(role="user", content="hi")])]
     assert not any(isinstance(event, TextDelta) for event in events)
     calls = [event for event in events if isinstance(event, ToolCallRequest)]
@@ -374,7 +380,7 @@ async def test_stream_step_still_streams_text_starting_with_angle_bracket():
     async def fake_create_stream(create_kwargs):
         return _GoodStream("<p>", "hello")
 
-    llm._create_stream = fake_create_stream  # type: ignore[method-assign]
+    llm._create_stream = fake_create_stream  # pyright: ignore[reportAttributeAccessIssue]
     events = [event async for event in llm.stream_step([ChatMessage(role="user", content="hi")])]
     assert [event.text for event in events if isinstance(event, TextDelta)] == ["<p>", "hello"]
 
@@ -393,7 +399,7 @@ async def test_stream_step_recovers_call_from_failed_generation():
         attempts += 1
         return AlwaysFailing()
 
-    llm._create_stream = fake_create_stream  # type: ignore[method-assign]
+    llm._create_stream = fake_create_stream  # pyright: ignore[reportAttributeAccessIssue]
     events = [event async for event in llm.stream_step([ChatMessage(role="user", content="hi")])]
     assert attempts == 3  # initial try + 2 retries, then salvage instead of raising
     calls = [event for event in events if isinstance(event, ToolCallRequest)]
