@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onBeforeUnmount, ref } from "vue";
 
-import type { AssistantItem, UserItem } from "../stores/chat";
+import { copyToClipboard } from "../lib/clipboard";
 import { useChatStore } from "../stores/chat";
-import type { AuditEvent, TurnEvent } from "../types";
+import type { AssistantItem, AuditEvent, TurnEvent, UserItem } from "../types";
 import MarkdownContent from "./MarkdownContent.vue";
 
 const props = defineProps<{ item: UserItem | AssistantItem }>();
@@ -21,6 +21,23 @@ async function toggleDetails(): Promise<void> {
   loading.value = true;
   events.value = await chat.fetchTurnEvents(props.item.stats.turn_id);
   loading.value = false;
+}
+
+// Copies the answer as Markdown source — what you would paste into a doc.
+const copied = ref<"ok" | "failed" | null>(null);
+let copyReset: ReturnType<typeof setTimeout> | null = null;
+async function copyAnswer(): Promise<void> {
+  copied.value = (await copyToClipboard(props.item.text)) ? "ok" : "failed";
+  if (copyReset !== null) clearTimeout(copyReset);
+  copyReset = setTimeout(() => (copied.value = null), 1500);
+}
+onBeforeUnmount(() => {
+  if (copyReset !== null) clearTimeout(copyReset);
+});
+
+/** Hover title: when the message appeared. Nothing for restored history. */
+function receivedAt(at: number | undefined): string | undefined {
+  return at === undefined ? undefined : `received ${new Date(at).toLocaleTimeString()}`;
 }
 
 function formatStats(stats: TurnEvent): string {
@@ -49,6 +66,10 @@ function describeEvent(event: AuditEvent): string {
     case "error":
       return event.message ?? "";
     default:
+      // Unreachable for the four types the server declares today, and kept
+      // deliberately: these rows are parsed from JSON, so a server that
+      // starts emitting a fifth kind should render a blank line, not crash
+      // an already-finished turn's timeline.
       return "";
   }
 }
@@ -57,9 +78,9 @@ function describeEvent(event: AuditEvent): string {
 <template>
   <div class="msg" :class="item.kind">
     <div class="avatar">{{ item.kind === "user" ? "You" : "AI" }}</div>
-    <div class="bubble">
+    <div class="bubble" :title="receivedAt(item.at)">
       <template v-if="item.kind === 'assistant'">
-        <MarkdownContent :source="item.text" />
+        <MarkdownContent :source="item.text" :streaming="item.streaming" />
         <span v-if="item.streaming" class="cursor">▍</span>
         <!-- Visible in both modes: an answer cut short must never read as a
              complete one, whether or not the dev stats line is showing. -->
@@ -67,13 +88,23 @@ function describeEvent(event: AuditEvent): string {
           <span aria-hidden="true">■</span>
           stopped by you{{ item.text ? "" : " before the answer started" }}
         </div>
+        <div v-if="!item.streaming && item.text" class="bubble-actions">
+          <button
+            class="link"
+            type="button"
+            :aria-label="copied === 'ok' ? 'Copied' : 'Copy answer'"
+            @click="copyAnswer"
+          >
+            {{ copied === "ok" ? "copied" : copied === "failed" ? "copy failed" : "copy" }}
+          </button>
+        </div>
         <div
           v-if="item.stats && chat.devMode"
           class="turn-stats"
           :title="`turn ${item.stats.turn_id} · backend ${item.stats.backend}`"
         >
           {{ formatStats(item.stats) }}
-          <button class="link" @click="toggleDetails">
+          <button class="link" type="button" @click="toggleDetails">
             {{ expanded ? "hide" : "details" }}
           </button>
         </div>

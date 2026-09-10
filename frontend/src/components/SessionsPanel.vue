@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
 
+import { usePopover } from "../lib/popover";
 import { useChatStore } from "../stores/chat";
+import type { SessionSummary } from "../types";
 
 /**
  * Recent conversations. Sessions already survive a reload (Redis + the
@@ -10,21 +12,29 @@ import { useChatStore } from "../stores/chat";
  * off, because the same history is what goes back into the prompt.
  */
 const chat = useChatStore();
-const open = ref(false);
+const wrap = ref<HTMLElement | null>(null);
+const trigger = ref<HTMLElement | null>(null);
+const { open, toggle, close } = usePopover("sessions", wrap, trigger);
 
-function toggle(): void {
-  open.value = !open.value;
+function onToggle(): void {
+  toggle();
   if (open.value) void chat.loadSessions();
 }
 
 async function pick(id: string): Promise<void> {
   await chat.switchSession(id);
-  open.value = false;
+  close({ focusTrigger: true });
 }
 
 function startNew(): void {
   chat.newSession();
-  open.value = false;
+  close({ focusTrigger: true });
+}
+
+async function remove(session: SessionSummary): Promise<void> {
+  const what = session.preview ? `“${session.preview}”` : "this conversation";
+  if (!window.confirm(`Delete ${what} and its audit trail? This cannot be undone.`)) return;
+  await chat.deleteSession(session.session_id);
 }
 
 /** Coarse on purpose: an exact clock adds noise to a "which one was it" list. */
@@ -39,18 +49,26 @@ function ago(updatedAt: number): string {
 </script>
 
 <template>
-  <div class="sessions-wrap">
-    <button class="ghost" title="Recent conversations" @click="toggle">
+  <div ref="wrap" class="sessions-wrap">
+    <button
+      ref="trigger"
+      class="ghost"
+      type="button"
+      title="Recent conversations"
+      :aria-expanded="open"
+      aria-controls="sessions-panel"
+      @click="onToggle"
+    >
       Chats<span v-if="chat.sessions.length"> ({{ chat.sessions.length }})</span>
     </button>
 
-    <div v-if="open" class="sessions-panel">
+    <div v-if="open" id="sessions-panel" class="sessions-panel">
       <header class="sessions-head">
         <strong>Recent conversations</strong>
-        <button class="link" @click="open = false">close</button>
+        <button class="link" type="button" @click="close({ focusTrigger: true })">close</button>
       </header>
 
-      <button class="new-chat" @click="startNew">+ New conversation</button>
+      <button class="new-chat" type="button" @click="startNew">+ New conversation</button>
 
       <p v-if="chat.sessionsLoading" class="muted">loading…</p>
       <p v-else-if="chat.sessions.length === 0" class="muted">
@@ -66,6 +84,7 @@ function ago(updatedAt: number): string {
         >
           <button
             class="session-open"
+            type="button"
             :title="session.session_id"
             @click="pick(session.session_id)"
           >
@@ -78,8 +97,10 @@ function ago(updatedAt: number): string {
           </button>
           <button
             class="link danger"
+            type="button"
             title="Delete this conversation and its audit trail"
-            @click="chat.deleteSession(session.session_id)"
+            :aria-label="`Delete conversation: ${session.preview || session.session_id}`"
+            @click="remove(session)"
           >
             delete
           </button>
@@ -156,8 +177,5 @@ function ago(updatedAt: number): string {
 .muted {
   font-size: 0.78rem;
   color: var(--muted, #6b7280);
-}
-.danger {
-  color: var(--danger, #b3261e);
 }
 </style>

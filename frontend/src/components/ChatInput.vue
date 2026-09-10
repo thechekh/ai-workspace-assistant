@@ -2,6 +2,10 @@
 import { ref } from "vue";
 
 import { useChatStore } from "../stores/chat";
+import { MAX_MESSAGE_CHARS } from "../types";
+
+/** The counter appears this close to the cap — a warning, not a readout. */
+const COUNTER_FROM = MAX_MESSAGE_CHARS - 500;
 
 const chat = useChatStore();
 const draft = ref("");
@@ -26,16 +30,28 @@ function onKeydown(event: KeyboardEvent): void {
 
 <template>
   <footer class="composer">
-    <textarea
-      v-model="draft"
-      rows="1"
-      :placeholder="
-        chat.busy
-          ? 'Answering… (Esc or Stop to interrupt)'
-          : 'Ask something… (Enter to send, Shift+Enter for a new line)'
-      "
-      @keydown="onKeydown"
-    ></textarea>
+    <div class="composer-field">
+      <textarea
+        v-model="draft"
+        rows="1"
+        aria-label="Message"
+        :maxlength="MAX_MESSAGE_CHARS"
+        :placeholder="
+          chat.busy
+            ? 'Answering… (Esc or Stop to interrupt)'
+            : 'Ask something… (Enter to send, Shift+Enter for a new line)'
+        "
+        @keydown="onKeydown"
+      ></textarea>
+      <!-- The server rejects anything longer; say so before it has to. -->
+      <span
+        v-if="draft.length >= COUNTER_FROM"
+        class="char-count"
+        :class="{ full: draft.length >= MAX_MESSAGE_CHARS }"
+      >
+        {{ draft.length }} / {{ MAX_MESSAGE_CHARS }}
+      </span>
+    </div>
     <!-- Send becomes Stop while a turn runs: one control, never both, so the
          button under the cursor always does the thing you can actually do. -->
     <button v-if="chat.busy" class="stop" title="Stop generating (Esc)" @click="chat.cancelTurn()">
@@ -48,8 +64,8 @@ function onKeydown(event: KeyboardEvent): void {
 
 <style scoped>
 .stop {
-  background: var(--danger, #b3261e);
-  border-color: var(--danger, #b3261e);
+  background: var(--danger);
+  border-color: var(--danger);
   color: #fff;
 }
 .stop-glyph {

@@ -1,30 +1,41 @@
 import { useWebSocket } from "@vueuse/core";
 import { defineStore } from "pinia";
-import { computed, ref, watch } from "vue";
+import { computed, onScopeDispose, ref, watch } from "vue";
 
+import { readStorage, writeStorage } from "../lib/storage";
 import type {
+  AssistantItem,
   AuditEvent,
   AuditTurn,
   CancelRequest,
+  ChatItem,
+  ChatItemDraft,
+  DocumentList,
+  DocumentUploadResult,
+  HealthInfo,
   IndexedDocument,
+  PlatformInfo,
   ServerEvent,
+  SessionList,
+  SessionMessages,
   SessionSummary,
   StoredMessage,
-  TurnEvent,
   UserMessage,
 } from "../types";
 
-export type BackendName = "custom" | "pydantic_ai" | "langgraph";
+/** The runtime the server ships as its default. */
+export const DEFAULT_BACKEND = "custom";
+/** What the picker offers until /api/info says what this instance runs. */
+export const FALLBACK_BACKENDS = [DEFAULT_BACKEND, "pydantic_ai", "langgraph"];
 
-export interface PlatformInfo {
-  backends: string[];
-  default_backend: string;
-  llm_provider: string;
-  embedding_provider: string;
-  retrieval_mode: string;
-  collection: string;
-  auth_required: boolean;
-}
+/** How long a toast stays on screen. */
+export const TOAST_MS = 4000;
+const HEALTH_INTERVAL_MS = 10_000;
+
+const DEV_MODE_KEY = "assistant_dev_mode";
+const TOKEN_KEY = "assistant_token";
+const BACKEND_KEY = "assistant_backend";
+const SESSION_KEY = "session_id";
 
 export interface Toast {
   id: number;
@@ -32,63 +43,55 @@ export interface Toast {
   text: string;
 }
 
-export interface HealthComponent {
-  status: string;
-  [detail: string]: unknown;
-}
-
-export interface HealthInfo {
-  status: "ok" | "degraded";
-  components: Record<string, HealthComponent>;
-}
-
 /** Dev mode shows the instrumentation (tool cards, per-turn stats, the
  *  audit timeline); standard mode is a plain chat. Persisted across reloads.
  *  Nothing is filtered server-side — the frames always arrive, so flipping
  *  the switch reveals the data for messages already on screen. */
 function resolveDevMode(): boolean {
-  return localStorage.getItem("assistant_dev_mode") === "true";
+  return readStorage("local", DEV_MODE_KEY) === "true";
 }
 
-/** Optional bearer token: captured once from ?token=... and persisted. */
+/** Optional bearer token: captured once from ?token=... and persisted.
+ *
+ *  The address bar is then rewritten without it. A secret left in the URL
+ *  ends up in browser history, in screenshots and in any link copied from
+ *  the bar. */
 function resolveToken(): string | null {
-  const fromUrl = new URLSearchParams(location.search).get("token");
-  if (fromUrl) localStorage.setItem("assistant_token", fromUrl);
-  return localStorage.getItem("assistant_token");
+  const params = new URLSearchParams(location.search);
+  const fromUrl = params.get("token");
+  if (fromUrl) {
+    writeStorage("local", TOKEN_KEY, fromUrl);
+    params.delete("token");
+    const query = params.toString();
+    const clean = `${location.pathname}${query ? `?${query}` : ""}${location.hash}`;
+    history.replaceState(history.state, "", clean);
+    return fromUrl;
+  }
+  return readStorage("local", TOKEN_KEY);
 }
 
-export interface UserItem {
-  kind: "user";
-  text: string;
+/** FastAPI's error body is `{detail}`; anything else (a proxy's HTML 502
+ *  page, say) falls back to the status code. */
+async function errorDetail(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body.detail === "string") return body.detail;
+  } catch {
+    /* not JSON */
+  }
+  return `HTTP ${response.status}`;
 }
-export interface AssistantItem {
-  kind: "assistant";
-  text: string;
-  streaming: boolean;
-  /** Answer cut short by Stop — rendered with a "stopped" marker. */
-  cancelled?: boolean;
-  /** Attached when the post-final `turn` frame arrives. */
-  stats?: TurnEvent;
-}
-export interface ToolItem {
-  kind: "tool";
-  tool: string;
-  args: string;
-  result: string | null;
-}
-export interface ErrorItem {
-  kind: "error";
-  text: string;
-}
-export type ChatItem = UserItem | AssistantItem | ToolItem | ErrorItem;
 
 export const useChatStore = defineStore("chat", () => {
   const items = ref<ChatItem[]>([]);
-  const sessionId = ref<string | null>(sessionStorage.getItem("session_id"));
-  const backend = ref<BackendName>("custom");
+  const sessionId = ref<string | null>(readStorage("session", SESSION_KEY));
   const info = ref<PlatformInfo | null>(null);
   const toasts = ref<Toast[]>([]);
   const token = resolveToken();
+  const hasToken = computed(() => token !== null);
+  /** The last completed answer, for the screen reader's live region:
+   *  announced once and whole, rather than one token at a time. */
+  const announcement = ref("");
 
   // True from "message sent" until the closing `turn` frame (or an error).
   // Drives the Stop button and blocks a second question mid-answer, which the
@@ -98,7 +101,7 @@ export const useChatStore = defineStore("chat", () => {
   const devMode = ref(resolveDevMode());
   function toggleDevMode(): void {
     devMode.value = !devMode.value;
-    localStorage.setItem("assistant_dev_mode", String(devMode.value));
+    writeStorage("local", DEV_MODE_KEY, String(devMode.value));
   }
 
   let toastSeq = 0;
@@ -107,18 +110,49 @@ export const useChatStore = defineStore("chat", () => {
     toasts.value.push({ id, kind, text });
     setTimeout(() => {
       toasts.value = toasts.value.filter((entry) => entry.id !== id);
-    }, 4000);
+    }, TOAST_MS);
+  }
+
+  // Item ids are monotonic for the page's lifetime, so a v-for keyed on them
+  // never hands one message's DOM (and component state) to another — which
+  // an index key does whenever the transcript is replaced or trimmed.
+  let itemSeq = 0;
+  /** Stamp a draft with its key. `at: null` for restored history, whose
+   *  original timing the server does not keep. */
+  function createItem(draft: ChatItemDraft, at: number | null = Date.now()): ChatItem {
+    return at === null ? { ...draft, id: ++itemSeq } : { ...draft, id: ++itemSeq, at };
+  }
+
+  // --- agent backend -------------------------------------------------------
+  // The user's choice, remembered across reloads. null means "the server's
+  // default": the socket then omits ?backend= and the server picks, and
+  // /api/info tells the picker which one that is. Before it answers, the
+  // hard-coded list stands in.
+  const chosenBackend = ref<string | null>(readStorage("local", BACKEND_KEY));
+  const backends = computed(() => info.value?.backends ?? FALLBACK_BACKENDS);
+  /** What the socket is using: the choice, else the server's default. */
+  const backend = computed(
+    () => chosenBackend.value ?? info.value?.default_backend ?? DEFAULT_BACKEND,
+  );
+  function selectBackend(name: string | null): void {
+    chosenBackend.value = name;
+    writeStorage("local", BACKEND_KEY, name);
   }
 
   async function loadInfo(): Promise<void> {
     try {
       const response = await fetch("/api/info");
-      if (response.ok) info.value = (await response.json()) as PlatformInfo;
+      if (!response.ok) return;
+      info.value = (await response.json()) as PlatformInfo;
+      // A remembered choice this instance no longer offers would leave the
+      // picker blank, and the server ignores unknown names anyway.
+      if (chosenBackend.value !== null && !info.value.backends.includes(chosenBackend.value)) {
+        selectBackend(null);
+      }
     } catch {
       /* offline dev server without backend — badge simply stays hidden */
     }
   }
-  void loadInfo();
 
   // Deep health (/api/health pings Redis/Qdrant) -> header dot, refreshed
   // every 10s. Unreachable backend -> null -> gray "unknown" dot.
@@ -131,18 +165,28 @@ export const useChatStore = defineStore("chat", () => {
       health.value = null;
     }
   }
-  void loadHealth();
-  setInterval(() => void loadHealth(), 10_000);
+  const healthTimer = setInterval(() => void loadHealth(), HEALTH_INTERVAL_MS);
+  onScopeDispose(() => clearInterval(healthTimer));
 
   // Re-evaluated on every (re)connect: reconnects resume the same session,
   // and the backend switch rides along as a query param.
   const wsUrl = computed(() => {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const params = new URLSearchParams({ backend: backend.value });
+    const params = new URLSearchParams();
+    if (chosenBackend.value) params.set("backend", chosenBackend.value);
     if (sessionId.value) params.set("session_id", sessionId.value);
     if (token) params.set("token", token);
     return `${proto}://${location.host}/chat?${params.toString()}`;
   });
+
+  /** Index of the first item of the turn in flight: everything after the
+   *  user message that opened it. */
+  function turnStart(): number {
+    for (let i = items.value.length - 1; i >= 0; i--) {
+      if (items.value[i]?.kind === "user") return i + 1;
+    }
+    return 0;
+  }
 
   /** The assistant bubble belonging to the turn now finishing, if it made one.
    *
@@ -154,55 +198,67 @@ export const useChatStore = defineStore("chat", () => {
   function answerOfCurrentTurn(): AssistantItem | undefined {
     for (let i = items.value.length - 1; i >= 0; i--) {
       const item = items.value[i];
-      if (item.kind === "user") return undefined;
+      if (!item || item.kind === "user") return undefined;
       if (item.kind === "assistant") return item;
     }
     return undefined;
   }
 
   function handleEvent(event: ServerEvent): void {
-    const last = items.value[items.value.length - 1];
+    const last = items.value.at(-1);
     switch (event.type) {
       case "session":
         sessionId.value = event.session_id;
-        sessionStorage.setItem("session_id", event.session_id);
+        writeStorage("session", SESSION_KEY, event.session_id);
         break;
       case "token":
-        if (last && last.kind === "assistant" && last.streaming) {
+        if (last?.kind === "assistant" && last.streaming) {
           last.text += event.content;
         } else {
-          items.value.push({ kind: "assistant", text: event.content, streaming: true });
+          items.value.push(createItem({ kind: "assistant", text: event.content, streaming: true }));
         }
         break;
       case "final":
-        if (last && last.kind === "assistant" && last.streaming) {
+        if (last?.kind === "assistant" && last.streaming) {
           last.text = event.content;
           last.streaming = false;
         } else {
-          items.value.push({ kind: "assistant", text: event.content, streaming: false });
+          items.value.push(
+            createItem({ kind: "assistant", text: event.content, streaming: false }),
+          );
         }
+        announcement.value = event.content;
         break;
       case "tool_call":
-        items.value.push({
-          kind: "tool",
-          tool: event.tool,
-          args: JSON.stringify(event.arguments),
-          result: null,
-        });
+        items.value.push(
+          createItem({
+            kind: "tool",
+            tool: event.tool,
+            // Empty stays empty rather than becoming "{}", so the card can ask
+            // "are there arguments?" instead of comparing rendered JSON.
+            args: Object.keys(event.arguments).length > 0 ? JSON.stringify(event.arguments) : "",
+            result: null,
+          }),
+        );
         break;
       case "tool_result": {
-        const pending = [...items.value]
-          .reverse()
-          .find(
-            (i): i is ToolItem => i.kind === "tool" && i.tool === event.tool && i.result === null,
-          );
-        if (pending) pending.result = event.result;
+        // Results come back in call order, so the first card still waiting
+        // for this tool is the one — a step may call the same tool twice.
+        // Bounded to the turn in flight: a card left pending by a stopped
+        // turn must not swallow a later turn's result.
+        for (let i = turnStart(); i < items.value.length; i++) {
+          const item = items.value[i];
+          if (item?.kind === "tool" && item.tool === event.tool && item.result === null) {
+            item.result = event.result;
+            break;
+          }
+        }
         break;
       }
       case "error":
-        if (last && last.kind === "assistant" && last.streaming) last.streaming = false;
+        if (last?.kind === "assistant" && last.streaming) last.streaming = false;
         busy.value = false;
-        items.value.push({ kind: "error", text: event.message });
+        items.value.push(createItem({ kind: "error", text: event.message }));
         toast("error", event.message);
         break;
       case "turn": {
@@ -216,7 +272,9 @@ export const useChatStore = defineStore("chat", () => {
         } else if (event.cancelled) {
           // Stopped before the first token: this turn has no bubble of its own,
           // and the previous turn's answer must not be borrowed to mark it.
-          items.value.push({ kind: "assistant", text: "", streaming: false, cancelled: true });
+          items.value.push(
+            createItem({ kind: "assistant", text: "", streaming: false, cancelled: true }),
+          );
         }
         // A failed turn already pushed an `error` item; the summary only adds
         // what it cost, which dev mode shows on the answer when there is one.
@@ -226,7 +284,19 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   const { status, send, open, close } = useWebSocket(wsUrl, {
-    autoReconnect: { retries: 10, delay: 2000 },
+    // Reconnects are explicit (backend switch, session switch, the header
+    // pill). vueuse's own URL watcher would otherwise reopen the socket
+    // whenever `wsUrl` changes: in the middle of a session switch while the
+    // transcript is still loading, and after every `session` frame on a new
+    // conversation — a second connection to the session just joined.
+    autoConnect: false,
+    autoReconnect: {
+      retries: 10,
+      delay: 2000,
+      onFailed() {
+        toast("error", "connection lost — click “disconnected” to retry");
+      },
+    },
     onMessage(_ws, messageEvent) {
       handleEvent(JSON.parse(String(messageEvent.data)) as ServerEvent);
     },
@@ -234,9 +304,14 @@ export const useChatStore = defineStore("chat", () => {
 
   const connected = computed(() => status.value === "OPEN");
 
+  /** Reconnect now — the "disconnected" pill, once auto-reconnect has given up. */
+  function reconnect(): void {
+    open();
+  }
+
   // Switching the agent backend reconnects with the same session — the new
   // runtime picks up the existing history from Redis.
-  watch(backend, () => {
+  watch(chosenBackend, () => {
     close();
     open();
   });
@@ -246,15 +321,15 @@ export const useChatStore = defineStore("chat", () => {
   watch(connected, (isConnected) => {
     if (!isConnected && busy.value) {
       busy.value = false;
-      const last = items.value[items.value.length - 1];
-      if (last && last.kind === "assistant" && last.streaming) last.streaming = false;
+      const last = items.value.at(-1);
+      if (last?.kind === "assistant" && last.streaming) last.streaming = false;
     }
   });
 
   function sendMessage(text: string): boolean {
     const trimmed = text.trim();
     if (!trimmed || !connected.value || busy.value) return false;
-    items.value.push({ kind: "user", text: trimmed });
+    items.value.push(createItem({ kind: "user", text: trimmed }));
     const payload: UserMessage = { type: "user_message", content: trimmed };
     send(JSON.stringify(payload));
     busy.value = true;
@@ -268,6 +343,18 @@ export const useChatStore = defineStore("chat", () => {
     const payload: CancelRequest = { type: "cancel" };
     send(JSON.stringify(payload));
   }
+
+  /** The most recent question, asked again — the error row's "retry". */
+  function retryLastMessage(): boolean {
+    for (let i = items.value.length - 1; i >= 0; i--) {
+      const item = items.value[i];
+      if (item?.kind === "user") return sendMessage(item.text);
+    }
+    return false;
+  }
+  const canRetry = computed(
+    () => connected.value && !busy.value && items.value.some((item) => item.kind === "user"),
+  );
 
   /** Audit timeline for one turn of the current session ("explain this turn"). */
   async function fetchTurnEvents(turnId: string): Promise<AuditEvent[] | null> {
@@ -298,13 +385,16 @@ export const useChatStore = defineStore("chat", () => {
     try {
       const response = await fetch("/api/documents");
       if (!response.ok) return;
-      documents.value = ((await response.json()) as { documents: IndexedDocument[] }).documents;
+      documents.value = ((await response.json()) as DocumentList).documents;
     } catch {
       /* backend unreachable — the panel just shows nothing */
     }
   }
 
-  async function uploadDocuments(files: File[], pasted?: { source: string; text: string }) {
+  async function uploadDocuments(
+    files: File[],
+    pasted?: { source: string; text: string },
+  ): Promise<void> {
     if (files.length === 0 && !pasted?.text.trim()) return;
     documentsLoading.value = true;
     const body = new FormData();
@@ -319,13 +409,13 @@ export const useChatStore = defineStore("chat", () => {
         headers: authHeaders(),
         body,
       });
-      const payload = await response.json();
       if (response.ok) {
-        toast("ok", `Indexed ${payload.chunks} chunks from ${payload.indexed.length} document(s)`);
-        for (const skip of payload.skipped ?? []) toast("error", `Skipped ${skip}`);
+        const result = (await response.json()) as DocumentUploadResult;
+        toast("ok", `Indexed ${result.chunks} chunks from ${result.indexed.length} document(s)`);
+        for (const skip of result.skipped) toast("error", `Skipped ${skip}`);
         await loadDocuments();
       } else {
-        toast("error", `Upload failed: ${payload.detail ?? response.status}`);
+        toast("error", `Upload failed: ${await errorDetail(response)}`);
       }
     } catch (error) {
       toast("error", `Upload failed: ${String(error)}`);
@@ -353,7 +443,6 @@ export const useChatStore = defineStore("chat", () => {
       toast("error", `Could not remove ${source}: ${String(error)}`);
     }
   }
-  void loadDocuments();
 
   // --- conversations -------------------------------------------------------
   const sessions = ref<SessionSummary[]>([]);
@@ -364,7 +453,7 @@ export const useChatStore = defineStore("chat", () => {
     try {
       const response = await fetch("/api/sessions", { headers: authHeaders() });
       if (response.ok) {
-        sessions.value = ((await response.json()) as { sessions: SessionSummary[] }).sessions;
+        sessions.value = ((await response.json()) as SessionList).sessions;
       }
     } catch {
       /* offline: the panel simply shows nothing */
@@ -382,27 +471,40 @@ export const useChatStore = defineStore("chat", () => {
   async function switchSession(id: string): Promise<void> {
     if (id === sessionId.value) return;
     sessionId.value = id;
-    sessionStorage.setItem("session_id", id);
+    writeStorage("session", SESSION_KEY, id);
     items.value = [];
     busy.value = false;
+    // Closed before the fetch, not after: a frame from the old connection, or
+    // a question sent while the history loads, would land in a transcript the
+    // fetch is about to replace.
+    close();
 
+    let stored: StoredMessage[] | null = null;
+    let failed = false;
     try {
       const response = await fetch(`/api/sessions/${id}/messages`, { headers: authHeaders() });
-      if (response.ok) {
-        const stored = ((await response.json()) as { messages: StoredMessage[] }).messages;
-        items.value = stored
-          .filter((message) => message.role === "user" || message.role === "assistant")
-          .map((message) =>
-            message.role === "user"
-              ? ({ kind: "user", text: message.content } as ChatItem)
-              : ({ kind: "assistant", text: message.content, streaming: false } as ChatItem),
-          );
-      }
+      if (response.ok) stored = ((await response.json()) as SessionMessages).messages;
     } catch {
+      failed = true;
+    }
+    // A later switch won while this one was loading: what it fetched belongs
+    // to a conversation no longer on screen, and the winner reconnects itself.
+    if (sessionId.value !== id) return;
+
+    if (stored) {
+      items.value = stored
+        .filter((message) => message.role === "user" || message.role === "assistant")
+        .map((message) =>
+          createItem(
+            message.role === "user"
+              ? { kind: "user", text: message.content }
+              : { kind: "assistant", text: message.content, streaming: false },
+            null,
+          ),
+        );
+    } else if (failed) {
       toast("error", "could not load that conversation's history");
     }
-
-    close();
     open(); // reconnects with ?session_id=<id>
   }
 
@@ -425,7 +527,7 @@ export const useChatStore = defineStore("chat", () => {
   }
 
   function newSession(): void {
-    sessionStorage.removeItem("session_id");
+    writeStorage("session", SESSION_KEY, null);
     sessionId.value = null;
     items.value = [];
     busy.value = false;
@@ -433,19 +535,37 @@ export const useChatStore = defineStore("chat", () => {
     open(); // wsUrl no longer carries session_id → server issues a fresh one
   }
 
+  /** Forget the stored access token and start over without it. */
+  function signOut(): void {
+    writeStorage("local", TOKEN_KEY, null);
+    location.reload();
+  }
+
+  void loadInfo();
+  void loadHealth();
+  void loadDocuments();
+
   return {
     items,
     sessionId,
     backend,
+    backends,
+    selectBackend,
     connected,
+    reconnect,
     busy,
     info,
     health,
+    hasToken,
+    signOut,
     devMode,
     toggleDevMode,
     toasts,
+    announcement,
     sendMessage,
     cancelTurn,
+    retryLastMessage,
+    canRetry,
     newSession,
     sessions,
     sessionsLoading,

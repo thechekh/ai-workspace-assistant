@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 
+import { usePopover } from "../lib/popover";
 import { useChatStore } from "../stores/chat";
 
 /**
@@ -9,15 +10,21 @@ import { useChatStore } from "../stores/chat";
  * on the very next message.
  */
 const chat = useChatStore();
-const open = ref(false);
+const wrap = ref<HTMLElement | null>(null);
+const trigger = ref<HTMLElement | null>(null);
+const { open, toggle, close } = usePopover("documents", wrap, trigger);
 const dragging = ref(false);
 const pastedText = ref("");
 const pastedName = ref("");
 const fileInput = ref<HTMLInputElement | null>(null);
 
-function toggle(): void {
-  open.value = !open.value;
+function onToggle(): void {
+  toggle();
   if (open.value) void chat.loadDocuments();
+}
+
+function pickFiles(): void {
+  fileInput.value?.click();
 }
 
 async function onFiles(fileList: FileList | null): Promise<void> {
@@ -40,27 +47,42 @@ async function addPasted(): Promise<void> {
   pastedText.value = "";
   pastedName.value = "";
 }
+
+async function remove(source: string): Promise<void> {
+  if (!window.confirm(`Remove “${source}” from the knowledge base?`)) return;
+  await chat.deleteDocument(source);
+}
 </script>
 
 <template>
-  <div class="docs-wrap">
-    <button class="ghost" :title="'Documents the assistant can search'" @click="toggle">
+  <div ref="wrap" class="docs-wrap">
+    <button
+      ref="trigger"
+      class="ghost"
+      type="button"
+      title="Documents the assistant can search"
+      :aria-expanded="open"
+      aria-controls="documents-panel"
+      @click="onToggle"
+    >
       Documents<span v-if="chat.documents.length"> ({{ chat.documents.length }})</span>
     </button>
 
-    <div v-if="open" class="docs-panel">
+    <div v-if="open" id="documents-panel" class="docs-panel">
       <header class="docs-head">
         <strong>Knowledge base</strong>
-        <button class="link" @click="open = false">close</button>
+        <button class="link" type="button" @click="close({ focusTrigger: true })">close</button>
       </header>
 
+      <!-- Drag-and-drop for the mouse; the button for everyone else — a div
+           with a click handler does not exist to the keyboard. -->
       <div
         class="dropzone"
         :class="{ over: dragging }"
         @dragover.prevent="dragging = true"
         @dragleave.prevent="dragging = false"
         @drop.prevent="onDrop"
-        @click="fileInput?.click()"
+        @click="pickFiles"
       >
         <input
           ref="fileInput"
@@ -71,7 +93,12 @@ async function addPasted(): Promise<void> {
           @change="onFiles(($event.target as HTMLInputElement).files)"
         />
         <span v-if="chat.documentsLoading">indexing…</span>
-        <span v-else>Drop .md / .txt / .rst here, or click to choose</span>
+        <span v-else>
+          Drop .md / .txt / .rst here, or
+          <button class="link choose-files" type="button" @click.stop="pickFiles">
+            choose files
+          </button>
+        </span>
       </div>
 
       <details class="paste">
@@ -87,7 +114,13 @@ async function addPasted(): Promise<void> {
         <li v-for="doc in chat.documents" :key="doc.source">
           <span class="doc-name" :title="doc.source">{{ doc.source }}</span>
           <span class="doc-chunks">{{ doc.chunks }} chunks</span>
-          <button class="link danger" title="Remove" @click="chat.deleteDocument(doc.source)">
+          <button
+            class="link danger"
+            type="button"
+            :title="`Remove ${doc.source}`"
+            :aria-label="`Remove ${doc.source}`"
+            @click="remove(doc.source)"
+          >
             ✕
           </button>
         </li>

@@ -7,15 +7,33 @@ import vue from "eslint-plugin-vue";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "node_modules/**"] },
+  { ignores: ["dist/**", "node_modules/**", "coverage/**"] },
   js.configs.recommended,
-  ...tseslint.configs.recommended,
+  // Type-aware rules: the store is async end to end, and a dropped promise or
+  // an `any` leaking out of `response.json()` is exactly what tsc alone lets
+  // through.
+  ...tseslint.configs.recommendedTypeChecked,
   ...vue.configs["flat/recommended"],
+  {
+    files: ["**/*.ts", "**/*.vue"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+        extraFileExtensions: [".vue"],
+      },
+    },
+  },
   {
     files: ["**/*.vue"],
     languageOptions: {
       parserOptions: { parser: tseslint.parser },
     },
+  },
+  {
+    // This file: plain JS outside the TS project, so no type information.
+    files: ["**/*.js"],
+    ...tseslint.configs.disableTypeChecked,
   },
   {
     files: ["**/*.ts", "**/*.vue"],

@@ -1,0 +1,2 @@
+# vitest --coverage output (npm run test:coverage)
+coverage/

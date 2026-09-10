@@ -61,3 +61,56 @@ describe("renderMarkdown — formatting", () => {
     expect(renderMarkdown("")).toBe("");
   });
 });
+
+describe("renderMarkdown — code blocks", () => {
+  const fence = (lang: string, code: string) => renderMarkdown(`\`\`\`${lang}\n${code}\n\`\`\``);
+
+  it("highlights the languages engineers paste", () => {
+    const samples: [string, string][] = [
+      ["python", "def f():\n    return 1"],
+      ["typescript", "const x: number = 1;"],
+      ["javascript", "const x = 1;"],
+      ["bash", "echo hi"],
+      ["shell", "$ ls"],
+      ["json", '{"a": 1}'],
+      ["yaml", "a: 1"],
+      ["markdown", "# h"],
+      ["sql", "SELECT 1"],
+      ["diff", "+ added\n- removed"],
+      ["dockerfile", "FROM python:3.12"],
+    ];
+    for (const [lang, code] of samples) {
+      expect(fence(lang, code), lang).toContain("hljs-");
+    }
+  });
+
+  it("resolves the short names models actually emit", () => {
+    // Each sample contains something its grammar marks up; a bare `x = 1`
+    // is unhighlighted in bash even though the alias resolves.
+    const samples: [string, string][] = [
+      ["py", "x = 1"],
+      ["ts", "const x: number = 1;"],
+      ["js", "const x = 1;"],
+      ["sh", 'echo "hi"'],
+      ["yml", "a: 1"],
+      ["md", "# h"],
+      ["docker", "FROM python:3.12"],
+    ];
+    for (const [alias, code] of samples) {
+      expect(fence(alias, code), alias).toContain("hljs-");
+    }
+  });
+
+  it("leaves a language it does not know as escaped plain text", () => {
+    const html = fence("brainfuck", "<b>");
+    expect(html).not.toContain("hljs-");
+    expect(html).toContain("&lt;b&gt;");
+  });
+
+  it("gives every fenced block a copy button, and inline code none", () => {
+    const html = renderMarkdown("```\na\n```\n\n```js\nb\n```");
+    expect(html.match(/class="copy-code"/g)).toHaveLength(2);
+    expect(html).toContain('aria-label="Copy code"');
+    expect(renderMarkdown("use `x` here")).not.toContain("copy-code");
+  });
+});

@@ -8,6 +8,8 @@
   --accent: #4f8cff;
   --user: #1d2836;
   --error: #ff6b6b;
+  /* --error is a text colour; --danger is the fill behind white text (Stop) */
+  --danger: #b3261e;
   --ok: #58d68d;
   --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
 }
@@ -40,6 +42,19 @@ body {
   max-width: 860px;
   margin: 0 auto;
   padding: 0 1rem;
+}
+
+/* visually hidden, read by screen readers (the answer live region) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---- header ---- */
@@ -96,6 +111,7 @@ select {
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
   border: 1px solid var(--border);
+  background: transparent;
 }
 
 .badge {
@@ -146,6 +162,15 @@ select {
   color: var(--error);
 }
 
+/* the "disconnected" pill is a button: click to reconnect */
+button.status.off {
+  cursor: pointer;
+}
+
+button.status.off:hover {
+  border-color: var(--error);
+}
+
 /* deep-health indicator (/api/health): green ok, amber degraded, gray unknown */
 .health-dot {
   width: 0.65rem;
@@ -178,6 +203,14 @@ button:disabled {
   cursor: default;
 }
 
+/* keyboard focus must be visible on every control, link-styled ones included */
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 button.ghost {
   background: transparent;
   border: 1px solid var(--border);
@@ -202,9 +235,18 @@ button.ghost {
   margin-top: 4rem;
 }
 
-.empty code {
-  font-family: var(--mono);
-  font-size: 0.85em;
+/* shown while the reader has scrolled up and new tokens keep arriving */
+.jump-latest {
+  position: sticky;
+  bottom: 0.4rem;
+  align-self: center;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--panel);
+  color: var(--accent);
+  box-shadow: 0 4px 16px #0008;
 }
 
 .msg {
@@ -247,6 +289,21 @@ button.ghost {
   color: var(--accent);
 }
 
+/* copy-the-answer row under a finished assistant bubble */
+.bubble-actions {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  white-space: normal;
+}
+
+.bubble-actions .link {
+  color: var(--muted);
+}
+
+.bubble-actions .link:hover {
+  color: var(--accent);
+}
+
 /* per-turn stats line under an answer (from the post-final `turn` frame) */
 .turn-stats {
   margin-top: 0.45rem;
@@ -259,13 +316,7 @@ button.ghost {
 }
 
 .turn-stats .link {
-  background: none;
-  border: none;
-  color: var(--accent);
-  cursor: pointer;
-  padding: 0;
   margin-left: 0.5rem;
-  font: inherit;
 }
 
 /* "explain this turn" timeline (audit trail from /api/sessions/{id}/turns) */
@@ -327,6 +378,10 @@ button.ghost {
   text-align: center;
 }
 
+.error .link {
+  margin-left: 0.5rem;
+}
+
 /* ---- tool cards ---- */
 .tool-card {
   border: 1px dashed var(--border);
@@ -359,6 +414,12 @@ button.ghost {
   border-top: 1px solid var(--border);
 }
 
+.composer-field {
+  flex: 1;
+  position: relative;
+  display: flex;
+}
+
 textarea {
   flex: 1;
   resize: none;
@@ -373,6 +434,21 @@ textarea {
 textarea:focus,
 select:focus {
   outline: 1px solid var(--accent);
+}
+
+/* appears within 500 chars of the server's 8000-char cap */
+.char-count {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.35rem;
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.char-count.full {
+  color: var(--error);
 }
 
 /* ---- markdown ---- */
@@ -416,6 +492,32 @@ select:focus {
 .markdown pre code {
   padding: 0;
   background: transparent;
+}
+
+/* a fenced block: the <pre> plus its copy button (injected in lib/markdown.ts) */
+.code-block {
+  position: relative;
+  margin: 0.35rem 0;
+}
+
+.copy-code {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+.copy-code:hover,
+.copy-code:focus-visible {
+  opacity: 1;
+  color: var(--text);
 }
 
 .markdown ul,
