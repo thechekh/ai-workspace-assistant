@@ -1,8 +1,6 @@
 """RAG pipeline tests — hash embedder + in-memory Qdrant: no containers, no cost."""
 
-import httpx
 import pytest
-import respx
 from qdrant_client import AsyncQdrantClient
 
 from assistant.rag.chunking import chunk_markdown
@@ -12,7 +10,7 @@ from assistant.rag.rerank import LexicalReranker, query_overlap
 from assistant.rag.retriever import Retriever
 from assistant.rag.sparse import encode_sparse
 from assistant.rag.store import RetrievedChunk, VectorStore
-from tests.conftest import HermeticSettings
+from tests.conftest import HermeticSettings, MockHTTP
 
 SAMPLE_MD = """# Services
 
@@ -134,19 +132,22 @@ def test_lexical_reranker_orders_by_overlap():
 
 
 async def test_voyage_embedder_calls_api_with_auth():
-    with respx.mock(assert_all_called=True) as router:
-        route = router.post("https://api.voyageai.com/v1/embeddings").mock(
-            return_value=httpx.Response(
-                200, json={"data": [{"embedding": [0.1] * 1024}, {"embedding": [0.2] * 1024}]}
-            )
-        )
-        embedder = VoyageEmbedder(model="voyage-3", api_key="voyage-test-key")
+    http = MockHTTP()
+    route = http.post(
+        "https://api.voyageai.com/v1/embeddings",
+        json={"data": [{"embedding": [0.1] * 1024}, {"embedding": [0.2] * 1024}]},
+    )
+    embedder = VoyageEmbedder(
+        model="voyage-3", api_key="voyage-test-key", transport=http.transport()
+    )
+    try:
         vectors = await embedder.embed(["one", "two"])
+    finally:
+        await embedder.aclose()
 
     assert len(vectors) == 2
     assert len(vectors[0]) == embedder.dimension == 1024
-    request = route.calls.last.request
-    assert request.headers["Authorization"] == "Bearer voyage-test-key"
+    assert route.last.headers["Authorization"] == "Bearer voyage-test-key"
 
 
 def test_build_embedder_requires_voyage_key():

@@ -6,9 +6,12 @@ not import from each other (that couples unrelated suites and executes a
 """
 
 import asyncio
+import re
 import socket
+from collections.abc import Callable
 from typing import Any
 
+import httpx2
 import pytest
 from fakeredis import FakeAsyncRedis
 from fastapi import FastAPI
@@ -74,6 +77,95 @@ def no_outbound_network(monkeypatch: pytest.MonkeyPatch) -> None:
         return real_connect(self, address, *args, **kwargs)
 
     monkeypatch.setattr(socket.socket, "connect", guarded)
+
+
+class Route:
+    """One mocked endpoint, and every request that reached it."""
+
+    def __init__(
+        self,
+        method: str,
+        pattern: re.Pattern[str],
+        respond: Callable[[httpx2.Request], httpx2.Response],
+    ):
+        self.method = method
+        self.pattern = pattern
+        self.respond = respond
+        self.requests: list[httpx2.Request] = []
+
+    @property
+    def last(self) -> httpx2.Request:
+        """The most recent request here — for asserting what went over the wire."""
+        if not self.requests:
+            raise AssertionError(f"nothing requested {self.pattern.pattern}")
+        return self.requests[-1]
+
+
+class MockHTTP:
+    """A tiny router over `httpx2.MockTransport`.
+
+    The project's own HTTP calls moved to httpx2 with the OpenAI and MCP SDKs,
+    and `respx` only patches httpx — so mocking happens by *injecting* a client
+    through the same `client=` seam the tools already expose, rather than by
+    patching a module globally. Routes match in the order they were added.
+    """
+
+    def __init__(self) -> None:
+        self.routes: list[Route] = []
+        self.unmatched: list[httpx2.Request] = []
+
+    def route(
+        self,
+        method: str,
+        url: str,
+        *,
+        json: object = None,
+        text: str | None = None,
+        status: int = 200,
+        headers: dict[str, str] | None = None,
+        regex: bool = False,
+        respond: Callable[[httpx2.Request], httpx2.Response] | None = None,
+    ) -> Route:
+        """Answer `method` calls to `url` (exact, or a pattern when `regex`).
+
+        `respond` takes over entirely when the answer depends on the request.
+        """
+        pattern = re.compile(url if regex else f"^{re.escape(url)}$")
+
+        def fixed(_: httpx2.Request) -> httpx2.Response:
+            if text is not None:
+                return httpx2.Response(status, text=text, headers=headers)
+            if json is not None:
+                return httpx2.Response(status, json=json, headers=headers)
+            return httpx2.Response(status, headers=headers)
+
+        entry = Route(method.upper(), pattern, respond or fixed)
+        self.routes.append(entry)
+        return entry
+
+    def get(self, url: str, **kwargs: object) -> Route:
+        return self.route("GET", url, **kwargs)  # type: ignore[arg-type]
+
+    def post(self, url: str, **kwargs: object) -> Route:
+        return self.route("POST", url, **kwargs)  # type: ignore[arg-type]
+
+    def _handle(self, request: httpx2.Request) -> httpx2.Response:
+        for route in self.routes:
+            if route.method == request.method and route.pattern.match(str(request.url)):
+                route.requests.append(request)
+                return route.respond(request)
+        # Loud rather than silent: an unrouted call in an offline suite is a
+        # test that would otherwise have gone to the internet.
+        self.unmatched.append(request)
+        return httpx2.Response(404, text=f"no mock route for {request.url}")
+
+    def transport(self) -> httpx2.MockTransport:
+        """The wire, for a caller that builds its own client (headers included)."""
+        return httpx2.MockTransport(self._handle)
+
+    def client(self, **kwargs: object) -> httpx2.AsyncClient:
+        """A client whose every request is served from these routes."""
+        return httpx2.AsyncClient(transport=self.transport(), **kwargs)  # type: ignore[arg-type]
 
 
 async def build_seeded_retriever_async(

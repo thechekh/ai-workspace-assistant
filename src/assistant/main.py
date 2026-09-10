@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import httpx
+import httpx2
 import redis.asyncio as aioredis
 import structlog
 from fastapi import FastAPI, Response
@@ -81,7 +81,7 @@ class Runtime:
     memory: ConversationMemory
     rate_limiter: RateLimiter
     agents: dict[str, AgentBackend]
-    http_client: httpx.AsyncClient
+    http_client: httpx2.AsyncClient
     qdrant: AsyncQdrantClient | None = None
     # The document store backing /api/documents; None when a retriever was
     # injected (tests) and there is no live Qdrant to write to.

@@ -55,20 +55,27 @@ SDK use its own default." Streaming, tool calls, and usage reporting ride the
 same code path everywhere.
 *Where:* [llm/client.py](../../src/assistant/llm/client.py) (`PROVIDER_BASE_URLS`).
 
-### `httpx` and `httpx2` — two HTTP clients, on purpose
-Our own outbound calls (`fetch_url`, the GitHub reads, the Voyage embedder)
-use **httpx**. The OpenAI SDK moved its transport to **httpx2** in 3.0 and
-the MCP SDK did the same in 2.0, and the two libraries' types are not
-interchangeable — the timeout handed to `AsyncOpenAI` and the client handed
-to `streamable_http_client` must be httpx2's, or the call fails a type check
-at the boundary. Staying on httpx for our own code is what keeps `respx`
-usable for mocking it; httpx2 gets an `httpx2.MockTransport` in the tests
-that need it. Both are declared in `pyproject.toml` rather than relied on
-transitively, because both are imported directly.
-*Where:* [llm/client.py](../../src/assistant/llm/client.py) and
-[mcp/registry.py](../../src/assistant/mcp/registry.py) (httpx2);
-[agent/tools/fetch.py](../../src/assistant/agent/tools/fetch.py) and
-[rag/repo.py](../../src/assistant/rag/repo.py) (httpx).
+### `httpx2` — one HTTP client for everything we write
+Every outbound call this project makes — `fetch_url`, the GitHub reads, the
+Voyage embedder, the pooled client in `build_runtime` — goes through
+**httpx2**, the same library the OpenAI SDK moved to in 3.0 and the MCP SDK
+in 2.0. That matters because those SDKs type-check what they are handed: the
+timeout given to `AsyncOpenAI` and the client given to
+`streamable_http_client` must be httpx2's, and a mismatch is a type error,
+not a conversion. Speaking one dialect removes the boundary entirely.
+
+`httpx` 0.x is still installed — `langchain-core`, `langgraph-sdk` and
+`qdrant-client` all require it — but nothing we write imports it. The visible
+consequence is in the tests: `respx` only patches httpx, so HTTP is mocked
+with `httpx2.MockTransport` through `MockHTTP` in
+[tests/conftest.py](../../tests/conftest.py), injected via the same `client=`
+parameter the app uses for connection pooling rather than by patching a
+module globally.
+*Where:* [agent/tools/fetch.py](../../src/assistant/agent/tools/fetch.py),
+[rag/repo.py](../../src/assistant/rag/repo.py),
+[rag/embeddings.py](../../src/assistant/rag/embeddings.py),
+[llm/client.py](../../src/assistant/llm/client.py),
+[mcp/registry.py](../../src/assistant/mcp/registry.py).
 
 ### Redis (redis-py asyncio) / fakeredis
 Session transcripts, the rolling summary, and the per-turn audit trail — all

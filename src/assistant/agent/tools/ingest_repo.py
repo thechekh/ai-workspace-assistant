@@ -10,7 +10,7 @@ plus one additive, rate-limited exception", and the allowlist test in
 `test_review_regressions.py` pins exactly that.
 """
 
-import httpx
+import httpx2
 import structlog
 
 from assistant.agent.tools.base import Tool
@@ -60,7 +60,7 @@ def make_ingest_repo(
     settings: Settings,
     store: VectorStore,
     *,
-    client: httpx.AsyncClient | None = None,
+    client: httpx2.AsyncClient | None = None,
     embedder: Embedder | None = None,
 ) -> Tool:
     """`client` is the app's pooled outbound client and `embedder` the one the
@@ -76,7 +76,7 @@ def make_ingest_repo(
         token = settings.github_token.get_secret_value() if settings.github_token else None
 
         owns_client = client is None
-        http = client or httpx.AsyncClient(timeout=30)
+        http = client or httpx2.AsyncClient(timeout=30)
         try:
             documents, skipped = await fetch_repo_documents(
                 repo, client=http, token=token, ref=ref, include_code=include_code

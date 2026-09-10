@@ -12,7 +12,7 @@ re-ingesting the same repo replaces exactly its own chunks.
 
 import re
 
-import httpx
+import httpx2
 
 from assistant.rag.filetypes import is_code_path, is_doc_path
 
@@ -95,7 +95,7 @@ def _is_document(path: str, size: int | None, *, include_code: bool) -> str | No
 async def fetch_repo_documents(
     repo: str,
     *,
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     token: str | None = None,
     ref: str | None = None,
     max_files: int = MAX_FILES,
@@ -179,7 +179,7 @@ async def fetch_repo_file(
     repo: str,
     path: str,
     *,
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     token: str | None = None,
     ref: str | None = None,
 ) -> str:

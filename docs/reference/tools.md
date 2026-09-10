@@ -58,7 +58,7 @@ explains each stage and [metrics.md](metrics.md) measures them.
 | Parameters | `url` *(string, required)* — absolute http(s) URL |
 | Returns | readable text of the page, HTML stripped, capped at 8,000 characters. `github.com/{owner}/{repo}` and `github.com/{owner}` are answered from the GitHub API instead: description, language, stars, topics and the README's first 6,000 characters, or the account and its public repositories |
 | Errors | `error: only http(s) URLs are supported` · `error: refusing to fetch private or loopback addresses` · `error: <url> is image/png, not a text page` · `error: GET <url> returned HTTP <status>` · `error: could not fetch <url>: <why>` |
-| Implementation | [tools/fetch.py](../../src/assistant/agent/tools/fetch.py) — httpx, 15 s timeout, redirects followed and re-checked, body streamed and cut at 1 MB |
+| Implementation | [tools/fetch.py](../../src/assistant/agent/tools/fetch.py) — httpx2, 15 s timeout, redirects followed and re-checked, body streamed and cut at 1 MB |
 
 The loopback and private-range refusal judges address literals with the
 standard library's `ipaddress` (loopback, RFC 1918, link-local, carrier-grade

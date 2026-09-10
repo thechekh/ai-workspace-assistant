@@ -1,21 +1,19 @@
 """The hosted embedders, offline: the HTTP they send and how they batch.
 
-Two different fakes, because the two providers no longer share a transport.
-`VoyageEmbedder` is our own httpx code, so `respx` answers for it. The OpenAI
-SDK moved to **httpx2** in 3.0, which respx does not patch — an httpx2
-`MockTransport` stands in there instead. Getting that wrong is not a failing
-test but a silent live request, which is what `no_outbound_network` in
-conftest now catches.
+Both providers ride httpx2 — Voyage because our own code moved there with the
+SDKs, OpenAI because its SDK did in 3.0 — so both are answered by an httpx2
+`MockTransport`: `MockHTTP` from conftest for Voyage, whose client we want to
+build itself (auth header included), and a patched client factory for OpenAI,
+whose client the SDK owns. Getting this wrong is not a failing test but a
+silent live request, which is what `no_outbound_network` in conftest catches.
 
 These are the branches the offline `hash` default never exercises.
 """
 
 import json
 
-import httpx
 import httpx2
 import pytest
-import respx
 from openai import AsyncOpenAI
 from pydantic import SecretStr
 
@@ -25,7 +23,7 @@ from assistant.rag.embeddings import (
     VoyageEmbedder,
     build_embedder,
 )
-from tests.conftest import HermeticSettings
+from tests.conftest import HermeticSettings, MockHTTP
 
 
 def _openai_reply(request: httpx2.Request) -> httpx2.Response:
@@ -78,38 +76,35 @@ async def test_openai_embedder_batches_128_texts_per_request(monkeypatch: pytest
     assert [len(json.loads(request.content)["input"]) for request in requests] == [128, 2]
 
 
-@respx.mock
 async def test_voyage_embedder_sends_the_token_and_batches():
-    def reply(request: httpx.Request) -> httpx.Response:
-        import json
-
+    def reply(request: httpx2.Request) -> httpx2.Response:
         inputs = json.loads(request.content)["input"]
-        return httpx.Response(
+        return httpx2.Response(
             200, json={"data": [{"embedding": [0.5, 0.5]} for _ in inputs], "model": "voyage-3"}
         )
 
-    route = respx.post("https://api.voyageai.com/v1/embeddings").mock(side_effect=reply)
-    embedder = VoyageEmbedder(model="voyage-3", api_key="pa-test")
+    http = MockHTTP()
+    route = http.post("https://api.voyageai.com/v1/embeddings", respond=reply)
+    embedder = VoyageEmbedder(model="voyage-3", api_key="pa-test", transport=http.transport())
     try:
         vectors = await embedder.embed(["a"] * 129)
     finally:
         await embedder.aclose()
 
     assert len(vectors) == 129
-    assert route.call_count == 2
-    assert route.calls[0].request.headers["authorization"] == "Bearer pa-test"
+    assert len(route.requests) == 2
+    assert route.requests[0].headers["authorization"] == "Bearer pa-test"
+    assert [len(json.loads(r.content)["input"]) for r in route.requests] == [128, 1]
     assert embedder.dimension == 1024
     assert VoyageEmbedder(model="voyage-3-lite", api_key="x").dimension == 512
 
 
-@respx.mock
 async def test_voyage_embedder_raises_on_provider_errors():
-    respx.post("https://api.voyageai.com/v1/embeddings").mock(
-        return_value=httpx.Response(401, json={"detail": "bad key"})
-    )
-    embedder = VoyageEmbedder(model="voyage-3", api_key="wrong")
+    http = MockHTTP()
+    http.post("https://api.voyageai.com/v1/embeddings", status=401, json={"detail": "bad key"})
+    embedder = VoyageEmbedder(model="voyage-3", api_key="wrong", transport=http.transport())
     try:
-        with pytest.raises(httpx.HTTPStatusError):
+        with pytest.raises(httpx2.HTTPStatusError):
             await embedder.embed(["a"])
     finally:
         await embedder.aclose()

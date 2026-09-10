@@ -36,7 +36,7 @@ Modern Python stack for the bench project. For each area: the chosen technology,
 | Short-term memory | **Redis** + conversation summarization | in-process dicts, Postgres | Spec'd; survives restarts, TTLs for sessions; also holds the audit trail and the rate-limit windows |
 | Background jobs | **none** (taskiq removed) | taskiq, arq, Celery, Dramatiq, RQ | Chosen, built, then removed — nothing left to schedule; see §Background jobs |
 | Observability | **Logfire + Langfuse combined** via OpenTelemetry | Logfire alone, Langfuse alone | Both are OTel-based so they compose; alone, either loses one view (Logfire the LLM cost/prompt side, Langfuse the app-latency side) — see §Observability |
-| Testing | **pytest + pytest-asyncio + httpx + respx** + golden RAG evals | — | Standard modern stack |
+| Testing | **pytest + pytest-asyncio + httpx2 mock transports** + golden RAG evals | — | Standard modern stack; respx was dropped when the SDKs moved to httpx2 |
 | Frontend | **Vue 3 + Vite + TypeScript** | single-file HTML, Streamlit, React | User preference; real SPA experience with WS streaming |
 | Containerization | **Docker Compose** | k8s (overkill) | One command brings up the app, Qdrant and Redis, plus Jaeger/Prometheus/Grafana behind a profile |
 
@@ -267,8 +267,8 @@ Honest caveat: there is overlap, and two dashboards is a cost in attention. If i
 ✅ Agreed as proposed:
 
 - **pytest + pytest-asyncio** — async tests throughout.
-- **httpx.AsyncClient / TestClient** — WS endpoint tests (connect, send, assert typed frames).
-- **respx** — mock LLM HTTP calls; agents are tested with scripted model responses (tool-call → result → final) so tests are fast, free, and deterministic.
+- **TestClient** — WS endpoint tests (connect, send, assert typed frames).
+- **`httpx2.MockTransport`**, routed by `MockHTTP` in `tests/conftest.py` — mock HTTP calls; agents are tested with scripted model responses (tool-call → result → final) so tests are fast, free, and deterministic. (Originally respx, dropped when the OpenAI and MCP SDKs moved to httpx2, which respx does not patch.)
 - **Golden-question eval set** (~20–30 Q/A pairs with expected source chunks) — reused for: RAG regression testing, the embedding comparison, and the agent-backend comparison. Run in CI on a small subset; full run manually/nightly.
 
 ---

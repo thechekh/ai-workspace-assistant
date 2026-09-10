@@ -18,7 +18,7 @@ import hashlib
 import math
 from typing import Protocol
 
-import httpx
+import httpx2
 from openai import AsyncOpenAI
 
 from assistant.config import Settings
@@ -85,15 +85,24 @@ class OpenAIEmbedder:
 
 
 class VoyageEmbedder:
-    """Voyage AI embeddings over raw HTTP (respx-testable, no extra SDK dep)."""
+    """Voyage AI embeddings over raw HTTP — no extra SDK dependency."""
 
     _ENDPOINT = "https://api.voyageai.com/v1/embeddings"
 
-    def __init__(self, model: str, api_key: str) -> None:
+    def __init__(
+        self, model: str, api_key: str, *, transport: httpx2.AsyncBaseTransport | None = None
+    ) -> None:
         self.model_id = model
         # voyage-3 family -> 1024 dims; the -lite variant -> 512
         self.dimension = 512 if "lite" in model else 1024
-        self._http = httpx.AsyncClient(timeout=60, headers={"Authorization": f"Bearer {api_key}"})
+        # A transport rather than a whole client, so the auth header and the
+        # timeout below stay this class's business and a test can still see
+        # exactly what it put on the wire.
+        self._http = httpx2.AsyncClient(
+            timeout=60,
+            headers={"Authorization": f"Bearer {api_key}"},
+            transport=transport,
+        )
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         vectors: list[list[float]] = []

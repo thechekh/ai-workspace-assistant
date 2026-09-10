@@ -4,7 +4,7 @@ import html
 import ipaddress
 import re
 
-import httpx
+import httpx2
 
 from assistant.agent.tools.base import Tool
 from assistant.rag.repo import GITHUB_RAW, github_headers
@@ -73,11 +73,11 @@ def is_blocked_host(host: str) -> bool:
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
 
 
-class BlockedRedirect(httpx.HTTPError):
+class BlockedRedirect(httpx2.HTTPError):
     """A redirect pointed somewhere the initial-URL check would have refused."""
 
 
-async def _refuse_internal_redirects(response: httpx.Response) -> None:
+async def _refuse_internal_redirects(response: httpx2.Response) -> None:
     """Re-check the target of every redirect, not just the URL we were given.
 
     Validating only the first URL is the classic way an SSRF guard gets walked
@@ -88,7 +88,7 @@ async def _refuse_internal_redirects(response: httpx.Response) -> None:
     if not response.has_redirect_location:
         return
     target = response.headers.get("location", "")
-    host = httpx.URL(response.url.join(target)).host or ""
+    host = httpx2.URL(response.url.join(target)).host or ""
     if is_blocked_host(host):
         raise BlockedRedirect(f"redirect to a private or loopback address ({host}) refused")
 
@@ -113,7 +113,7 @@ def _is_textual(content_type: str) -> bool:
 
 
 async def _github_repo_summary(
-    client: httpx.AsyncClient, owner: str, repo: str, token: str | None
+    client: httpx2.AsyncClient, owner: str, repo: str, token: str | None
 ) -> str | None:
     headers = github_headers(token)
     meta = await client.get(f"https://api.github.com/repos/{owner}/{repo}", headers=headers)
@@ -136,7 +136,7 @@ async def _github_repo_summary(
 
 
 async def _github_user_summary(
-    client: httpx.AsyncClient, owner: str, token: str | None
+    client: httpx2.AsyncClient, owner: str, token: str | None
 ) -> str | None:
     headers = github_headers(token)
     user = await client.get(f"https://api.github.com/users/{owner}", headers=headers)
@@ -165,7 +165,7 @@ async def _github_user_summary(
     )
 
 
-async def _read_page(http: httpx.AsyncClient, url: str, max_bytes: int) -> str:
+async def _read_page(http: httpx2.AsyncClient, url: str, max_bytes: int) -> str:
     """GET a page, decoding at most `max_bytes` of it; the rest is never read."""
     async with http.stream("GET", url) as response:
         if response.status_code >= 400:
@@ -182,11 +182,11 @@ async def _read_page(http: httpx.AsyncClient, url: str, max_bytes: int) -> str:
     return strip_html(text) if "html" in content_type else text
 
 
-def new_http_client() -> httpx.AsyncClient:
+def new_http_client() -> httpx2.AsyncClient:
     """The shared outbound client. Created once per app so calls reuse the
     connection pool instead of paying a TCP+TLS handshake each time (the
     GitHub path makes two requests)."""
-    return httpx.AsyncClient(
+    return httpx2.AsyncClient(
         timeout=15,
         follow_redirects=True,
         headers={"User-Agent": "ai-workspace-assistant/0.1"},
@@ -198,7 +198,7 @@ def new_http_client() -> httpx.AsyncClient:
 
 def make_fetch_url(
     *,
-    client: httpx.AsyncClient | None = None,
+    client: httpx2.AsyncClient | None = None,
     max_chars: int = _FETCH_MAX_CHARS,
     max_bytes: int = _FETCH_MAX_BYTES,
     github_token: str | None = None,
@@ -211,7 +211,7 @@ def make_fetch_url(
         url = str(arguments.get("url", "")).strip()
         if not url.startswith(("http://", "https://")):
             return "error: only http(s) URLs are supported"
-        if is_blocked_host(httpx.URL(url).host or ""):
+        if is_blocked_host(httpx2.URL(url).host or ""):
             return "error: refusing to fetch private or loopback addresses"
 
         owned = client is None
@@ -232,7 +232,7 @@ def make_fetch_url(
             if text.startswith("error:"):
                 return text
             return text.strip()[:max_chars] or "(the page has no extractable text)"
-        except httpx.HTTPError as exc:
+        except httpx2.HTTPError as exc:
             return f"error: could not fetch {url}: {exc}"
         finally:
             if owned:

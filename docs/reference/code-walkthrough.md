@@ -248,7 +248,7 @@ The pipeline, in order, with this turn's timings:
    `POST …/v1/embeddings` at `11:51:49.605`, most of the retrieval's second;
    offline, [`HashEmbedder`](../../src/assistant/rag/embeddings.py#L39) does
    signed feature hashing into 512 dimensions, free and deterministic.
-   [`build_embedder`](../../src/assistant/rag/embeddings.py#L113) chooses from
+   [`build_embedder`](../../src/assistant/rag/embeddings.py#L122) chooses from
    config.
 2. **Sparse-encode it** ([`sparse.py`](../../src/assistant/rag/sparse.py)),
    with a tokenizer that splits `completedPercentage` into its words so

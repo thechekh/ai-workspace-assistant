@@ -10,9 +10,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "redis>=5.2",
-    # 3.0 moved the SDK's own transport to httpx2, which is why respx (which
-    # patches httpx 0.x) cannot intercept it — see tests/conftest.py.
-    "openai>=3.0",
+    "openai>=3.0",  # 3.0 moved the SDK's own transport to httpx2
     "qdrant-client>=1.12",
     # 2.0 renamed the server class back: FastMCP -> MCPServer, under
     # mcp.server.mcpserver. The client half (ClientSession, stdio_client,
@@ -28,12 +26,11 @@ dependencies = [
     "structlog>=24.4",
     "prometheus-client>=0.20",
     "fakeredis>=2.26",  # ASSISTANT_REDIS_URL=fakeredis:// is a documented runtime mode
-    "httpx>=0.27",  # fetch_url tool + Voyage embedder (was only a transitive dep)
-    # Two HTTP clients on purpose, not by accident: the OpenAI SDK (3.0) and
-    # the MCP SDK (2.0) both moved to httpx2, and their types are not
-    # interchangeable with httpx's, so the timeout we hand OpenAI and the
-    # client we hand MCP must be httpx2's. Our own outbound calls stay on
-    # httpx, where `respx` can still mock them.
+    # One HTTP client for everything we write. The OpenAI SDK (3.0) and the
+    # MCP SDK (2.0) both moved to httpx2 and type-check what they are handed,
+    # so our own calls speak the same dialect rather than converting at each
+    # boundary. `httpx` 0.x is still in the tree — langchain-core, langgraph
+    # and qdrant-client require it — but nothing we write imports it.
     "httpx2>=2.12",
     "python-multipart>=0.0.9",  # multipart uploads for POST /api/documents
 ]
@@ -57,20 +54,25 @@ evals = [
 dev = [
     "ruff>=0.8",
     # Pinned, not floated: pyright-python downloads whatever npm version the
-    # range allows and warns on stderr when a newer one exists, so a floating
-    # pin makes CI output noisy and the type check non-reproducible.
+    # range allows, so a floating pin makes the type check non-reproducible —
+    # a new release could fail the build with nothing in the diff to explain
+    # it. It still checks npm and warns on stderr when a newer version exists;
+    # CI sets PYRIGHT_PYTHON_IGNORE_WARNINGS=1 to keep that out of the log.
     "pyright==1.1.413",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
+    # No HTTP-mocking library: respx patches httpx 0.x and everything we write
+    # is on httpx2, so `MockHTTP` in tests/conftest.py routes requests over
+    # `httpx2.MockTransport` instead — injected through the same `client=`
+    # seam the app uses for pooling, rather than patching a module globally.
+    "pre-commit>=4.0",
+    "pyyaml>=6.0",
+    "types-pyyaml>=6.0",
     # `-n 4` runs the suite in ~16s vs ~26s serial. Deliberately not in
     # addopts: interleaved output makes a failing test harder to read, and
     # `-n auto` is *slower* on a many-core machine (12 workers each pay
     # interpreter + fixture startup for a suite that only lasts 26s).
-    "respx>=0.21",
-    "pre-commit>=4.0",
-    "pyyaml>=6.0",
-    "types-pyyaml>=6.0",
     "pytest-xdist>=3.8.0",
 ]
 

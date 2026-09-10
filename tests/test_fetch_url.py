@@ -1,11 +1,12 @@
 """fetch_url tool + search_docs relevance gate (the 'Chinese chunks' fixes).
 
-httpx is mocked — no network. The gate tests use the seeded in-memory
-retriever from conftest.
+Every request is served by `MockHTTP` (conftest) over an httpx2 mock
+transport, handed to the tool through the `client=` seam the app uses for
+connection pooling — so nothing reaches the network and the routes record
+what went out. The gate tests use the seeded in-memory retriever.
 """
 
 import json
-from typing import ClassVar
 
 import pytest
 
@@ -13,7 +14,7 @@ from assistant.agent.base import ChatMessage
 from assistant.agent.tools import NO_RELEVANT_DOCS, make_fetch_url, make_search_docs, strip_html
 from assistant.llm.client import FakeLLM, ToolCallRequest, ToolSpec
 from assistant.rag.rerank import query_overlap
-from tests.conftest import build_seeded_retriever_async
+from tests.conftest import MockHTTP, build_seeded_retriever_async
 
 # --- relevance gate -------------------------------------------------------------
 
@@ -46,75 +47,6 @@ async def test_search_docs_still_returns_relevant_chunks():
 
 
 # --- fetch_url ------------------------------------------------------------------
-
-
-class FakeResponse:
-    def __init__(self, status_code=200, json_data=None, text="", headers=None):
-        self.status_code = status_code
-        self._json = json_data
-        self.text = text
-        self.headers = headers or {}
-        self.charset_encoding = None
-
-    def json(self):
-        return self._json
-
-    async def aiter_bytes(self):
-        """The streamed form the page reader consumes, in small pieces."""
-        data = self.text.encode()
-        for start in range(0, len(data), 1024):
-            yield data[start : start + 1024]
-
-
-class _StreamContext:
-    def __init__(self, response: FakeResponse) -> None:
-        self._response = response
-
-    async def __aenter__(self) -> FakeResponse:
-        return self._response
-
-    async def __aexit__(self, *exc) -> bool:
-        return False
-
-
-class FakeAsyncClient:
-    routes: ClassVar[dict[str, FakeResponse]] = {}
-    calls: ClassVar[list[tuple[str, dict]]] = []
-
-    def __init__(self, **kwargs):
-        pass
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *exc):
-        return False
-
-    def _route(self, url: str) -> FakeResponse:
-        for prefix, response in type(self).routes.items():
-            if url.startswith(prefix):
-                return response
-        return FakeResponse(status_code=404)
-
-    async def get(self, url, **kwargs):
-        type(self).calls.append((url, kwargs))
-        return self._route(url)
-
-    def stream(self, method, url, **kwargs):
-        type(self).calls.append((url, kwargs))
-        return _StreamContext(self._route(url))
-
-    async def aclose(self):
-        """make_fetch_url closes any client it created itself."""
-        return
-
-
-@pytest.fixture
-def fake_http(monkeypatch: pytest.MonkeyPatch):
-    FakeAsyncClient.routes = {}
-    FakeAsyncClient.calls = []
-    monkeypatch.setattr("httpx.AsyncClient", FakeAsyncClient)
-    return FakeAsyncClient
 
 
 async def test_fetch_url_rejects_non_http_and_private_hosts():
@@ -162,102 +94,118 @@ def test_public_hosts_are_allowed(host: str):
     assert not is_blocked_host(host), host
 
 
-async def test_fetch_url_stops_reading_at_the_byte_cap(fake_http):
+async def test_fetch_url_stops_reading_at_the_byte_cap():
     """A multi-gigabyte page must not be buffered whole to return 8k characters."""
-    fake_http.routes = {
-        "https://example.com/huge": FakeResponse(
-            text="x" * 50_000, headers={"content-type": "text/plain"}
-        )
-    }
-    tool = make_fetch_url(max_bytes=4096, max_chars=100)
-    result = await tool.handler({"url": "https://example.com/huge"})
+    http = MockHTTP()
+    http.get(
+        "https://example.com/huge",
+        text="x" * 50_000,
+        headers={"content-type": "text/plain"},
+    )
+    async with http.client() as client:
+        tool = make_fetch_url(client=client, max_bytes=4096, max_chars=100)
+        result = await tool.handler({"url": "https://example.com/huge"})
     assert result == "x" * 100
 
 
-async def test_fetch_url_refuses_binary_content_before_reading_it(fake_http):
-    fake_http.routes = {
-        "https://example.com/photo": FakeResponse(
-            text="not really bytes", headers={"content-type": "image/png"}
-        )
-    }
-    tool = make_fetch_url()
-    result = await tool.handler({"url": "https://example.com/photo"})
+async def test_fetch_url_refuses_binary_content_before_reading_it():
+    http = MockHTTP()
+    http.get(
+        "https://example.com/photo",
+        text="not really bytes",
+        headers={"content-type": "image/png"},
+    )
+    async with http.client() as client:
+        tool = make_fetch_url(client=client)
+        result = await tool.handler({"url": "https://example.com/photo"})
     assert result.startswith("error:")
     assert "image/png" in result
 
 
-async def test_fetch_url_authenticates_the_github_fast_path_with_the_token(fake_http):
-    fake_http.routes = {
-        "https://api.github.com/repos/acme/private": FakeResponse(
-            json_data={"full_name": "acme/private", "description": "d"}
-        ),
-    }
-    tool = make_fetch_url(github_token="ghp_secret")
-    await tool.handler({"url": "https://github.com/acme/private"})
-    sent = [kwargs.get("headers", {}) for url, kwargs in fake_http.calls if "api.github" in url]
-    assert sent, "the GitHub fast path must go through the API"
-    assert all(headers.get("Authorization") == "Bearer ghp_secret" for headers in sent)
-    assert all(headers.get("X-GitHub-Api-Version") for headers in sent)
+async def test_fetch_url_authenticates_the_github_fast_path_with_the_token():
+    http = MockHTTP()
+    meta = http.get(
+        "https://api.github.com/repos/acme/private",
+        json={"full_name": "acme/private", "description": "d"},
+    )
+    readme = http.get("https://api.github.com/repos/acme/private/readme", text="# private")
+    async with http.client() as client:
+        tool = make_fetch_url(client=client, github_token="ghp_secret")
+        await tool.handler({"url": "https://github.com/acme/private"})
+
+    for route in (meta, readme):
+        assert route.last.headers["Authorization"] == "Bearer ghp_secret"
+        assert route.last.headers["X-GitHub-Api-Version"]
+    # The README is asked for as raw content, not as JSON about the file.
+    assert readme.last.headers["Accept"] == "application/vnd.github.raw+json"
 
 
-async def test_fetch_url_github_repo_uses_the_api(fake_http):
-    fake_http.routes = {
-        "https://api.github.com/repos/thechekh/awsomequiz-streamlit/readme": FakeResponse(
-            text="# AwsomeQuiz\nA Streamlit quiz app with AWS certification question banks."
-        ),
-        "https://api.github.com/repos/thechekh/awsomequiz-streamlit": FakeResponse(
-            json_data={
-                "full_name": "thechekh/awsomequiz-streamlit",
-                "description": "Quiz app",
-                "language": "Python",
-                "stargazers_count": 3,
-                "topics": ["streamlit"],
-                "pushed_at": "2026-07-01T10:00:00Z",
-            }
-        ),
-    }
-    tool = make_fetch_url()
-    result = await tool.handler({"url": "https://github.com/thechekh/awsomequiz-streamlit"})
+async def test_fetch_url_github_repo_uses_the_api():
+    http = MockHTTP()
+    http.get(
+        "https://api.github.com/repos/thechekh/awsomequiz-streamlit",
+        json={
+            "full_name": "thechekh/awsomequiz-streamlit",
+            "description": "Quiz app",
+            "language": "Python",
+            "stargazers_count": 3,
+            "topics": ["streamlit"],
+            "pushed_at": "2026-07-01T10:00:00Z",
+        },
+    )
+    http.get(
+        "https://api.github.com/repos/thechekh/awsomequiz-streamlit/readme",
+        text="# AwsomeQuiz\nA Streamlit quiz app with AWS certification question banks.",
+    )
+    async with http.client() as client:
+        tool = make_fetch_url(client=client)
+        result = await tool.handler({"url": "https://github.com/thechekh/awsomequiz-streamlit"})
     assert "thechekh/awsomequiz-streamlit" in result
     assert "Quiz app" in result
     assert "question banks" in result  # README content included
 
 
-async def test_fetch_url_github_account_lists_repos(fake_http):
-    fake_http.routes = {
-        "https://api.github.com/users/thechekh/repos": FakeResponse(
-            json_data=[
-                {"name": "awsomequiz-streamlit", "language": "Python", "description": "Quiz"},
-                {"name": "ai-workspace-assistant", "language": "Python", "description": None},
-            ]
-        ),
-        "https://api.github.com/users/thechekh": FakeResponse(
-            json_data={"login": "thechekh", "type": "User", "name": None, "public_repos": 2}
-        ),
-    }
-    tool = make_fetch_url()
-    result = await tool.handler({"url": "https://github.com/thechekh"})
+async def test_fetch_url_github_account_lists_repos():
+    http = MockHTTP()
+    http.get(
+        "https://api.github.com/users/thechekh",
+        json={"login": "thechekh", "type": "User", "name": None, "public_repos": 2},
+    )
+    http.get(
+        r"https://api\.github\.com/users/thechekh/repos\?.*",
+        json=[
+            {"name": "awsomequiz-streamlit", "language": "Python", "description": "Quiz"},
+            {"name": "ai-workspace-assistant", "language": "Python", "description": None},
+        ],
+        regex=True,
+    )
+    async with http.client() as client:
+        tool = make_fetch_url(client=client)
+        result = await tool.handler({"url": "https://github.com/thechekh"})
     assert "GitHub account thechekh" in result
     assert "awsomequiz-streamlit" in result
     assert "(no description)" in result
 
 
-async def test_fetch_url_strips_html_pages(fake_http):
-    fake_http.routes = {
-        "https://example.com/": FakeResponse(
-            text="<html><script>evil()</script><body><h1>Hello</h1> &amp; welcome</body></html>",
-            headers={"content-type": "text/html; charset=utf-8"},
-        )
-    }
-    tool = make_fetch_url()
-    result = await tool.handler({"url": "https://example.com/"})
+async def test_fetch_url_strips_html_pages():
+    http = MockHTTP()
+    http.get(
+        "https://example.com/",
+        text="<html><script>evil()</script><body><h1>Hello</h1> &amp; welcome</body></html>",
+        headers={"content-type": "text/html; charset=utf-8"},
+    )
+    async with http.client() as client:
+        tool = make_fetch_url(client=client)
+        result = await tool.handler({"url": "https://example.com/"})
     assert result == "Hello & welcome"
 
 
-async def test_fetch_url_reports_http_errors(fake_http):
-    fake_http.routes = {"https://example.com/gone": FakeResponse(status_code=500)}
-    tool = make_fetch_url()
-    result = await tool.handler({"url": "https://example.com/gone"})
+async def test_fetch_url_reports_http_errors():
+    http = MockHTTP()
+    http.get("https://example.com/gone", status=500)
+    async with http.client() as client:
+        tool = make_fetch_url(client=client)
+        result = await tool.handler({"url": "https://example.com/gone"})
     assert "HTTP 500" in result
 
 

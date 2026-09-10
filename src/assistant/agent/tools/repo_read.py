@@ -9,7 +9,7 @@ Read-only by construction: one GET against api.github.com with a validated
 owner/repo and path. The model never supplies a URL.
 """
 
-import httpx
+import httpx2
 import structlog
 
 from assistant.agent.tools.base import Tool
@@ -46,7 +46,7 @@ _PARAMETERS: dict[str, object] = {
 }
 
 
-def make_repo_read_file(settings: Settings, *, client: httpx.AsyncClient | None = None) -> Tool:
+def make_repo_read_file(settings: Settings, *, client: httpx2.AsyncClient | None = None) -> Tool:
     """`client` is the app's pooled outbound client (a private one is made per
     call without it — fine for tests and scripts)."""
 
@@ -59,7 +59,7 @@ def make_repo_read_file(settings: Settings, *, client: httpx.AsyncClient | None 
         token = settings.github_token.get_secret_value() if settings.github_token else None
 
         owns_client = client is None
-        http = client or httpx.AsyncClient(timeout=30)
+        http = client or httpx2.AsyncClient(timeout=30)
         try:
             text = await fetch_repo_file(repo, path, client=http, token=token, ref=ref)
         except RepoIngestError as exc:

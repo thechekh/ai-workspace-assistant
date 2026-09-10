@@ -10,7 +10,7 @@ import asyncio
 import hashlib
 import json
 
-import httpx
+import httpx2
 import pytest
 from fakeredis import FakeAsyncRedis
 from fastapi.testclient import TestClient
@@ -158,21 +158,21 @@ async def test_a_redirect_to_localhost_is_refused() -> None:
     """The classic bypass: a public URL passes the check, then 302s inward.
     169.254.169.254 is the cloud metadata address this protects in practice."""
     hops = {
-        "https://public.example/start": httpx.Response(
+        "https://public.example/start": httpx2.Response(
             302, headers={"location": "http://169.254.169.254/latest/meta-data/"}
         ),
-        "http://169.254.169.254/latest/meta-data/": httpx.Response(
+        "http://169.254.169.254/latest/meta-data/": httpx2.Response(
             200, text="iam/security-credentials/admin"
         ),
     }
 
-    def transport(request: httpx.Request) -> httpx.Response:
+    def transport(request: httpx2.Request) -> httpx2.Response:
         return hops[str(request.url)]
 
     from assistant.agent.tools.fetch import _refuse_internal_redirects
 
-    async with httpx.AsyncClient(
-        transport=httpx.MockTransport(transport),
+    async with httpx2.AsyncClient(
+        transport=httpx2.MockTransport(transport),
         follow_redirects=True,
         event_hooks={"response": [_refuse_internal_redirects]},
     ) as client:

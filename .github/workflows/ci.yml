@@ -34,7 +34,12 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      # The version is pinned in pyproject; pyright-python still checks npm on
+      # every run and prints "a new version is available" to stderr, which is
+      # noise in a log that should only ever say "0 errors".
       - run: uv run pyright
+        env:
+          PYRIGHT_PYTHON_IGNORE_WARNINGS: "1"
       # -n auto: the runner has 4 cores, which measured fastest. Locally `auto`
       # can be slower than `-n 4` on a many-core machine — see pyproject.
       - run: uv run pytest -q --cov --cov-report=term-missing -n auto

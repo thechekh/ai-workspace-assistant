@@ -64,11 +64,12 @@ in `ADOPTED` there (add a page to the list when you bring it up to standard).
   any broad handler or routine disconnects pollute the error metrics.
 - Importing `assistant.main` must stay side-effect free — the app is built
   lazily via module `__getattr__` so tests do not read a developer's `.env`.
-- **Two HTTP clients, deliberately.** The OpenAI SDK (3.0) and the MCP SDK
-  (2.0) moved to `httpx2`; our own outbound calls stay on `httpx`, where
-  `respx` can mock them. The types are not interchangeable — the timeout
-  handed to `AsyncOpenAI` and the client handed to `streamable_http_client`
-  must be httpx2's. Mock httpx2 with `httpx2.MockTransport`, not respx.
+- **`httpx2`, never `httpx`.** Everything we write uses httpx2 — the dialect
+  the OpenAI (3.0) and MCP (2.0) SDKs moved to, and they type-check what they
+  are handed. `httpx` 0.x is still in the tree via langchain/qdrant; importing
+  it in our code reintroduces a boundary that pyright will reject. There is no
+  `respx` (it patches httpx): mock with `MockHTTP` from `tests/conftest.py`,
+  injected through the `client=`/`transport=` seam.
 - A test that loses its mock used to reach the real provider silently. It
   cannot now: an autouse fixture in `tests/conftest.py` refuses any connect
   to a non-loopback address. If you see that error, fix the mock — do not

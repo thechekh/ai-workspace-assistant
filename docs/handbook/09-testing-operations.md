@@ -31,7 +31,7 @@ scripted provider errors. Map of the suite:
 | test_ws.py | WS protocol end-to-end **×3 backends**: streaming, history resume, tool loop, backend switch, bounded memory, zero-infra mode |
 | test_observability.py | `turn` frame, /metrics series, deep health (ok + degraded), audit trail timeline, InstrumentedLLM usage capture |
 | test_llm_errors.py | error mapping (429/401/404/5xx/network), 429 backoff, `stream_options` fallback, `tool_use_failed` retry + `failed_generation` salvage, leaked-tool-syntax parsing, cost table |
-| test_fetch_url.py | fetch_url (mocked httpx: GitHub repo/account/HTML/SSRF guard), relevance gate, duplicate-call guard, FakeLLM URL routing |
+| test_fetch_url.py | fetch_url (mocked over `httpx2.MockTransport`: GitHub repo/account/HTML/SSRF guard), relevance gate, duplicate-call guard, FakeLLM URL routing |
 | test_agent.py / test_tool_loop.py | the custom loop's mechanics |
 | test_pydantic_backend.py / test_langgraph_backend.py | runtime parity |
 | test_rag.py | chunking, hybrid search, rerank, ingest idempotency |

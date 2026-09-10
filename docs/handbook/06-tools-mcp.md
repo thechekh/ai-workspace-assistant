@@ -82,7 +82,7 @@ The hosted route needs authentication headers, which is why `MCPServerConfig`
 carries a **`headers`** field ([config.py](../../src/assistant/config.py)):
 without it the `http` transport can only reach unauthenticated servers, so the
 hosted GitHub server was unreachable regardless of the PAT. The headers become
-an `httpx` client handed to the transport in
+an `httpx2` client handed to the transport in
 [`MCPRegistry._connect`](../../src/assistant/mcp/registry.py), and
 `tests/test_mcp.py`'s `test_http_transport_sends_auth_headers` asserts the
 credential actually reaches the wire — with a fake transport that raises on
