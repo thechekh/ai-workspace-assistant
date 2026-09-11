@@ -149,10 +149,12 @@ empty window the assistant nonetheless remembered.
 ## 6. Reading it honestly
 
 - **One turn at a time, per connection.** A second `user_message` while one
-  is still running gets an `error` frame telling the client to wait or
+  is still streaming gets an `error` frame telling the client to wait or
   cancel first — there is no queueing of a second question behind the
   first. A deliberate simplicity trade, but a real limit of the protocol as
-  shipped, not just of the UI.
+  shipped, not just of the UI. (One arriving after `final` but before the
+  `turn` frame is the exception: the answer is delivered, so the server
+  waits out its own bookkeeping and then takes the message.)
 - **No typing indicators, read receipts, or multi-user presence.** The
   bidirectional channel makes them possible later; none of them exist
   today.
@@ -166,7 +168,7 @@ empty window the assistant nonetheless remembered.
   rather than hiding it (§4).
 - **All of the above is pinned by tests, not just read from the code.**
   Session resume, the cancel path and the invalid-frame handling in §2–§4
-  are each one assertion inside the 627-test offline suite (2026-09-10,
+  are each one assertion inside the 629-test offline suite (2026-09-10,
   `uv run pytest -q`) — the number this whole protocol has to keep passing
   against every time it changes.
 

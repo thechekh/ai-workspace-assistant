@@ -218,7 +218,7 @@ All variables use the `ASSISTANT_` prefix and map 1:1 to
 3. Open http://localhost:8000/ → send `ping` → tokens stream, a stats line
    appears under the answer. *That stats line is the same one every other
    chapter in this handbook points back to.*
-4. `uv run pytest -q` → `627 passed` (fully offline, ~25 s).
+4. `uv run pytest -q` → `629 passed` (fully offline, ~25 s).
 
 ## 7. Troubleshooting
 

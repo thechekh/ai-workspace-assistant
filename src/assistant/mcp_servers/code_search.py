@@ -27,9 +27,19 @@ _MAX_FILE_BYTES = 512_000
 
 
 def _iter_files() -> Iterator[Path]:
+    """Every searchable file, in the same order on every machine.
+
+    `os.walk` yields directory entries in filesystem order — alphabetical on
+    NTFS, hash order on ext4 — so an unsorted walk made `max_results` cut a
+    *different* set of hits on Linux than on Windows, and a query the model
+    had seen work on one box came back empty on another. Sorting both lists
+    pins the order to the paths themselves.
+    """
     for dirpath, dirnames, filenames in os.walk(ROOT):
-        dirnames[:] = [d for d in dirnames if d not in _IGNORED_DIRS and not d.startswith(".")]
-        for filename in filenames:
+        dirnames[:] = sorted(
+            d for d in dirnames if d not in _IGNORED_DIRS and not d.startswith(".")
+        )
+        for filename in sorted(filenames):
             path = Path(dirpath) / filename
             if path.suffix.lower() in _TEXT_EXTENSIONS and path.stat().st_size < _MAX_FILE_BYTES:
                 yield path

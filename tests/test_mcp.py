@@ -30,7 +30,7 @@ async def test_stdio_servers_expose_namespaced_tools_and_execute():
         # code search over this very repository
         search = next(tool for tool in tools if tool.name == "code__search_code")
         result = await search.handler({"pattern": "class CustomAgent"})
-        assert "custom.py" in result
+        assert "src/assistant/agent/backends/custom.py:" in result
 
         # path traversal is rejected
         read = next(tool for tool in tools if tool.name == "code__read_file")

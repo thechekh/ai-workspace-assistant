@@ -86,7 +86,12 @@ A second `user_message` while one is still answering is refused with an
 `error` frame rather than queued — the model is mid-answer and the history a
 queued question would be answered from is already stale. Verbatim, from
 [api/ws.py](../../src/assistant/api/ws.py): *"still answering the previous
-message — stop it first, or wait for it to finish"*.
+message — stop it first, or wait for it to finish"*. "Still answering" means
+exactly that: once `final` (or the `error` that replaces it) has gone out,
+a message that arrives before the `turn` frame is held for the few
+milliseconds of bookkeeping left and then answered, never refused — the
+answer is already on the user's screen, and telling them the turn was
+unfinished contradicted what they could see.
 
 **Server → client, in order per turn:**
 
@@ -337,7 +342,7 @@ About ninety seconds, offline or real profile:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `error: still answering the previous message — stop it first, or wait for it to finish` | a second `user_message` arrived while a turn was in flight | wait for the `turn` frame, or send `{"type": "cancel"}` first |
+| `error: still answering the previous message — stop it first, or wait for it to finish` | a second `user_message` arrived while the model was still streaming (before `final`) | wait for `final`, or send `{"type": "cancel"}` first |
 | Reopening a chat with `?session_id=` shows an empty transcript, but the model still remembers it | the client reconnected the socket but never called `GET /api/sessions/{id}/messages` | fetch the transcript over HTTP on reopen — the WebSocket resumes history for the model but never replays it to the client |
 | `?backend=does_not_exist` answers normally instead of erroring | unknown backend names silently fall back to the configured default | check the `backend` field of the `turn` frame to see what actually ran |
 | A long conversation's prompt-size figure stops climbing | `ConversationMemory` folded the tail into a rolling summary — this is the intended behavior, not a bug | inspect `session:{id}:summary` in Redis, or the token counts in `turn.summary` log lines (chapter 07) |

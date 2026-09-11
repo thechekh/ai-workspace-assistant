@@ -8,7 +8,7 @@ tiered, feature-by-feature script is
 [reference/testing.md](../reference/testing.md); this chapter is what runs
 without a human at the keyboard, plus how to run the platform once it does.
 
-## 1. The automated suite (627 tests, fully offline)
+## 1. The automated suite (629 tests, fully offline)
 
 ```sh
 uv run pytest -q          # ~26s. No network, no Docker, no keys.
@@ -68,8 +68,9 @@ uv run pytest tests/test_mcp.py -q -p no:cacheprovider          # 5 passed in 3.
 The second file is the one marked `slow` in the map above, and the 3.72 s is
 mostly real Python subprocesses actually starting and shaking hands over
 stdio — `test_stdio_servers_expose_namespaced_tools_and_execute` spawns both
-bundled MCP servers for real and asserts `code__search_code` finds
-`"custom.py"` when it greps this very repository for `class CustomAgent`.
+bundled MCP servers for real and asserts `code__search_code` returns the
+`src/assistant/agent/backends/custom.py` hit when it greps this very
+repository for `class CustomAgent`.
 
 Quality gates (CI, every push): `ruff check` · `ruff format --check` ·
 `pyright` (0 errors) · `pytest` with a 90% coverage floor — on Python 3.12
@@ -232,7 +233,7 @@ Three short demos, all offline except the third:
   model's *answers* less faithful (or the reverse) — the two are measured
   separately in `evals/`, and only the free, deterministic one runs on every
   push (§1).
-- **"627 tests" is a snapshot, not a promise.** New tests land between
+- **"629 tests" is a snapshot, not a promise.** New tests land between
   updates to this number; `tests/test_docs_consistency.py` tolerates drift
   up to 5% before failing the build, which is a deliberate looseness, not
   proof the count is current at this exact moment.

@@ -276,6 +276,51 @@ def test_second_message_mid_turn_is_refused():
         assert _receive_until(ws, "turn")[-1]["cancelled"] is True
 
 
+def test_message_sent_right_after_final_is_answered_not_refused(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """After `final` the turn's task is still alive for a moment — the summary
+    frame and the audit row are written after the answer goes out. A message
+    arriving in that window used to be refused as "still answering the
+    previous message", while everything on the user's screen said the answer
+    was done. CI reproduced it by scheduling luck on Linux; here the window is
+    held open on every OS by making the audit write slow.
+    """
+    from assistant.memory.session import SessionStore
+
+    real_append_turn = SessionStore.append_turn
+
+    async def slow_append_turn(self, session_id, record):
+        await asyncio.sleep(0.3)
+        await real_append_turn(self, session_id, record)
+
+    monkeypatch.setattr(SessionStore, "append_turn", slow_append_turn)
+
+    app = create_app(
+        HermeticSettings(llm_provider="fake", mcp_enabled=False),
+        redis_client=FakeAsyncRedis(decode_responses=True),
+        llm=FakeLLM(),
+        retriever=build_seeded_retriever(),
+    )
+    with TestClient(app) as client, client.websocket_connect("/chat") as ws:
+        session_id = ws.receive_json()["session_id"]
+        ws.send_json({"type": "user_message", "content": "first"})
+        assert collect_until_final(ws)[-1]["type"] == "final"
+
+        # Sent before the first turn's `turn` frame has even been written.
+        ws.send_json({"type": "user_message", "content": "second"})
+        events = _receive_until(ws, "turn")  # the first turn's summary, late
+        assert [e["type"] for e in events if e["type"] == "error"] == []
+        second = collect_until_final(ws)[-1]
+        assert second["type"] == "final"
+        assert "second" in second["content"]
+
+        # Both turns were audited, in order — the wait let the first finish.
+        _receive_until(ws, "turn")
+        turns = client.get(f"/api/sessions/{session_id}/turns").json()["turns"]
+        assert len(turns) == 2
+
+
 def test_cancelled_turn_is_audited_and_keeps_the_partial_answer():
     """The stopped turn is a real record: persisted, and visible to the next turn."""
     app = _slow_app(SlowLLM())

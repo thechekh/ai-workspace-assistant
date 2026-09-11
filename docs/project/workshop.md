@@ -47,7 +47,7 @@ for the hard questions.
    Pydantic AI vs LangGraph, switchable per session. *Slide source:*
    [backend-comparison.md](../reference/backend-comparison.md) — measured LoC
    **110 / 364 / 318** (`wc -l src/assistant/agent/backends/*.py`, 2026-09-10)
-   + verdict table. The same test suite passes on all three: **627 tests**
+   + verdict table. The same test suite passes on all three: **629 tests**
    (`uv run pytest -q`, 2026-09-10).
 5. **MCP** — why a protocol beats N bespoke integrations; stdio vs
    streamable HTTP; tool namespacing; graceful degradation. Our servers:

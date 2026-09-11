@@ -9,9 +9,35 @@ from assistant.mcp_servers import code_search, fake_github
 
 
 def test_search_code_finds_this_repository_and_caps_results():
-    hits = code_search.search_code("class CustomAgent", max_results=3)
-    assert "custom.py" in hits
-    assert len(hits.splitlines()) <= 3
+    """The hit must be the source file itself — not a doc line that happens
+    to *mention* `custom.py`, which is what a substring check used to accept
+    and what let an order-dependent result pass on one OS and fail on another."""
+    hits = code_search.search_code("class CustomAgent", max_results=50)
+    assert "src/assistant/agent/backends/custom.py:" in hits
+    assert "class CustomAgent:" in hits
+
+    capped = code_search.search_code("class CustomAgent", max_results=3)
+    assert len(capped.splitlines()) == 3
+
+
+def test_search_code_walks_files_in_a_fixed_order():
+    """A capped search returns the same hits every time, on every OS.
+
+    The walk sorts directory entries, so the order is a property of the
+    paths, not of the filesystem: a directory's files come first, in name
+    order, then its subdirectories, in name order. Without that, ext4's hash
+    order put `tests/` before `src/` and a three-hit cap never reached the
+    source file the query was for.
+    """
+
+    def paths_hit() -> list[str]:
+        hits = code_search.search_code("import", max_results=8).splitlines()
+        return [hit.split(":", 1)[0] for hit in hits]
+
+    first = paths_hit()
+    assert first == paths_hit()
+    # Root-level files are walked before any subdirectory.
+    assert "/" not in first[0]
 
 
 def test_search_code_reports_invalid_regex_and_misses_honestly():

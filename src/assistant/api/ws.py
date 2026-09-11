@@ -110,6 +110,9 @@ async def chat_endpoint(websocket: WebSocket) -> None:
     # Set when the user asks to stop, so the turn can tell a Stop from the
     # client going away: both cancel the task, only one is "stopped by the user".
     stop_requested = asyncio.Event()
+    # Set by the turn once nothing more will be streamed — `final` (or the
+    # error) is out and only the summary frame and the audit row remain.
+    settled = asyncio.Event()
     try:
         while True:
             raw = await websocket.receive_text()
@@ -134,21 +137,30 @@ async def chat_endpoint(websocket: WebSocket) -> None:
                     turn.cancel()
                 continue
 
-            if running:
-                # One turn at a time: the model is mid-answer and the history
-                # it is working from would be wrong for a second question.
-                await websocket.send_text(
-                    ErrorEvent(
-                        message="still answering the previous message — "
-                        "stop it first, or wait for it to finish"
-                    ).model_dump_json()
-                )
-                continue
+            if running and turn is not None:
+                if not settled.is_set():
+                    # One turn at a time: the model is mid-answer and the
+                    # history it is working from would be wrong for a second
+                    # question.
+                    await websocket.send_text(
+                        ErrorEvent(
+                            message="still answering the previous message — "
+                            "stop it first, or wait for it to finish"
+                        ).model_dump_json()
+                    )
+                    continue
+                # The answer is already on screen; what is left of the task
+                # is its summary frame and audit row, a few milliseconds.
+                # Refusing here told a user who sent promptly that the turn
+                # was unfinished when everything they could see said it was
+                # done — so the message waits for the bookkeeping instead.
+                await asyncio.wait([turn])
 
             if not await _within_rate_limit(websocket, limiter, settings, identity):
                 continue
 
             stop_requested = asyncio.Event()
+            settled = asyncio.Event()
             turn = asyncio.create_task(
                 _handle_turn(
                     websocket,
@@ -160,6 +172,7 @@ async def chat_endpoint(websocket: WebSocket) -> None:
                     incoming.content,
                     llm_model,
                     stop_requested,
+                    settled,
                 )
             )
             # Nobody awaits a finished turn, so without this an escaping
@@ -232,6 +245,7 @@ async def _handle_turn(
     user_message: str,
     llm_model: str,
     stop_requested: asyncio.Event,
+    settled: asyncio.Event,
 ) -> None:
     """One user message: run the agent, forward events, record telemetry + audit.
 
@@ -342,6 +356,9 @@ async def _handle_turn(
         finally:
             current_turn_stats.reset(stats_token)
 
+        # Every path that reaches here has finished streaming — normally,
+        # stopped, or failed — so the receive loop may accept the next message.
+        settled.set()
         summary = recorder.summary(cancelled=cancelled, failed=failed)
         TURNS_TOTAL.labels(backend=backend).inc()
         if not (cancelled or failed):
@@ -352,11 +369,14 @@ async def _handle_turn(
         if summary.cost_usd:
             COST_USD_TOTAL.labels(model=llm_model).inc(summary.cost_usd)
 
+        # The audit row goes to Redis *before* the `turn` frame: `turn` is
+        # the frame that ends a turn, so the UI can ask for the details it
+        # promises the moment it arrives — and the task has nothing left to
+        # do after sending it.
         try:
-            await websocket.send_text(summary.model_dump_json())
-        except Exception:  # noqa: BLE001 — the client may close right after `final`; the stats still get logged
-            logger.info("turn.summary_send_failed")
-
+            await store.append_turn(session_id, recorder.record(summary))
+        except Exception:
+            logger.warning("turn.audit_store_failed", exc_info=True)
         logger.info(
             "turn.summary",
             **summary.model_dump(exclude={"type", "turn_id", "backend"}),
@@ -364,6 +384,6 @@ async def _handle_turn(
             answer_chars=recorder.answer_chars,
         )
         try:
-            await store.append_turn(session_id, recorder.record(summary))
-        except Exception:
-            logger.warning("turn.audit_store_failed", exc_info=True)
+            await websocket.send_text(summary.model_dump_json())
+        except Exception:  # noqa: BLE001 — the client may close right after `final`; the stats still get logged
+            logger.info("turn.summary_send_failed")
